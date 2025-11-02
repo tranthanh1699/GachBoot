@@ -24,7 +24,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "dev_common.h"
+#include "svc_app.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -34,7 +34,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-CONFIG_LOG_TAG(MAIN, true); 
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -95,7 +95,7 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
-  // dev_uart_init(); 
+  svc_app_init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -107,8 +107,8 @@ int main(void)
     /* USER CODE BEGIN 3 */
 
     // CDC_Transmit_FS((uint8_t *)"Hello from STM32!\r\n", 19);
-    DBG_OUT_I("Test Log message from main loop.\n"); 
-    HAL_Delay(1000);
+    svc_app_run();
+    DEV_DELAY_MS(5);
   }
   /* USER CODE END 3 */
 }

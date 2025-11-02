@@ -43,6 +43,7 @@ add_subdirectory(components/dev_uart)
 add_subdirectory(components/dev_crc)
 add_subdirectory(components/dev_com_if)
 add_subdirectory(components/dev_com_tp)
+add_subdirectory(service/svc_app)
 
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
@@ -77,4 +78,5 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
     dev_crc
     dev_com_if
     dev_com_tp
+    svc_app
 )

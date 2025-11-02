@@ -36,9 +36,9 @@ dev_err_t dev_uart_get_uint8(uint8_t *data);
  * @param data Pointer to the data buffer to be get
  * @param length Length of data to read
  * @param delimiter Delimiter byte to stop reading
- * @return dev_err_t Returns DEV_OK on success, or an appropriate error code on failure.
+ * @return uint32_t Returns the number of bytes read
  */
-dev_err_t dev_uart_get_until(uint8_t *data, uint32_t length, uint8_t delimiter); 
+uint32_t dev_uart_get_until(uint8_t *data, uint32_t length, uint8_t delimiter); 
 
 /**
  * @brief Transmit data over UART.

@@ -15,6 +15,6 @@ dev_err_t dev_com_tp_init(void);
  * @param length Length of the received data.
  * @return dev_err_t Returns DEV_OK on success, or an appropriate error code on failure.
  */
-dev_err_t dev_com_tp_notification_callback(const uint8_t *data, uint32_t length);
+dev_err_t dev_com_tp_notification_callback(dev_com_if_packet_t * mailbox);
 
 #endif // DEV_COM_TP_H

@@ -21,14 +21,15 @@
 typedef enum
 {
 	/* Common Error Codes */
-    DEV_OK,					/* No error */
-    DEV_ERR, 				/* Generic error */
-    DEV_ERR_INVALID_ARG,	/* Invalid argument */
-	DEV_ERR_NO_MEM,			/* Out of memory */
-    DEV_ERR_TIMEOUT,		/* Operation timed out */
-	DEV_ERR_REGISTER_EVENT_FAIL, /* Event registration failed */
-	DEV_ERR_ARRAY_OUT_OF_BOUND,	/* Array index out of bounds */
-	DEV_ERR_CRC_FAIL,			/* CRC check failed */
+    DEV_OK,							/* No error */
+    DEV_ERR, 						/* Generic error */
+	DEV_ERR_MODULE_NOT_INIT,		/* Module not initialized */
+    DEV_ERR_INVALID_ARG,			/* Invalid argument */
+	DEV_ERR_NO_MEM,					/* Out of memory */
+    DEV_ERR_TIMEOUT,				/* Operation timed out */
+	DEV_ERR_REGISTER_EVENT_FAIL, 	/* Event registration failed */
+	DEV_ERR_ARRAY_OUT_OF_BOUND,		/* Array index out of bounds */
+	DEV_ERR_CRC_FAIL,				/* CRC check failed */
 
 	/* Specific Error Codes can be added here */
 } dev_err_t;
@@ -46,7 +47,7 @@ typedef enum
 										static const bool const_log_enabled = enable;
 										
 #define DBG_OUT(msg,...)			    if (const_log_enabled == true) { 															\
-											DEV_LOG("---> [%s-%d]: " msg, const_TAG, __LINE__, ##__VA_ARGS__); 						\
+											DEV_LOG("---> [%s-%d]: " msg "\r\n", const_TAG, __LINE__, ##__VA_ARGS__); 				\
 										}
 
 #define DBG_OUT_RAW(msg,...)			if (const_log_enabled == true) { 															\
@@ -54,22 +55,42 @@ typedef enum
 										}
 									
 #define DBG_OUT_E(msg,...)			    if (const_log_enabled == true) { 															\
-											DEV_LOG("\033[0;31m---> [%s-%d]: " msg "\033[0m", const_TAG, __LINE__, ##__VA_ARGS__); 	\
+											DEV_LOG("\033[0;31m---> [%s-%d]: " msg "\033[0m\r\n", const_TAG, __LINE__, ##__VA_ARGS__);\
 										}
 
 #define DBG_OUT_W(msg,...)              if (const_log_enabled == true) { 															\
-											DEV_LOG("\033[0;33m---> [%s-%d]: " msg "\033[0m", const_TAG, __LINE__, ##__VA_ARGS__); 	\
+											DEV_LOG("\033[0;33m---> [%s-%d]: " msg "\033[0m\r\n", const_TAG, __LINE__, ##__VA_ARGS__);\
 										}
 										
 
 #define DBG_OUT_I(msg,...)              if (const_log_enabled == true) { 															\
-											DEV_LOG("\033[0;32m---> [%s-%d]: " msg "\033[0m", const_TAG, __LINE__, ##__VA_ARGS__); 	\
+											DEV_LOG("\033[0;32m---> [%s-%d]: " msg "\033[0m\r\n", const_TAG, __LINE__, ##__VA_ARGS__);\
 										}
 
 #define DBG_OUT_RAW_I(msg,...)          if (const_log_enabled == true) { 															\
 											DEV_LOG("\033[0;32m" msg "\033[0m", ##__VA_ARGS__); 									\
 										}
 
+#define DBG_OUT_HEX(data, length)		if (const_log_enabled == true) { 															\
+											char hex_buf[256];																		\
+											int hex_idx = 0;																		\
+											DEV_LOG("---> [%s-%d]: Hex Dump - Length: %d\r\n", const_TAG, __LINE__, length); 		\
+											for (uint32_t i = 0; i < length; i++) {												\
+												if (i % 16 == 0 && hex_idx > 0) {													\
+													hex_buf[hex_idx] = '\0';														\
+													DBG_OUT_RAW("%s\r\n", hex_buf);													\
+													hex_idx = 0;																	\
+												}																					\
+												if (i % 16 == 0) {																	\
+													hex_idx += snprintf(&hex_buf[hex_idx], sizeof(hex_buf) - hex_idx, "     ");	\
+												}																					\
+												hex_idx += snprintf(&hex_buf[hex_idx], sizeof(hex_buf) - hex_idx, "%02X ", data[i]);\
+											}																						\
+											if (hex_idx > 0) {																		\
+												hex_buf[hex_idx] = '\0';															\
+												DBG_OUT_RAW("%s\r\n", hex_buf);														\
+											}																						\
+										}
 
 #else
 #define CONFIG_LOG_TAG(name)				

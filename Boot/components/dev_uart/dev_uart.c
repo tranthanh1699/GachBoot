@@ -4,6 +4,7 @@
 CONFIG_LOG_TAG(UART, true)
 
 static dev_ringbuffer_t s_Uart_Ringbuffer;
+static bool s_Uart_Initialized = false;
 volatile uint8_t rx_byte;
 #if DEV_CONFIG_UART_MUTEX == 1
     #include "dev_mutex.h"
@@ -44,6 +45,7 @@ dev_err_t dev_uart_init(void)
     dev_mutex_init(&s_Uart_Mutex);
 #endif
     dev_uart_set_rx_interrupt();
+    s_Uart_Initialized = true;
     return DEV_OK;
 }
 
@@ -53,6 +55,7 @@ dev_err_t dev_uart_init(void)
  */
 dev_err_t dev_uart_deinit(void)
 {
+    s_Uart_Initialized = false;
     dev_ringbuffer_deinit(&s_Uart_Ringbuffer);
 #if DEV_CONFIG_UART_MUTEX == 1
     dev_mutex_deinit(&s_Uart_Mutex);
@@ -66,6 +69,7 @@ dev_err_t dev_uart_deinit(void)
  */
 uint32_t dev_uart_available(void)
 {
+    DEV_RETURN_ON_FALSE(s_Uart_Initialized == true, 0, "UART not initialized");
     uint32_t available_bytes = 0;
 
     #if DEV_CONFIG_UART_MUTEX == 1
@@ -88,6 +92,7 @@ uint32_t dev_uart_available(void)
  */
 dev_err_t dev_uart_get_uint8(uint8_t *data)
 {
+    DEV_RETURN_ON_FALSE(s_Uart_Initialized == true, 0, "UART not initialized");
     dev_err_t err = DEV_OK;
     DEV_RETURN_ON_FALSE(data != NULL, DEV_ERR_INVALID_ARG, "Data pointer is NULL");
 
@@ -116,11 +121,11 @@ dev_err_t dev_uart_get_uint8(uint8_t *data)
  * @param data Pointer to the data buffer to be get
  * @param length Length of data to read
  * @param delimiter Delimiter byte to stop reading
- * @return dev_err_t Returns DEV_OK on success, or an appropriate error code on failure.
+ * @return uint32_t Returns the number of bytes read
  */
-dev_err_t dev_uart_get_until(uint8_t *data, uint32_t length, uint8_t delimiter)
+uint32_t dev_uart_get_until(uint8_t *data, uint32_t length, uint8_t delimiter)
 {
-    dev_err_t err = DEV_OK;
+    DEV_RETURN_ON_FALSE(s_Uart_Initialized == true, 0, "UART not initialized");
     DEV_RETURN_ON_FALSE(data != NULL, DEV_ERR_INVALID_ARG, "Data pointer is NULL");
     DEV_RETURN_ON_FALSE(length > 0, DEV_ERR_INVALID_ARG, "Length must be greater than zero");
 
@@ -135,14 +140,10 @@ dev_err_t dev_uart_get_until(uint8_t *data, uint32_t length, uint8_t delimiter)
         if (available_bytes > 0)
         {
             dev_ringbuffer_read_uint8(&s_Uart_Ringbuffer, &byte);
+            data[bytes_read++] = byte;
             if (byte == delimiter)
             {
                 break; // Stop reading if delimiter is found
-            }
-            else
-            {
-                /* Store the byte in the data buffer */
-                data[bytes_read++] = byte;
             }
         }
         else
@@ -155,7 +156,7 @@ dev_err_t dev_uart_get_until(uint8_t *data, uint32_t length, uint8_t delimiter)
 #if DEV_CONFIG_UART_MUTEX == 1
     dev_mutex_unlock(&s_Uart_Mutex);        
 #endif
-    return err;
+    return bytes_read;
 }
 
 /**
@@ -166,6 +167,7 @@ dev_err_t dev_uart_get_until(uint8_t *data, uint32_t length, uint8_t delimiter)
  */
 dev_err_t dev_uart_transmit(const uint8_t *data, uint32_t length)
 {
+    DEV_RETURN_ON_FALSE(s_Uart_Initialized == true, 0, "UART not initialized");
     DEV_RETURN_ON_FALSE(data != NULL, DEV_ERR_INVALID_ARG, "Data pointer is NULL");
     DEV_RETURN_ON_FALSE(length > 0, DEV_ERR_INVALID_ARG, "Length must be greater than zero");
 
@@ -181,6 +183,7 @@ dev_err_t dev_uart_transmit(const uint8_t *data, uint32_t length)
 static dev_err_t dev_uart_set_buffer_uint8(uint8_t data)
 {
     dev_err_t err = DEV_OK;
+    DEV_RETURN_ON_FALSE(s_Uart_Initialized == true, 0, "UART not initialized");
 #if DEV_CONFIG_UART_MUTEX == 1
     dev_mutex_lock(&s_Uart_Mutex);
 #endif

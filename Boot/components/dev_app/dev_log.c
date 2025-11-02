@@ -12,7 +12,7 @@
 void dev_log(const char* str, ...)
 {
 
-    char log_buffer[256];
+    char log_buffer[512];
     va_list args;
     va_start(args, str);
     vsnprintf(log_buffer, sizeof(log_buffer), str, args);

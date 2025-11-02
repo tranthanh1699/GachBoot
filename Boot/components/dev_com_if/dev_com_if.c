@@ -3,7 +3,7 @@
 #include "dev_crc.h"
 
 CONFIG_LOG_TAG(COM_IF, true)
-
+static bool s_Com_If_Initialized = false;
 static dev_com_if_receive_callback_t s_Receive_Callback = NULL;
 
 /* Data structure of interface packet
@@ -69,6 +69,7 @@ dev_err_t dev_com_if_init(dev_com_if_receive_callback_t receive_callback)
     // RTOS-specific initialization can be added here
     dev_rtos_create_task(dev_com_if_main_function, "DevComIfTask", 1024, NULL, 1, NULL);
 #endif // DEV_COM_IF_CONFIG_USE_RTOS == 1
+    s_Com_If_Initialized = true;
     return DEV_OK;  
 }
 
@@ -90,10 +91,10 @@ void dev_com_if_main_function(void)
         if(dev_uart_available() > 0)
         {
             uint8_t data[DEV_COM_IF_CONFIG_BUFFER_SIZE]; 
-            dev_err_t err = dev_uart_get_until(data, DEV_COM_IF_CONFIG_BUFFER_SIZE, '\n');
-            if (err == DEV_OK)
+            uint32_t bytes_read = dev_uart_get_until(data, DEV_COM_IF_CONFIG_BUFFER_SIZE, '\n');
+            if (bytes_read > 0)
             {
-                if (dev_com_if_process_received_packet(data, DEV_COM_IF_CONFIG_BUFFER_SIZE) == DEV_OK)
+                if (dev_com_if_process_received_packet(data, bytes_read) == DEV_OK)
                 {
                     // Call the receive callback with the received data
                     dev_com_if_packet_t mailbox;
@@ -121,6 +122,7 @@ void dev_com_if_main_function(void)
  */
 dev_err_t dev_com_if_transmit(const uint8_t *data, uint32_t length)
 {
+    DEV_RETURN_ON_FALSE(s_Com_If_Initialized == true, DEV_ERR_INVALID_ARG, "Communication Interface not initialized");
     DEV_RETURN_ON_FALSE(data != NULL, DEV_ERR_INVALID_ARG, "Data pointer is NULL");
     DEV_RETURN_ON_FALSE(length > 0, DEV_ERR_INVALID_ARG, "Length must be greater than zero");
 
@@ -137,6 +139,7 @@ dev_err_t dev_com_if_transmit(const uint8_t *data, uint32_t length)
 static dev_err_t dev_com_if_process_received_packet(const uint8_t *packet, uint32_t length)
 {
     dev_err_t err;
+    DEV_RETURN_ON_FALSE(s_Com_If_Initialized == true, DEV_ERR_INVALID_ARG, "Communication Interface not initialized");
     DEV_RETURN_ON_FALSE(packet != NULL, DEV_ERR_INVALID_ARG, "Packet pointer is NULL");
     DEV_RETURN_ON_FALSE(length >= (DEV_COM_IF_HEADER_SIZE + DEV_COM_IF_DLC_MIN + DEV_COM_IF_FOOTER_SIZE), DEV_ERR_INVALID_ARG, "Length must be greater than 8");
 
