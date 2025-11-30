@@ -75,6 +75,14 @@ uint8_t dcmdsl_get_current_session(void)
 }
 
 /**
+ * @brief Get active session (alias for compatibility)
+ */
+uint8_t dcmdsl_get_active_session(void)
+{
+    return session_ctx.current_session;
+}
+
+/**
  * @brief Set session
  */
 void dcmdsl_set_session(uint8_t session)

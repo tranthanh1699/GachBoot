@@ -37,12 +37,33 @@ typedef uint8_t Std_ReturnType;
 #define UDS_NRC_CONDITIONS_NOT_CORRECT                   0x22
 #define UDS_NRC_REQUEST_SEQUENCE_ERROR                   0x24
 #define UDS_NRC_REQUEST_OUT_OF_RANGE                     0x31
+#define UDS_NRC_SECURITY_ACCESS_DENIED                   0x33
+#define UDS_NRC_INVALID_KEY                              0x35
+#define UDS_NRC_EXCEED_NUMBER_OF_ATTEMPTS                0x36
+#define UDS_NRC_REQUIRED_TIME_DELAY_NOT_EXPIRED          0x37
 #define UDS_NRC_REQUEST_CORRECTLY_RECEIVED_RESPONSE_PENDING  0x78  // Response pending - need more time
 
-// UDS Session Types (ISO 14229-1)
+// UDS Session Types (ISO 14229-1) - Session IDs
 #define UDS_SESSION_DEFAULT                     0x01
 #define UDS_SESSION_PROGRAMMING                 0x02
 #define UDS_SESSION_EXTENDED_DIAGNOSTIC         0x03
+
+// UDS Session Bitmask (for DID/RID access control)
+#define UDS_SESSION_MASK_DEFAULT                (1u << 0)   // 0x00000001
+#define UDS_SESSION_MASK_PROGRAMMING            (1u << 1)   // 0x00000002
+#define UDS_SESSION_MASK_EXTENDED               (1u << 2)   // 0x00000004
+#define UDS_SESSION_MASK_ALL                    0xFFFFFFFFu // All sessions
+
+// UDS Security Levels (ISO 14229-1) - Security Level IDs
+#define UDS_SECURITY_LEVEL_LOCKED               0x00
+#define UDS_SECURITY_LEVEL_1                    0x01
+#define UDS_SECURITY_LEVEL_2                    0x02
+
+// UDS Security Bitmask (for DID/RID access control)
+#define UDS_SECURITY_MASK_LOCKED                (1u << 0)   // 0x00000001
+#define UDS_SECURITY_MASK_LEVEL_1               (1u << 1)   // 0x00000002
+#define UDS_SECURITY_MASK_LEVEL_2               (1u << 2)   // 0x00000004
+#define UDS_SECURITY_MASK_ALL                   0xFFFFFFFFu // All security levels
 
 // UDS Timing Parameters (ISO 14229-2)
 #define UDS_S3_SERVER_TIMEOUT_MS                5000u  // 5 seconds

@@ -44,6 +44,12 @@ dev_err_t dcmdsl_process_request(dev_com_tp_sdu_t * sdu_info_p);
 uint8_t dcmdsl_get_current_session(void);
 
 /**
+ * @brief Get active session (alias for compatibility)
+ * @return uint8_t Current active session type
+ */
+uint8_t dcmdsl_get_active_session(void);
+
+/**
  * @brief Set session
  * @param session Session type
  */
