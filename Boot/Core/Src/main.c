@@ -105,10 +105,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-
-    // CDC_Transmit_FS((uint8_t *)"Hello from STM32!\r\n", 19);
     svc_app_run();
-    DEV_DELAY_MS(5);
   }
   /* USER CODE END 3 */
 }

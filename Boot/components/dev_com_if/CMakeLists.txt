@@ -11,5 +11,4 @@ target_include_directories(dev_com_if PUBLIC
 
 # Link to stm32cubemx to get HAL includes and definitions
 target_link_libraries(dev_com_if PUBLIC stm32cubemx)
-target_link_libraries(dev_com_if PUBLIC dev_uart)
-target_link_libraries(dev_com_if PUBLIC dev_crc)
+target_link_libraries(dev_com_if PUBLIC dev_com)

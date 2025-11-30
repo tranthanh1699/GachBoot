@@ -12,6 +12,7 @@ target_include_directories(svc_app PUBLIC
 # Link to stm32cubemx to get HAL includes and definitions
 target_link_libraries(svc_app PUBLIC stm32cubemx)
 target_link_libraries(svc_app PUBLIC dev_app)
-target_link_libraries(svc_app PUBLIC dev_uart)
+target_link_libraries(svc_app PUBLIC dev_com)
 target_link_libraries(svc_app PUBLIC dev_com_if)
 target_link_libraries(svc_app PUBLIC dev_com_tp)
+target_link_libraries(svc_app PUBLIC svc_dcm)

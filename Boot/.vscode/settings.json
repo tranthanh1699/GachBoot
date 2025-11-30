@@ -27,6 +27,12 @@
         "stdio.h": "c",
         "errno.h": "c",
         "string.h": "c",
-        "typeinfo": "c"
+        "typeinfo": "c",
+        "dev_com.h": "c",
+        "dev_log.h": "c",
+        "cstdlib": "c",
+        "dev_delay_nonblocking.h": "c",
+        "dev_com_tp_cfg.h": "c",
+        "svc_dcm.h": "c"
     }
 }

@@ -11,9 +11,13 @@
 #include "stm32h7xx_hal.h"
 #include "usbd_cdc_if.h"
 
+/* Device Configuration */
+#define DEV_CONFIG_COMMON_USE_RTOS    0  // Set to 1 if using RTOS
+
 /* User lib */
 #include "dev_log.h"
 #define DEV_LOG dev_log
+#define DEV_LOG_HEX dev_log_hex
 
 #define DEV_DELAY_MS(ms)     HAL_Delay(ms)
 #define DEV_GET_TICK_MS()    HAL_GetTick()
@@ -72,24 +76,7 @@ typedef enum
 										}
 
 #define DBG_OUT_HEX(data, length)		if (const_log_enabled == true) { 															\
-											char hex_buf[256];																		\
-											int hex_idx = 0;																		\
-											DEV_LOG("---> [%s-%d]: Hex Dump - Length: %d\r\n", const_TAG, __LINE__, length); 		\
-											for (uint32_t i = 0; i < length; i++) {												\
-												if (i % 16 == 0 && hex_idx > 0) {													\
-													hex_buf[hex_idx] = '\0';														\
-													DBG_OUT_RAW("%s\r\n", hex_buf);													\
-													hex_idx = 0;																	\
-												}																					\
-												if (i % 16 == 0) {																	\
-													hex_idx += snprintf(&hex_buf[hex_idx], sizeof(hex_buf) - hex_idx, "     ");	\
-												}																					\
-												hex_idx += snprintf(&hex_buf[hex_idx], sizeof(hex_buf) - hex_idx, "%02X ", data[i]);\
-											}																						\
-											if (hex_idx > 0) {																		\
-												hex_buf[hex_idx] = '\0';															\
-												DBG_OUT_RAW("%s\r\n", hex_buf);														\
-											}																						\
+											DEV_LOG_HEX(data, length); 																\
 										}
 
 #else
@@ -108,6 +95,15 @@ typedef enum
             return err_code;                                       \
         }                                                          \
     } while(0)
+
+
+/* ========= DELAY NONBLOCKING ========= */
+#include "dev_delay_nonblocking.h"
+#define DEV_DELAY_CFG_NON_BLOCKING(timer)   	delay_timer_t timer = {0, 0, false};
+#define DEV_DELAY_NON_BLOCKING_MS(timer, ms)   	dev_delay_nonblocking_ms(&timer, ms)
+#define DEV_DELAY_NON_BLOCKING_RESET(timer)   	dev_delay_nonblocking_reset(&timer)
+#define DEV_DELAY_NON_BLOCKING_STOP(timer)   	dev_delay_nonblocking_stop(&timer)
+
 
 /**
  * @brief This function to check timeout

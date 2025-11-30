@@ -39,11 +39,14 @@ add_subdirectory(cmake/stm32cubemx)
 
 # Add user component modules
 add_subdirectory(components/dev_app)
-add_subdirectory(components/dev_uart)
+add_subdirectory(components/dev_com)
 add_subdirectory(components/dev_crc)
 add_subdirectory(components/dev_com_if)
 add_subdirectory(components/dev_com_tp)
+
+# Add user service modules
 add_subdirectory(service/svc_app)
+add_subdirectory(service/svc_dcm)
 
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
@@ -74,9 +77,12 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
 
     # Add user defined libraries
     dev_app
-    dev_uart
+    dev_com
     dev_crc
     dev_com_if
     dev_com_tp
+
+    # Add service libraries
     svc_app
+    svc_dcm
 )

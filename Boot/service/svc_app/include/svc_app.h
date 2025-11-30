@@ -1,7 +1,7 @@
 #ifndef SVC_APP_H
 #define SVC_APP_H
 #include "dev_common.h"
-#include "dev_uart.h"
+#include "dev_com.h"
 #include "dev_com_if.h"
 #include "dev_com_tp.h"
 
