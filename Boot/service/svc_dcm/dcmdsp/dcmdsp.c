@@ -5,6 +5,7 @@
 #include "uds_services/service_0x22/uds_service_0x22.h"
 #include "uds_services/service_0x2E/uds_service_0x2E.h"
 #include "uds_services/service_0x27/uds_service_0x27.h"
+#include "uds_services/service_0x31/uds_service_0x31.h"
 
 CONFIG_LOG_TAG(DCMDSP, true)
 
@@ -14,6 +15,7 @@ static const uds_service_entry_t service_table[] = {
     {UDS_SID_READ_DATA_BY_ID, uds_service_0x22_handler},
     {UDS_SID_SECURITY_ACCESS, uds_service_0x27_handler},
     {UDS_SID_WRITE_DATA_BY_ID, uds_service_0x2e_handler},
+    {UDS_SID_ROUTINE_CONTROL, uds_service_0x31_handler},
     {UDS_SID_TESTER_PRESENT, uds_service_0x3e_handler},
 };
 
