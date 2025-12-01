@@ -33,10 +33,9 @@ Std_ReturnType uds_service_0x3e_handler(const uds_message_t *message, uint8_t *e
         return E_OK; // Success but no response
     }
     
-    // Phase 4: Build positive response
-    message->response[0] = UDS_SID_TESTER_PRESENT + 0x40; // 0x7E
-    message->response[1] = 0x00;
-    *(message->response_len) = 2;
+    // Phase 4: Build positive response (data only, DCMDSP will add positive SID)
+    message->response[0] = 0x00;
+    *(message->response_len) = 1;
     
     DBG_OUT_I("Tester Present acknowledged");
     

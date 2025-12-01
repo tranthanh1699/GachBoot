@@ -1,6 +1,7 @@
 #include "dcmdsl.h"
 #include "svc_dcm.h"
 #include "dcmdsd/dcmdsd.h"
+#include "../uds_services/service_0x27/uds_security_config.h"
 
 CONFIG_LOG_TAG(DCMDSL, true)
 
@@ -46,6 +47,9 @@ void dcmdsl_main_function(uint32_t elapsed_ms)
             session_ctx.current_session = UDS_SESSION_DEFAULT;
             session_ctx.session_active = false;
             session_ctx.s3_timeout_counter = 0;
+            
+            // Reset all security levels on session timeout
+            uds_security_reset_all();
         }
     }
 }

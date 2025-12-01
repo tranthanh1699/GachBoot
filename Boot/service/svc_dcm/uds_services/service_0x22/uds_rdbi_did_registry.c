@@ -46,15 +46,22 @@ const uds_did_entry_t* uds_rdbi_get_registry(uint16_t *count)
 // DID Read Callback Implementations
 // ============================================================================
 
+static uint8_t testPendingVINRead = 0;
 /**
  * @brief Read VIN (Vehicle Identification Number)
  * Service handler guarantees buffer has 17 bytes available
  */
 static Std_ReturnType did_read_vin(uint8_t *data)
 {
-    const uint8_t vin[] = "1HGBH41JXMN109186";
-    memcpy(data, vin, 17);
-    return E_OK;
+    if (testPendingVINRead < 5) {
+        testPendingVINRead++;
+        return DCM_E_PENDING;
+    } else {
+        const uint8_t vin[] = "1HGBH41JXMN109186";
+        memcpy(data, vin, 17);
+        testPendingVINRead = 0;
+        return E_OK;
+    }
 }
 
 /**

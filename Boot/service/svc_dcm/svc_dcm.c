@@ -45,6 +45,9 @@ void svc_dcm_main_function(void)
         // DSL manages timing and session
         dcmdsl_main_function(SVC_DCM_TICK_INTERVAL_MS);
         
+        // DSD processes pending requests
+        dcmdsd_process_pending();
+        
 #if SVC_DCM_CONFIG_USE_RTOS == 1
         // Yield to RTOS if applicable
         dev_rtos_yield();

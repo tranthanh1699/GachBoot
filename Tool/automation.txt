@@ -1,0 +1,38 @@
+# Automation Script Example
+# Lines starting with # are comments
+# Commands:
+#   DELAY <ms>              - Wait for milliseconds
+#   SA <level>              - Security Access unlock (e.g., SA 01, SA 02)
+#   SECURITY_UNLOCK <level> - Same as SA (long form)
+#   <hex data>              - Send UDS command
+
+# Enter Extended Diagnostic Session
+10 03
+DELAY 100
+
+# Security Access Level 1 (auto unlock with key calculation)
+SA 01
+DELAY 500
+
+# Read VIN (DID F190)
+22 F1 90
+DELAY 200
+
+# Security Access Level 2 (long form)
+SECURITY_UNLOCK 02
+DELAY 500
+
+# Read Boot Software Version (DID F191)
+22 F1 91
+DELAY 200
+
+# Read Application Software Version (DID F192)
+22 F1 92
+DELAY 200
+
+# Tester Present
+3E 00
+DELAY 100
+
+# Return to Default Session
+10 01

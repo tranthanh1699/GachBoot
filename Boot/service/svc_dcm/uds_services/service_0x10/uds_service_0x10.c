@@ -1,6 +1,7 @@
 #include "uds_service_0x10.h"
 #include "svc_dcm.h"
 #include "dcmdsl/dcmdsl.h"
+#include "../service_0x27/uds_security_config.h"
 
 CONFIG_LOG_TAG(UDS_0x10, true)
 
@@ -28,23 +29,32 @@ Std_ReturnType uds_service_0x10_handler(const uds_message_t *message, uint8_t *e
     }
     
     // Phase 3: Process - update session via DSL
+    uint8_t current_session = dcmdsl_get_current_session();
     dcmdsl_set_session(session_type);
+    
+    // Reset security levels when changing session (ISO 14229-1)
+    // Exception: Default -> Programming keeps security if already unlocked
+    if (current_session != session_type) {
+        if (!(current_session == UDS_SESSION_DEFAULT && session_type == UDS_SESSION_PROGRAMMING)) {
+            uds_security_reset_all();
+            DBG_OUT_I("Security levels reset due to session change");
+        }
+    }
     
     // Get timing parameters
     const dcmdsl_timing_params_t *timing = dcmdsl_get_timing_params();
     
-    // Phase 4: Build positive response
-    message->response[0] = UDS_SID_DIAGNOSTIC_SESSION_CONTROL + 0x40; // 0x50
-    message->response[1] = session_type;
+    // Phase 4: Build positive response (data only, DCMDSP will add positive SID)
+    message->response[0] = session_type;
     // P2_Server_Max in units of 1ms (2 bytes, big-endian)
-    message->response[2] = (timing->p2_server_max >> 8) & 0xFF;
-    message->response[3] = timing->p2_server_max & 0xFF;
+    message->response[1] = (timing->p2_server_max >> 8) & 0xFF;
+    message->response[2] = timing->p2_server_max & 0xFF;
     // P2*_Server_Max in units of 10ms (2 bytes, big-endian)
     uint16_t p2_star_units = timing->p2_star_server_max / 10;
-    message->response[4] = (p2_star_units >> 8) & 0xFF;
-    message->response[5] = p2_star_units & 0xFF;
+    message->response[3] = (p2_star_units >> 8) & 0xFF;
+    message->response[4] = p2_star_units & 0xFF;
     
-    *(message->response_len) = 6;
+    *(message->response_len) = 5;
     
     DBG_OUT_I("Session changed to: 0x%02X", session_type);
     

@@ -1,0 +1,20 @@
+{
+    "default_min_id": 16,
+    "tester_present_interval_ms": 3000,
+    "enable_tester_present_on_connect": false,
+    "tester_present_suppress": false,
+    "security_exe_path": "C:/Users/thanh/Desktop/Work/Personal_Project/Bootloader/Boot/Tool/SecurityUnlock/dist/SecurityUnlock.exe",
+    "automation_script_path": "",
+    "security_levels": [
+        {
+            "level": 1,
+            "name": "Programming Session",
+            "color": "lightblue"
+        },
+        {
+            "level": 2,
+            "name": "Extended Diagnostic",
+            "color": "lightgreen"
+        }
+    ]
+}

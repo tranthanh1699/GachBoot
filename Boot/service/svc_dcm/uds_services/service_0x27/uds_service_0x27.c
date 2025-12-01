@@ -72,7 +72,7 @@ Std_ReturnType uds_service_0x27_handler(const uds_message_t *message, uint8_t *e
         // Check if already unlocked
         if (state->state == SECURITY_STATE_UNLOCKED) {
             DBG_OUT_I("Security level %d already unlocked - sending zero seed", config->security_level);
-            // Send zero seed (AUTOSAR: already unlocked)
+            // Send zero seed (AUTOSAR: already unlocked) - data only, DCMDSP adds SID
             message->response[0] = sub_function;
             memset(&message->response[1], 0x00, config->seed_size);
             *(message->response_len) = 1 + config->seed_size;
@@ -163,7 +163,7 @@ Std_ReturnType uds_service_0x27_handler(const uds_message_t *message, uint8_t *e
             
             DBG_OUT_I("Security level %d unlocked successfully", config->security_level);
 
-            // Build positive response
+            // Build positive response (data only, DCMDSP will add positive SID)
             message->response[0] = sub_function;
             *(message->response_len) = 1;
             return E_OK;
