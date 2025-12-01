@@ -14,8 +14,11 @@ if errorlevel 1 (
 
 echo.
 echo Building executable...
-pyinstaller --onefile --name SecurityUnlock --console SecurityUnlock.py
-
+python -m PyInstaller ^
+    --onefile ^
+    --windowed ^
+    --name SecurityUnlock ^
+    SecurityUnlock.py
 if errorlevel 1 (
     echo.
     echo Build FAILED!

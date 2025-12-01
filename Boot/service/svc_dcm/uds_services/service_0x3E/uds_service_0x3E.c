@@ -1,7 +1,7 @@
 #include "uds_service_0x3E.h"
 #include "svc_dcm.h"
 
-CONFIG_LOG_TAG(UDS_0x3E, true)
+CONFIG_LOG_TAG(UDS_0x3E, false)
 
 /**
  * @brief Service 0x3E handler - Tester Present

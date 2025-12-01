@@ -2,6 +2,7 @@
 #include "uds_wdbi_did_registry.h"
 #include "svc_dcm.h"
 #include "dcmdsl/dcmdsl.h"
+#include "../service_0x27/uds_security_config.h"
 
 CONFIG_LOG_TAG(UDS_0x2E, true)
 
@@ -58,9 +59,15 @@ Std_ReturnType uds_service_0x2e_handler(const uds_message_t *message, uint8_t *e
         return E_NOT_OK;
     }
     
-    // TODO: Get current security level from DCMDSL
-    // For now, assume locked (no security access)
-    uint32_t current_security_mask = UDS_SECURITY_MASK_LOCKED;
+    // Get current security level and convert to mask
+    uint8_t current_level = uds_security_get_active_level();
+    uint32_t current_security_mask = UDS_SECURITY_MASK_LOCKED;  // Default: locked
+    
+    if (current_level == UDS_SECURITY_LEVEL_1) {
+        current_security_mask = UDS_SECURITY_MASK_LEVEL_1;
+    } else if (current_level == UDS_SECURITY_LEVEL_2) {
+        current_security_mask = UDS_SECURITY_MASK_LEVEL_2;
+    }
     
     if ((did_entry->security_mask & current_security_mask) == 0) {
         DBG_OUT_E("DID 0x%04X requires security access (mask: 0x%08X, required: 0x%08X)", 

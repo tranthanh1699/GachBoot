@@ -143,7 +143,9 @@ dev_err_t dcmdsd_process_request(dev_com_tp_sdu_t * sdu_info_p)
     }
     
     uint8_t sid = sdu_info_p->SduBuffer[0];
-    DBG_OUT_I("Dispatching SID: 0x%02X, Size: %d", sid, sdu_info_p->SduSize);
+    if (sid != 0x3E) {  // Skip log for Tester Present
+        DBG_OUT_I("Dispatching SID: 0x%02X, Size: %d", sid, sdu_info_p->SduSize);
+    }
     
     // Prepare response buffer
     uint8_t response_buffer[256];
