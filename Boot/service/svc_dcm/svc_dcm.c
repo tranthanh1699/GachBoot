@@ -2,6 +2,7 @@
 #include "dcmdsl/dcmdsl.h"
 #include "dcmdsd/dcmdsd.h"
 #include "dcmdsp/dcmdsp.h"
+#include "uds_services/service_0x11/uds_service_0x11.h"
 
 CONFIG_LOG_TAG(DCM_SVC, true)
 static bool dcm_initialized = false;
@@ -47,6 +48,9 @@ void svc_dcm_main_function(void)
         
         // DSD processes pending requests
         dcmdsd_process_pending();
+        
+        // Process pending ECU reset
+        uds_service_0x11_process_reset();
         
 #if SVC_DCM_CONFIG_USE_RTOS == 1
         // Yield to RTOS if applicable
