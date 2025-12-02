@@ -159,7 +159,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                   NvM (NV Manager)                       │
+│                   NvM (NV Manager)                      │
 │   • Block management (NATIVE/REDUNDANT)                 │
 │   • CRC32 validation & inline storage                   │
 │   • RAM mirrors for fast read access                    │
@@ -168,7 +168,7 @@
                             ▲
                             │
 ┌─────────────────────────────────────────────────────────┐
-│            MemIf (Memory Abstraction Interface)          │
+│            MemIf (Memory Abstraction Interface)         │
 │   • AUTOSAR routing layer                               │
 │   • Device-agnostic API                                 │
 │   • Job status tracking                                 │
@@ -176,7 +176,7 @@
                             ▲
                             │
 ┌─────────────────────────────────────────────────────────┐
-│              Fee (Flash EEPROM Emulation)                │
+│              Fee (Flash EEPROM Emulation)               │
 │   • Logical sector management                           │
 │   • Dynamic address allocation                          │
 │   • Wear leveling (2-sector ping-pong)                  │
@@ -185,7 +185,7 @@
                             ▲
                             │
 ┌─────────────────────────────────────────────────────────┐
-│              Fls (Flash Hardware Driver)                 │
+│              Fls (Flash Hardware Driver)                │
 │   • STM32H7 flash operations (read/write/erase)         │
 │   • 32-byte write alignment & padding                   │
 │   • Sector boundary protection                          │
