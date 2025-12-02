@@ -33,6 +33,7 @@
         "cstdlib": "c",
         "dev_delay_nonblocking.h": "c",
         "dev_com_tp_cfg.h": "c",
-        "svc_dcm.h": "c"
+        "svc_dcm.h": "c",
+        "dev_nvm_config.h": "c"
     }
 }

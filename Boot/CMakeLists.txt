@@ -43,6 +43,10 @@ add_subdirectory(components/dev_com)
 add_subdirectory(components/dev_crc)
 add_subdirectory(components/dev_com_if)
 add_subdirectory(components/dev_com_tp)
+add_subdirectory(components/dev_fls)
+add_subdirectory(components/dev_fee)
+add_subdirectory(components/dev_memif)
+add_subdirectory(components/dev_nvm)
 
 # Add user service modules
 add_subdirectory(service/svc_app)
@@ -81,6 +85,10 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
     dev_crc
     dev_com_if
     dev_com_tp
+    dev_fls
+    dev_fee
+    dev_memif
+    dev_nvm
 
     # Add service libraries
     svc_app

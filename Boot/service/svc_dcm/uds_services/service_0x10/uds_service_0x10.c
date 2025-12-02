@@ -1,7 +1,6 @@
 #include "uds_service_0x10.h"
 #include "svc_dcm.h"
 #include "dcmdsl/dcmdsl.h"
-#include "../service_0x27/uds_security_config.h"
 
 CONFIG_LOG_TAG(UDS_0x10, true)
 
@@ -28,18 +27,8 @@ Std_ReturnType uds_service_0x10_handler(const uds_message_t *message, uint8_t *e
         return E_NOT_OK;
     }
     
-    // Phase 3: Process - update session via DSL
-    uint8_t current_session = dcmdsl_get_current_session();
+    // Phase 3: Process - update session via DSL (callbacks will handle security reset)
     dcmdsl_set_session(session_type);
-    
-    // Reset security levels when changing session (ISO 14229-1)
-    // Exception: Default -> Programming keeps security if already unlocked
-    if (current_session != session_type) {
-        if (!(current_session == UDS_SESSION_DEFAULT && session_type == UDS_SESSION_PROGRAMMING)) {
-            uds_security_reset_all();
-            DBG_OUT_I("Security levels reset due to session change");
-        }
-    }
     
     // Get timing parameters
     const dcmdsl_timing_params_t *timing = dcmdsl_get_timing_params();

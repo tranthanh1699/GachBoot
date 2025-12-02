@@ -4,16 +4,16 @@
 #include "dev_common.h"
 #include "svc_dcm.h"
 
-// Security Access Sub-functions (ISO 14229-1)
-#define UDS_SA_REQUEST_SEED_LEVEL_1         0x01    // Request seed for level 1
-#define UDS_SA_SEND_KEY_LEVEL_1             0x02    // Send key for level 1
-#define UDS_SA_REQUEST_SEED_LEVEL_2         0x03    // Request seed for level 2
-#define UDS_SA_SEND_KEY_LEVEL_2             0x04    // Send key for level 2
+                                                          // Security Access Sub-functions (ISO 14229-1)
+#define UDS_SA_REQUEST_SEED_LEVEL_1                 0x01  // Request seed for level 1
+#define UDS_SA_SEND_KEY_LEVEL_1                     0x02  // Send key for level 1
+#define UDS_SA_REQUEST_SEED_LEVEL_2                 0x03  // Request seed for level 2
+#define UDS_SA_SEND_KEY_LEVEL_2                     0x04  // Send key for level 2
 
-// Security Access specific NRCs
-#define UDS_NRC_INVALID_KEY                 0x35    // Invalid key
-#define UDS_NRC_EXCEED_NUMBER_OF_ATTEMPTS   0x36    // Exceed number of attempts
-#define UDS_NRC_REQUIRED_TIME_DELAY_NOT_EXPIRED  0x37  // Time delay not expired
+                                                          // Security Access specific NRCs
+#define UDS_NRC_INVALID_KEY                         0x35  // Invalid key
+#define UDS_NRC_EXCEED_NUMBER_OF_ATTEMPTS           0x36  // Exceed number of attempts
+#define UDS_NRC_REQUIRED_TIME_DELAY_NOT_EXPIRED     0x37  // Time delay not expired
 
 /**
  * @brief Security level state

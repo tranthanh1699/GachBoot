@@ -49,7 +49,7 @@ Std_ReturnType uds_service_0x11_handler(const uds_message_t *message, uint8_t *e
     }
 
     // Phase 4: Check session support (reset requires Programming or Extended session)
-    uint8_t current_session = dcmdsl_get_active_session();
+    uint8_t current_session = dcmdsl_get_session();
     
     if (current_session == UDS_SESSION_DEFAULT) {
         DBG_OUT_E("Reset not allowed in Default session");

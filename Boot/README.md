@@ -22,6 +22,7 @@
 - [Architecture](#-architecture-overview)
   - [Bootloader Stack](#bootloader-stack)
   - [Layer Design](#three-layer-architecture)
+  - [NVM Memory Stack](#nvm-memory-stack-autosar)
   - [Directory Structure](#directory-structure)
 - [UDS Services](#-uds-services)
   - [Session Control (0x10)](#service-0x10---diagnostic-session-control)
@@ -66,6 +67,9 @@
 | **UDS Protocol Stack** | 7 diagnostic services (0x10, 0x11, 0x22, 0x27, 0x2E, 0x31, 0x3E) |
 | **Session Management** | Default, Programming, Extended Diagnostic modes |
 | **Security Access** | Multi-level (Level 1/2) with pluggable algorithms |
+| **NVM Module** | AUTOSAR 4-layer memory stack (NvM → MemIf → Fee → Fls) |
+| **Block Management** | NATIVE/REDUNDANT types with CRC32 validation |
+| **Wear Leveling** | 2-sector ping-pong strategy (256KB flash) |
 | **MIN Protocol** | Lightweight transport layer over UART |
 | **Registry System** | Configurable DIDs, RIDs with access control |
 | **Timing Control** | P2/P2*/S3 timeout management |
@@ -147,6 +151,86 @@
    - Accesses DID/RID registries
    - Returns standardized responses
 
+---
+
+### NVM Memory Stack (AUTOSAR)
+
+**Four-layer architecture for non-volatile memory management:**
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                   NvM (NV Manager)                       │
+│   • Block management (NATIVE/REDUNDANT)                 │
+│   • CRC32 validation & inline storage                   │
+│   • RAM mirrors for fast read access                    │
+│   • Power-loss protection                               │
+└─────────────────────────────────────────────────────────┘
+                            ▲
+                            │
+┌─────────────────────────────────────────────────────────┐
+│            MemIf (Memory Abstraction Interface)          │
+│   • AUTOSAR routing layer                               │
+│   • Device-agnostic API                                 │
+│   • Job status tracking                                 │
+└─────────────────────────────────────────────────────────┘
+                            ▲
+                            │
+┌─────────────────────────────────────────────────────────┐
+│              Fee (Flash EEPROM Emulation)                │
+│   • Logical sector management                           │
+│   • Dynamic address allocation                          │
+│   • Wear leveling (2-sector ping-pong)                  │
+│   • Automatic sector switching                          │
+└─────────────────────────────────────────────────────────┘
+                            ▲
+                            │
+┌─────────────────────────────────────────────────────────┐
+│              Fls (Flash Hardware Driver)                 │
+│   • STM32H7 flash operations (read/write/erase)         │
+│   • 32-byte write alignment & padding                   │
+│   • Sector boundary protection                          │
+│   • 128KB sector management                             │
+└─────────────────────────────────────────────────────────┘
+```
+
+#### NVM Block Configuration
+
+**Supported Block Types:**
+
+| Block ID | Name | Type | Length | Description |
+|----------|------|------|--------|-------------|
+| `0x0001` | VIN | REDUNDANT | 17 bytes | Vehicle Identification Number (2 copies) |
+| `0x0002` | ECU Serial | REDUNDANT | 4 bytes | ECU serial number (2 copies) |
+| `0x0003` | Fingerprint | NATIVE | 32 bytes | Programming fingerprint (single copy) |
+| `0x0004` | Boot SW | NATIVE | 11 bytes | Bootloader software ID |
+| `0x0005` | App SW | NATIVE | 10 bytes | Application software ID |
+| `0x0006` | Prog Date | REDUNDANT | 4 bytes | Programming date (2 copies) |
+
+**Memory Layout (STM32H743 Bank 2):**
+
+```
+Flash Bank 2: 0x08100000 - 0x081FFFFF (1MB)
+NVM Sectors:  0x081C0000 - 0x081FFFFF (256KB, 2x 128KB sectors)
+
+Sector A: 0x081C0000 - 0x081DFFFF (128KB)
+Sector B: 0x081E0000 - 0x081FFFFF (128KB)
+
+Wear Leveling: Ping-pong between Sector A ↔ Sector B
+```
+
+**Key Features:**
+
+✅ **Automatic Redundancy** - REDUNDANT blocks write 2 copies with independent CRCs  
+✅ **Dynamic Addressing** - Fee allocates addresses, NvM tracks per block  
+✅ **Fast Reads** - NvM maintains RAM mirrors (no flash access)  
+✅ **Wear Leveling** - Automatic sector switching when full (>127KB used)  
+✅ **Power-Loss Protection** - Inline CRC32 after each write  
+✅ **Alignment Handling** - Fls auto-pads writes to 32-byte boundaries with 0xFF  
+
+**Code Flow Documentation:** See [NVM_CODE_FLOW.md](./NVM_CODE_FLOW.md) for detailed write/read/erase flows
+
+---
+
 ### Directory Structure
 
 ```
@@ -160,9 +244,20 @@ Boot/
 │   └── CMSIS/                        # ARM CMSIS headers
 │
 ├── 📁 components/                    # Reusable components
-│   └── dev_app/                      # Device abstraction layer
-│       ├── include/                  # Common headers
-│       └── dev_common.c              # Logging, delays, etc.
+│   ├── dev_app/                      # Device abstraction layer
+│   │   ├── include/                  # Common headers
+│   │   └── dev_common.c              # Logging, delays, etc.
+│   ├── dev_nvm/                      # Non-Volatile Memory Manager
+│   │   ├── dev_nvm.c/.h             # Block management, CRC, redundancy
+│   │   └── include/dev_nvm_config.h  # Block configuration
+│   ├── dev_memif/                    # Memory Abstraction Interface (AUTOSAR MemIf)
+│   │   └── dev_memif.c/.h           # Routing layer for memory devices
+│   ├── dev_fee/                      # Flash EEPROM Emulation (AUTOSAR Fee)
+│   │   ├── dev_fee.c/.h             # Sector management, wear leveling
+│   │   └── include/dev_fee_config.h  # Sector configuration
+│   └── dev_fls/                      # Flash Driver (AUTOSAR Fls)
+│       ├── dev_fls.c/.h             # STM32H7 flash hardware operations
+│       └── include/dev_fls_config.h  # Flash memory layout
 │
 ├── 📁 service/                       # UDS services
 │   └── svc_dcm/                      # Diagnostic Communication Manager
@@ -957,6 +1052,13 @@ static Std_ReturnType routine_handler(
 - [x] **Core Services:** 0x10, 0x11, 0x22, 0x27, 0x2E, 0x31, 0x3E
 - [x] **Session Management:** Default/Programming/Extended with S3 timeout
 - [x] **Security System:** Multi-level with pluggable algorithms
+- [x] **NVM Module:** AUTOSAR-compliant 4-layer memory stack (NvM → MemIf → Fee → Fls)
+  - Block management with CRC32 validation
+  - NATIVE/REDUNDANT block types with automatic redundancy
+  - Wear leveling with 2-sector ping-pong strategy
+  - Dynamic address allocation with Fee sector management
+  - RAM mirrors for fast read access
+  - Power-loss protection with inline CRC
 - [x] **MinTool GUI:** Full-featured diagnostic application
 - [x] **SecurityUnlock:** Standalone key calculator
 - [x] **Automation:** Script runner with SA command

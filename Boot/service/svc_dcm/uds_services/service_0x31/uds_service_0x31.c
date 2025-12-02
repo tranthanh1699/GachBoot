@@ -45,7 +45,7 @@ Std_ReturnType uds_service_0x31_handler(const uds_message_t *message, uint8_t *e
     }
 
     // Phase 5: Check session support
-    uint8_t current_session = dcmdsl_get_active_session();
+    uint8_t current_session = dcmdsl_get_session();
     uint32_t current_session_mask = 0;
     switch (current_session) {
         case UDS_SESSION_DEFAULT:

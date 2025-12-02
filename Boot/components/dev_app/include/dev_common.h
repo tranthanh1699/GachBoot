@@ -34,6 +34,10 @@ typedef enum
 	DEV_ERR_REGISTER_EVENT_FAIL, 	/* Event registration failed */
 	DEV_ERR_ARRAY_OUT_OF_BOUND,		/* Array index out of bounds */
 	DEV_ERR_CRC_FAIL,				/* CRC check failed */
+	DEV_ERR_NOT_FOUND,				/* Item not found */
+	DEV_ERR_PERMISSION_DENIED,		/* Permission denied */
+	DEV_ERR_CRC,					/* CRC check failed */
+	DEV_ERR_HARDWARE,				/* Hardware error */
 
 	/* Specific Error Codes can be added here */
 } dev_err_t;
