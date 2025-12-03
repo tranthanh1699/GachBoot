@@ -93,13 +93,13 @@
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    Application Layer                     │
+│                    Application Layer                    │
 │              (UDS Service Handlers 0x10-0x3E)           │
 └─────────────────────────────────────────────────────────┘
                             ▲
                             │
 ┌─────────────────────────────────────────────────────────┐
-│              DCMDSP (Service Processor)                  │
+│              DCMDSP (Service Processor)                 │
 │   • Service routing & dispatch                          │
 │   • Positive/negative response building                 │
 │   • Pending request management (NRC 0x78)               │
@@ -107,7 +107,7 @@
                             ▲
                             │
 ┌─────────────────────────────────────────────────────────┐
-│              DCMDSL (Session Layer)                      │
+│              DCMDSL (Session Layer)                     │
 │   • Session management (Default/Prog/Extended)          │
 │   • Security state tracking                             │
 │   • S3 timeout monitoring (5 seconds)                   │
@@ -116,14 +116,14 @@
                             ▲
                             │
 ┌─────────────────────────────────────────────────────────┐
-│              DCMDSD (Transport Dispatcher)               │
+│              DCMDSD (Transport Dispatcher)              │
 │   • Request queuing & forwarding                        │
 │   • Response transmission                               │
 └─────────────────────────────────────────────────────────┘
                             ▲
                             │
 ┌─────────────────────────────────────────────────────────┐
-│                  MIN Protocol Layer                      │
+│                  MIN Protocol Layer                     │
 │   • Framing (8-bit ID + payload + CRC-8)                │
 │   • UART transport                                      │
 └─────────────────────────────────────────────────────────┘
@@ -492,7 +492,7 @@ Response: (none)          # No response sent
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│            Security Level Configuration              │
+│            Security Level Configuration             │
 ├─────────────────────────────────────────────────────┤
 │  Level 1 (Programming Session)                      │
 │  • Algorithm: XOR U32 (seed XOR 0x12345678)         │
