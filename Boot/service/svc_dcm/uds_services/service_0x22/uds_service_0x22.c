@@ -1,5 +1,5 @@
 #include "uds_service_0x22.h"
-#include "uds_rdbi_did_registry.h"
+#include "../service_did/uds_did_registry.h"
 #include "svc_dcm.h"
 #include "dcmdsl/dcmdsl.h"
 #include "../service_0x27/uds_security_config.h"
@@ -64,7 +64,7 @@ Std_ReturnType uds_service_0x22_handler(const uds_message_t *message, uint8_t *e
         uint16_t did = (message->request[1 + (i * 2)] << 8) | message->request[2 + (i * 2)];
         
         // Find DID in registry
-        const uds_did_entry_t *did_entry = uds_rdbi_find_did(did);
+        const uds_did_entry_t *did_entry = uds_did_registry_find(did);
         
         if (did_entry == NULL) {
             DBG_OUT_W("DID 0x%04X not found in registry", did);
@@ -77,23 +77,27 @@ Std_ReturnType uds_service_0x22_handler(const uds_message_t *message, uint8_t *e
             continue;
         }
 
-        // Check session support
-        if ((did_entry->session_mask & current_session_mask) == 0) {
-            DBG_OUT_W("DID 0x%04X not supported in current session (mask: 0x%08X, required: 0x%08X)", 
-                      did, current_session_mask, did_entry->session_mask);
+        // Check if DID supports Read service
+        if (did_entry->read_config.callback == NULL) {
+            DBG_OUT_W("DID 0x%04X does not support Read (0x22)", did);
             if (num_dids == 1) {
-                *error_code = UDS_NRC_CONDITIONS_NOT_CORRECT;
+                *error_code = UDS_NRC_REQUEST_OUT_OF_RANGE;
                 return E_NOT_OK;
             }
             continue;
         }
-        
-        // Check security level support
-        if ((did_entry->security_mask & current_security_mask) == 0) {
-            DBG_OUT_W("DID 0x%04X requires higher security level (mask: 0x%08X, required: 0x%08X)", 
-                      did, current_security_mask, did_entry->security_mask);
+
+        // Validate session and security access
+        if (uds_did_validate_access(did, UDS_SID_READ_DATA_BY_IDENTIFIER, current_session_mask, current_security_mask) != E_OK) {
+            DBG_OUT_W("DID 0x%04X access denied (session: 0x%08X, security: 0x%08X)", 
+                      did, current_session_mask, current_security_mask);
             if (num_dids == 1) {
-                *error_code = UDS_NRC_SECURITY_ACCESS_DENIED;
+                // Return proper NRC based on which check failed
+                if ((did_entry->read_config.session_mask & current_session_mask) == 0) {
+                    *error_code = UDS_NRC_CONDITIONS_NOT_CORRECT;
+                } else {
+                    *error_code = UDS_NRC_SECURITY_ACCESS_DENIED;
+                }
                 return E_NOT_OK;
             }
             continue;
@@ -103,10 +107,10 @@ Std_ReturnType uds_service_0x22_handler(const uds_message_t *message, uint8_t *e
         uint16_t data_len = did_entry->expected_length;
         
         // For variable length DIDs, call length_getter
-        if (data_len == 0 && did_entry->length_getter != NULL) {
-            Std_ReturnType len_result = did_entry->length_getter(&data_len);
-            if (len_result != E_OK) {
-                DBG_OUT_E("DID 0x%04X length_getter failed", did);
+        if (data_len == 0 && did_entry->read_config.length_getter != NULL) {
+            data_len = did_entry->read_config.length_getter();
+            if (data_len == 0) {
+                DBG_OUT_E("DID 0x%04X length_getter returned 0", did);
                 if (num_dids == 1) {
                     *error_code = UDS_NRC_CONDITIONS_NOT_CORRECT;
                     return E_NOT_OK;
@@ -131,7 +135,7 @@ Std_ReturnType uds_service_0x22_handler(const uds_message_t *message, uint8_t *e
         message->response[response_pos++] = did & 0xFF;
 
         // Call DID read callback - it just fills the buffer
-        Std_ReturnType result = did_entry->read_callback(&message->response[response_pos]);
+        Std_ReturnType result = did_entry->read_config.callback(&message->response[response_pos]);
 
         if (result == DCM_E_PENDING) {
             // Service pending - will retry

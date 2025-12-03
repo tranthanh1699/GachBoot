@@ -34,6 +34,8 @@
         "dev_delay_nonblocking.h": "c",
         "dev_com_tp_cfg.h": "c",
         "svc_dcm.h": "c",
-        "dev_nvm_config.h": "c"
+        "dev_nvm_config.h": "c",
+        "uds_did_registry.h": "c",
+        "uds_did_callbacks.h": "c"
     }
 }
