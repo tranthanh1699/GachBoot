@@ -247,17 +247,20 @@ Boot/
 │   ├── dev_app/                      # Device abstraction layer
 │   │   ├── include/                  # Common headers
 │   │   └── dev_common.c              # Logging, delays, etc.
-│   ├── dev_nvm/                      # Non-Volatile Memory Manager
-│   │   ├── dev_nvm.c/.h             # Block management, CRC, redundancy
-│   │   └── include/dev_nvm_config.h  # Block configuration
-│   ├── dev_memif/                    # Memory Abstraction Interface (AUTOSAR MemIf)
-│   │   └── dev_memif.c/.h           # Routing layer for memory devices
-│   ├── dev_fee/                      # Flash EEPROM Emulation (AUTOSAR Fee)
-│   │   ├── dev_fee.c/.h             # Sector management, wear leveling
-│   │   └── include/dev_fee_config.h  # Sector configuration
-│   └── dev_fls/                      # Flash Driver (AUTOSAR Fls)
-│       ├── dev_fls.c/.h             # STM32H7 flash hardware operations
-│       └── include/dev_fls_config.h  # Flash memory layout
+│   └── dev_memstack/                 # AUTOSAR Memory Stack (unified)
+│       ├── 📄 README.md             # Comprehensive stack documentation
+│       ├── dev_nvm/                  # Non-Volatile Memory Manager
+│       │   ├── dev_nvm.c/.h         # Block management, CRC, redundancy
+│       │   └── include/dev_nvm_config.h  # Block configuration
+│       ├── dev_memif/                # Memory Abstraction Interface (AUTOSAR MemIf)
+│       │   └── dev_memif.c/.h       # Routing layer for memory devices
+│       ├── dev_fee/                  # Flash EEPROM Emulation (AUTOSAR Fee)
+│       │   ├── dev_fee.c/.h         # Sector management, wear leveling
+│       │   └── include/dev_fee_config.h  # Sector configuration
+│       ├── dev_fls/                  # Flash Driver (AUTOSAR Fls)
+│       │   ├── dev_fls.c/.h         # STM32H7 flash hardware operations
+│       │   └── include/dev_fls_config.h  # Flash memory layout
+│       └── CMakeLists.txt            # Interface library for all 4 layers
 │
 ├── 📁 service/                       # UDS services
 │   └── svc_dcm/                      # Diagnostic Communication Manager
@@ -272,7 +275,12 @@ Boot/
 │           ├── service_0x27/         # Security Access
 │           ├── service_0x2E/         # Write DID
 │           ├── service_0x31/         # Routine Control
-│           └── service_0x3E/         # Tester Present
+│           ├── service_0x3E/         # Tester Present
+│           └── service_did/          # **Unified DID Registry**
+│               ├── 📄 README.md     # Complete registry documentation
+│               ├── uds_did_registry.c/.h      # Central DID table & API
+│               ├── uds_did_callbacks.c/.h     # DID callback implementations
+│               └── CMakeLists.txt    # Static library build
 │
 └── 📁 Tool/                          # Python diagnostic tools
     ├── 📄 MinTool_modular.py        # GUI app entry point
@@ -343,26 +351,75 @@ Response: 51 01           # Success (reset in 1 second)
 
 ### Service 0x22 - Read Data By Identifier
 
-**Read diagnostic data from ECU.**
+**Read diagnostic data from ECU using unified DID registry.**
+
+#### Unified DID Registry Architecture
+
+**All UDS services (0x22, 0x2E, 0x2F) share a single DID configuration table** with per-service callbacks and access control:
+
+```c
+typedef struct {
+    uint16_t did;                    // Data Identifier
+    uint16_t expected_length;        // Fixed length (0 = variable)
+    uint16_t min_length, max_length; // For variable length
+    
+    // Service 0x22 (Read) config
+    struct {
+        uds_did_read_callback_t callback;
+        uds_did_length_getter_t length_getter;  // Dynamic length
+        uint32_t session_mask;                  // Allowed sessions
+        uint32_t security_mask;                 // Required security
+    } read_config;
+    
+    // Service 0x2E (Write) config
+    struct {
+        uds_did_write_callback_t callback;
+        uint32_t session_mask;
+        uint32_t security_mask;
+        bool semantic_validation;               // Enable data validation
+    } write_config;
+    
+    // Service 0x2F (IO Control) - Future
+    struct {
+        uds_did_io_control_callback_t callback;
+        uint32_t session_mask;
+        uint32_t security_mask;
+        uint8_t supported_options;
+    } io_control_config;
+} uds_did_entry_t;
+```
+
+**Benefits:**
+- ✅ Single source of truth for all DIDs
+- ✅ No duplication between services
+- ✅ Easy to add new services (0x2F) without modifying existing code
+- ✅ Per-service access control and callbacks
+- ✅ Centralized in `service/svc_dcm/uds_services/service_did/`
 
 #### Implemented DIDs
-| DID | Name | Length | Session | Security | Description |
-|-----|------|--------|---------|----------|-------------|
-| `0xF190` | VIN | 17 bytes | All | All | Vehicle Identification Number |
-| `0xF183` | Boot SW ID | 11 bytes | All | All | Bootloader software ID |
-| `0xF184` | App SW ID | 10 bytes | All | All | Application software ID |
-| `0xF18C` | ECU Serial | 4 bytes | Default/Extended | All | ECU serial number |
+| DID | Name | Length | Read Support | Write Support | Description |
+|-----|------|--------|--------------|---------------|-------------|
+| `0xF190` | VIN | 17 bytes | All sessions | ❌ | Vehicle Identification Number |
+| `0xF183` | Boot SW ID | 11 bytes | All sessions | ❌ | Bootloader software ID |
+| `0xF184` | App SW ID | 10 bytes | All sessions | ❌ | Application software ID |
+| `0xF18C` | ECU Serial | 4 bytes | Default/Extended | Extended (Lvl1/2) | ECU serial number |
+| `0xF15A` | Fingerprint | 1-32 bytes | ❌ | Prog/Extended (Lvl1/2) | Programming fingerprint |
+| `0xF199` | Prog Date | 4 bytes | All sessions | Programming (Lvl2) | Last programming date |
+| `0xF100` | ECU Config | 2 bytes | Extended | Extended (Lvl1/2) | ECU configuration |
 
 #### Features
 - ✅ Multiple DID support in single request
-- ✅ Session-based access control
-- ✅ Security-based access control
-- ✅ Fixed/variable length DIDs
+- ✅ Per-service session/security masks (32-bit bitmasks)
+- ✅ Fixed/variable length DIDs with dynamic length getters
+- ✅ Unified registry shared across services 0x22, 0x2E, 0x2F
 
 #### Example
 ```
 Request:  22 F1 90                # Read VIN
 Response: 62 F1 90 [17 bytes]     # VIN data
+
+Request:  22 F1 90 F1 83          # Read VIN + Boot SW ID
+Response: 62 F1 90 [17] F1 83 [11]  # Both DIDs
 ```
 
 ---
@@ -410,25 +467,32 @@ Response: 67 02                   # Security unlocked!
 
 ### Service 0x2E - Write Data By Identifier
 
-**Write configuration data to ECU.**
+**Write configuration data to ECU using unified DID registry.**
 
-#### Implemented DIDs
-| DID | Name | Length | Session | Security | Description |
-|-----|------|--------|---------|----------|-------------|
-| `0xF15A` | Fingerprint | 1-32 bytes | Programming/Extended | Level 1 or 2 | Programming fingerprint |
-| `0xF199` | Programming Date | 4 bytes | Programming | Level 2 | Date of last programming |
-| `0xF100` | ECU Config | 2 bytes | Extended | Level 1 or 2 | ECU configuration value |
+All write-capable DIDs are configured in the same unified registry as read operations (Service 0x22). See [Service 0x22](#service-0x22---read-data-by-identifier) for architecture details.
+
+#### Writable DIDs
+| DID | Name | Length | Session | Security | Validation | Description |
+|-----|------|--------|---------|----------|------------|-------------|
+| `0xF15A` | Fingerprint | 1-32 bytes | Prog/Extended | Level 1 or 2 | No | Programming fingerprint (variable length) |
+| `0xF199` | Prog Date | 4 bytes | Programming | Level 2 | Yes | Date of last programming (format checked) |
+| `0xF100` | ECU Config | 2 bytes | Extended | Level 1 or 2 | Yes | ECU configuration value (range checked) |
+| `0xF18C` | ECU Serial | 4 bytes | Extended | Level 1 or 2 | No | ECU serial number |
 
 #### Features
-- ✅ Fixed/variable length validation
-- ✅ Session enforcement
-- ✅ Security enforcement
-- ✅ Semantic data validation
+- ✅ Fixed/variable length validation (via unified registry)
+- ✅ Session enforcement (32-bit bitmask)
+- ✅ Security enforcement (32-bit bitmask)
+- ✅ Semantic data validation (optional per-DID flag)
+- ✅ Single callback implementation per DID
 
 #### Example
 ```
 Request:  2E F1 00 12 34          # Write ECU config = 0x1234
 Response: 6E F1 00                # Success
+
+Request:  2E F1 5A 01 02 03       # Write fingerprint (3 bytes)
+Response: 6E F1 5A                # Success
 ```
 
 ---
