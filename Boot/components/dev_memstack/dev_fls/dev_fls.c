@@ -91,7 +91,7 @@ dev_err_t dev_fls_write(uint32_t address, const uint8_t *data, uint32_t length)
         return DEV_ERR_INVALID_ARG;
     }
     
-    // Create padded buffer if needed
+    // Create adaptive buffer aligned to 32 bytes
     uint8_t write_buffer[aligned_length];
     memcpy(write_buffer, data, length);
     
