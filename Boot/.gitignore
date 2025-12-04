@@ -2,6 +2,7 @@ build
 mx.scratch
 !.settings
 .vscode/
+debug/
 .idea
 *.log
 *.tmp
