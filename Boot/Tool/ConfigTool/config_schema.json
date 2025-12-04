@@ -1,0 +1,133 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GachBoot Configuration",
+  "description": "Configuration schema for DID registry, NVM blocks, and services",
+  "type": "object",
+  "properties": {
+    "project": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Project name"
+        },
+        "version": {
+          "type": "string",
+          "description": "Configuration version"
+        },
+        "generated_path": {
+          "type": "string",
+          "description": "Output path for generated files"
+        }
+      },
+      "required": ["name", "version", "generated_path"]
+    },
+    "nvm_blocks": {
+      "type": "array",
+      "description": "NVM block definitions",
+      "items": {
+        "type": "object",
+        "properties": {
+          "block_id": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unique block ID"
+          },
+          "block_name": {
+            "type": "string",
+            "pattern": "^[A-Z_][A-Z0-9_]*$",
+            "description": "Block name (uppercase with underscores)"
+          },
+          "data_length": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Data length in bytes"
+          },
+          "default_value": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            },
+            "description": "Default data values (hex array)"
+          },
+          "description": {
+            "type": "string",
+            "description": "Block description"
+          }
+        },
+        "required": ["block_id", "block_name", "data_length", "default_value"]
+      }
+    },
+    "dids": {
+      "type": "array",
+      "description": "Diagnostic Identifier (DID) definitions",
+      "items": {
+        "type": "object",
+        "properties": {
+          "did": {
+            "type": "string",
+            "pattern": "^0x[0-9A-Fa-f]{4}$",
+            "description": "DID identifier (e.g., 0xF190)"
+          },
+          "did_name": {
+            "type": "string",
+            "pattern": "^[A-Z_][A-Z0-9_]*$",
+            "description": "DID name constant"
+          },
+          "description": {
+            "type": "string",
+            "description": "DID description"
+          },
+          "data_type": {
+            "type": "string",
+            "enum": ["STATIC", "NVM", "DYNAMIC"],
+            "description": "Data source type"
+          },
+          "nvm_block_id": {
+            "type": "integer",
+            "description": "NVM block ID (required if data_type=NVM)"
+          },
+          "static_data": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            },
+            "description": "Static data array (required if data_type=STATIC)"
+          },
+          "data_length": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Data length in bytes"
+          },
+          "read_access": {
+            "type": "boolean",
+            "description": "Enable read access (0x22)"
+          },
+          "write_access": {
+            "type": "boolean",
+            "description": "Enable write access (0x2E)"
+          },
+          "session_required": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["DEFAULT", "PROGRAMMING", "EXTENDED_DIAGNOSTIC"]
+            },
+            "description": "Required diagnostic sessions"
+          },
+          "security_level": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Required security level (0=none)"
+          }
+        },
+        "required": ["did", "did_name", "description", "data_type", "data_length", "read_access", "write_access"]
+      }
+    }
+  },
+  "required": ["project", "nvm_blocks", "dids"]
+}
