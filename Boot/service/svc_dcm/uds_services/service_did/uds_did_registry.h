@@ -22,12 +22,20 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "svc_dcm.h"
 
 // Forward declare Std_ReturnType if not already defined
 #ifndef STD_TYPES_H
 typedef uint8_t Std_ReturnType;
 #define E_OK        0x00u
 #define E_NOT_OK    0x01u
+#endif
+
+/* Service IDs */
+#ifndef UDS_SID_READ_DATA_BY_IDENTIFIER
+#define UDS_SID_READ_DATA_BY_IDENTIFIER         0x22
+#define UDS_SID_WRITE_DATA_BY_IDENTIFIER        0x2E
+#define UDS_SID_IO_CONTROL_BY_IDENTIFIER        0x2F
 #endif
 
 #ifdef __cplusplus
@@ -59,7 +67,7 @@ typedef Std_ReturnType (*uds_did_read_callback_t)(uint8_t *data);
  * @note Callback must validate and process input data
  *       Length is pre-validated against expected_length range
  */
-typedef Std_ReturnType (*uds_did_write_callback_t)(const uint8_t *data, uint16_t length);
+typedef Std_ReturnType (*uds_did_write_callback_t)(const uint8_t *data, ErrorCode_t * ErrorCode);
 
 /**
  * @brief DID IO control callback function type (Future: Service 0x2F)
@@ -143,21 +151,6 @@ typedef struct {
  */
 const uds_did_entry_t* uds_did_registry_find(uint16_t did);
 
-/**
- * @brief Get total number of DIDs in registry
- * 
- * @return uint16_t Number of registered DIDs
- */
-uint16_t uds_did_registry_get_count(void);
-
-/**
- * @brief Check if DID supports specific service
- * 
- * @param did       Data Identifier
- * @param service   Service ID (0x22, 0x2E, 0x2F)
- * @return bool true if DID supports service, false otherwise
- */
-bool uds_did_supports_service(uint16_t did, uint8_t service);
 
 /**
  * @brief Validate DID access for service in current session/security
@@ -175,14 +168,6 @@ Std_ReturnType uds_did_validate_access(
     uint32_t security_mask
 );
 
-/**
- * @brief Get DID length (handles both fixed and variable length)
- * 
- * @param did       Data Identifier
- * @param service   Service ID (0x22, 0x2E, 0x2F)
- * @return uint16_t DID data length in bytes, 0 if DID not found
- */
-uint16_t uds_did_get_length(uint16_t did, uint8_t service);
 
 /**
  * @brief Validate DID data length
@@ -199,12 +184,8 @@ bool uds_did_validate_length(uint16_t did, uint8_t service, uint16_t length);
 /* ========================================================================== */
 /* Note: Session and Security masks are defined in svc_dcm.h */
 
-/* Service IDs */
-#ifndef UDS_SID_READ_DATA_BY_IDENTIFIER
-#define UDS_SID_READ_DATA_BY_IDENTIFIER         0x22
-#define UDS_SID_WRITE_DATA_BY_IDENTIFIER        0x2E
-#define UDS_SID_IO_CONTROL_BY_IDENTIFIER        0x2F
-#endif
+Std_ReturnType uds_did_read_vin(uint8_t *data);
+Std_ReturnType uds_did_write_vin(const uint8_t *data, ErrorCode_t * ErrorCode);
 
 #ifdef __cplusplus
 }

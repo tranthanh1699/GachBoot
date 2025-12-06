@@ -9,7 +9,7 @@ CONFIG_LOG_TAG(UDS_0x31, true)
 /**
  * @brief Service 0x31 handler - Routine Control
  */
-Std_ReturnType uds_service_0x31_handler(const uds_message_t *message, uint8_t *error_code)
+Std_ReturnType uds_service_0x31_handler(const uds_message_t *message, ErrorCode_t *error_code)
 {
     // Phase 1: Validate request length (minimum: SID + SubFunc + RID)
     if (message->request_len < 4) {

@@ -6,9 +6,12 @@
 // AUTOSAR Standard Types
 #ifndef STD_TYPES_H
 typedef uint8_t Std_ReturnType;
+typedef uint8_t ErrorCode_t;
 #define E_OK        0x00u
 #define E_NOT_OK    0x01u
 #endif
+
+
 
 // DCM Standard Return Values (AUTOSAR DCM)
 #define DCM_E_PENDING                           0x10u  // Service processing is pending

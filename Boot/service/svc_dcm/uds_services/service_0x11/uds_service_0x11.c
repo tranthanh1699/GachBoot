@@ -23,7 +23,7 @@ static volatile uint32_t reset_time_ms = 0;
 /**
  * @brief Service 0x11 handler - ECU Reset
  */
-Std_ReturnType uds_service_0x11_handler(const uds_message_t *message, uint8_t *error_code)
+Std_ReturnType uds_service_0x11_handler(const uds_message_t *message, ErrorCode_t *error_code)
 {
     // Phase 1: Validate request length (SID + SubFunction)
     if (message->request_len != 2) {

@@ -8,7 +8,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import json
 import os
-from code_generator import CodeGenerator
+from nvm_module import validate_nvm_blocks, generate_nvm_code
+from did_module import validate_dids, generate_did_code
 
 class ConfigEditor:
     def __init__(self, root):
@@ -18,11 +19,14 @@ class ConfigEditor:
         
         self.config_file = "gachboot_config.json"
         self.config = None
-        self.modified = False
+        self.set_modified(False)
         
         # Apply theme
         style = ttk.Style()
         style.theme_use('clam')
+        
+        # Bind Ctrl+S for save
+        self.root.bind('<Control-s>', lambda e: self.save_config())
         
         self.setup_ui()
         self.load_config()
@@ -44,8 +48,8 @@ class ConfigEditor:
         
         generate_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Generate", menu=generate_menu)
-        generate_menu.add_command(label="Generate Code", command=self.generate_code)
-        generate_menu.add_command(label="Validate Config", command=self.validate_config)
+        generate_menu.add_command(label="🔍 Validate Config", command=self.validate_config)
+        generate_menu.add_command(label="⚙️ Generate Code", command=self.generate_code)
         
         help_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Help", menu=help_menu)
@@ -60,7 +64,7 @@ class ConfigEditor:
         main_paned.add(left_frame, weight=1)
         self.setup_tree_navigation(left_frame)
         
-        # Right panel: Content
+        # Right panel: Dynamic config editor
         right_frame = ttk.Frame(main_paned)
         main_paned.add(right_frame, weight=3)
         
@@ -71,14 +75,19 @@ class ConfigEditor:
         # Project info frame
         self.setup_project_frame(right_frame)
         
-        # Content notebook (tabs)
-        self.notebook = ttk.Notebook(right_frame)
-        self.notebook.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
+        # Dynamic config panel (replaces tabs)
+        self.config_panel_frame = ttk.LabelFrame(right_frame, text="Configuration Editor", padding="10")
+        self.config_panel_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
+        self.config_panel_frame.columnconfigure(0, weight=1)
+        self.config_panel_frame.rowconfigure(0, weight=1)
         
-        # NVM Blocks tab
+        # Welcome message (default view)
+        welcome_label = ttk.Label(self.config_panel_frame, text="Select an item from the navigation tree", 
+                                   font=('', 11), foreground='gray')
+        welcome_label.pack(expand=True)
+        
+        # Initialize tree widgets (hidden)
         self.setup_nvm_tab()
-        
-        # DIDs tab
         self.setup_did_tab()
         
         # Status bar
@@ -104,6 +113,8 @@ class ConfigEditor:
         
         # Bind selection event
         self.nav_tree.bind('<<TreeviewSelect>>', self.on_tree_select)
+        # Bind right-click menu
+        self.nav_tree.bind('<Button-3>', self.show_context_menu)
         
         # Info panel at bottom
         info_frame = ttk.LabelFrame(parent, text="Item Details", padding="10")
@@ -146,8 +157,7 @@ class ConfigEditor:
     
     def setup_nvm_tab(self):
         """Setup NVM Blocks tab"""
-        nvm_frame = ttk.Frame(self.notebook)
-        self.notebook.add(nvm_frame, text="💾 NVM Blocks")
+        nvm_frame = ttk.Frame(self.config_panel_frame)
         
         # Toolbar
         toolbar = ttk.Frame(nvm_frame)
@@ -181,8 +191,7 @@ class ConfigEditor:
     
     def setup_did_tab(self):
         """Setup DIDs tab"""
-        did_frame = ttk.Frame(self.notebook)
-        self.notebook.add(did_frame, text="🔧 DIDs")
+        did_frame = ttk.Frame(self.config_panel_frame)
         
         # Toolbar
         toolbar = ttk.Frame(did_frame)
@@ -227,11 +236,24 @@ class ConfigEditor:
                 with open(self.config_file, 'r', encoding='utf-8') as f:
                     self.config = json.load(f)
                 self.refresh_ui()
+                self.set_modified(False)
+                self.update_title()
                 self.status_var.set(f"Loaded: {self.config_file}")
             else:
                 self.new_config()
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load config: {e}")
+    
+    def update_title(self):
+        """Update window title with file name and modified status"""
+        filename = os.path.basename(self.config_file) if self.config_file else "Untitled"
+        modified_mark = " *" if self.modified else ""
+        self.root.title(f"GachBoot ConfigTool - {filename}{modified_mark}")
+    
+    def set_modified(self, modified=True):
+        """Set modified flag and update title"""
+        self.modified = modified
+        self.update_title()
     
     def refresh_ui(self):
         """Refresh UI with current config"""
@@ -250,11 +272,17 @@ class ConfigEditor:
         # NVM Blocks
         self.nvm_tree.delete(*self.nvm_tree.get_children())
         for block in self.config['nvm_blocks']:
-            default_str = ' '.join([f"{v:02X}" for v in block['default_value']])
+            rom_data = block.get('rom_data', block.get('default_value', ''))
+            # Check if rom_data is string (array name) or list (old format)
+            if isinstance(rom_data, str):
+                default_str = rom_data  # Display array name
+            else:
+                default_str = ' '.join([f"{v:02X}" for v in rom_data])  # Display hex values
+            
             self.nvm_tree.insert('', tk.END, values=(
                 block['block_id'],
                 block['block_name'],
-                block['data_length'],
+                block.get('block_size', block.get('data_length', 0)),
                 default_str,
                 block['description']
             ))
@@ -263,14 +291,16 @@ class ConfigEditor:
         # DIDs
         self.did_tree.delete(*self.did_tree.get_children())
         for did in self.config['dids']:
+            has_read = 'read_config' in did and did['read_config'].get('callback')
+            has_write = 'write_config' in did and did['write_config'].get('callback')
             self.did_tree.insert('', tk.END, values=(
                 did['did'],
                 did['did_name'],
-                did['data_type'],
-                did['data_length'],
-                '✓' if did['read_access'] else '✗',
-                '✓' if did['write_access'] else '✗',
-                did['description']
+                'Fixed' if did.get('fixed_length', True) else 'Variable',
+                did.get('expected_length', 0),
+                '✓' if has_read else '✗',
+                '✓' if has_write else '✗',
+                did.get('description', '')
             ))
         self.did_count_var.set(str(len(self.config['dids'])))
     
@@ -286,7 +316,7 @@ class ConfigEditor:
         
         # NVM Blocks branch with count
         nvm_count = len(self.config['nvm_blocks'])
-        nvm_root = self.nav_tree.insert(root, tk.END, text=f"💾 NVM Blocks ({nvm_count})", open=True)
+        nvm_root = self.nav_tree.insert(root, tk.END, text=f"💾 NVM Blocks ({nvm_count})", open=True, tags=('nvm_root',))
         for i, block in enumerate(self.config['nvm_blocks']):
             block_node = self.nav_tree.insert(nvm_root, tk.END, 
                 text=f"  [{block['block_id']}] {block['block_name']}", 
@@ -294,22 +324,13 @@ class ConfigEditor:
         
         # DIDs branch with count
         did_count = len(self.config['dids'])
-        did_root = self.nav_tree.insert(root, tk.END, text=f"🔧 DIDs ({did_count})", open=True)
+        did_root = self.nav_tree.insert(root, tk.END, text=f"🔧 DIDs ({did_count})", open=True, tags=('did_root',))
         
-        # Group DIDs by type
-        did_types = {}
+        # List all DIDs directly (no grouping)
         for i, did in enumerate(self.config['dids']):
-            dtype = did['data_type']
-            if dtype not in did_types:
-                did_types[dtype] = []
-            did_types[dtype].append((i, did))
-        
-        for dtype, dids in sorted(did_types.items()):
-            type_node = self.nav_tree.insert(did_root, tk.END, text=f"  📋 {dtype} ({len(dids)})", open=True)
-            for i, did in dids:
-                self.nav_tree.insert(type_node, tk.END, 
-                    text=f"    {did['did']} - {did['did_name']}", 
-                    tags=('did', str(i)))
+            self.nav_tree.insert(did_root, tk.END, 
+                text=f"  {did['did']} - {did['did_name']}", 
+                tags=('did', str(i)))
     
     def browse_config_file(self):
         """Browse for config file"""
@@ -324,18 +345,56 @@ class ConfigEditor:
     
     def browse_output_path(self):
         """Browse for output directory"""
-        directory = filedialog.askdirectory(
-            title="Select Output Directory",
-            initialdir=self.output_path_var.get() if self.output_path_var.get() else "."
-        )
-        if directory:
-            # Convert to relative path if possible
-            try:
-                rel_path = os.path.relpath(directory, os.path.dirname(self.config_file))
-                self.output_path_var.set(rel_path)
-            except ValueError:
-                self.output_path_var.set(directory)
-            self.modified = True
+        try:
+            # Get initial directory
+            initial_dir = "."
+            if self.output_path_var.get():
+                # Try to use current output path
+                if os.path.isabs(self.output_path_var.get()):
+                    initial_dir = self.output_path_var.get()
+                else:
+                    # Relative path - resolve it
+                    if self.config_file and os.path.exists(self.config_file):
+                        base_dir = os.path.dirname(os.path.abspath(self.config_file))
+                        initial_dir = os.path.join(base_dir, self.output_path_var.get())
+                    else:
+                        initial_dir = os.path.abspath(self.output_path_var.get())
+            
+            directory = filedialog.askdirectory(
+                title="Select Output Directory",
+                initialdir=initial_dir if os.path.exists(initial_dir) else "."
+            )
+            
+            if directory:
+                # Convert to relative path if possible
+                if self.config_file and os.path.exists(self.config_file):
+                    try:
+                        base_dir = os.path.dirname(os.path.abspath(self.config_file))
+                        rel_path = os.path.relpath(directory, base_dir)
+                        self.output_path_var.set(rel_path)
+                        print(f"[DEBUG] Set output path (relative): {rel_path}")
+                    except (ValueError, TypeError) as e:
+                        self.output_path_var.set(directory)
+                        print(f"[DEBUG] Set output path (absolute): {directory}")
+                else:
+                    # No config file yet - use relative to current directory
+                    try:
+                        rel_path = os.path.relpath(directory)
+                        self.output_path_var.set(rel_path)
+                        print(f"[DEBUG] Set output path (relative to cwd): {rel_path}")
+                    except (ValueError, TypeError) as e:
+                        self.output_path_var.set(directory)
+                        print(f"[DEBUG] Set output path (absolute): {directory}")
+                
+                # Update config immediately
+                if self.config:
+                    self.config['project']['generated_path'] = self.output_path_var.get()
+                    print(f"[DEBUG] Updated config['project']['generated_path'] = {self.output_path_var.get()}")
+                
+                self.set_modified()
+                self.status_var.set(f"Output path set to: {self.output_path_var.get()}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to browse directory: {e}")
     
     def open_config(self):
         """Open configuration file"""
@@ -364,66 +423,333 @@ class ConfigEditor:
         item = self.nav_tree.item(selection[0])
         tags = item['tags']
         
+        # Update info panel
         self.info_text.config(state=tk.NORMAL)
         self.info_text.delete(1.0, tk.END)
         
         if tags and tags[0] == 'nvm':
-            # Show NVM block details
+            # Show NVM block details in info panel
             idx = int(tags[1])
             block = self.config['nvm_blocks'][idx]
             info = f"NVM Block Details\n"
             info += f"{'='*30}\n"
             info += f"Block ID: {block['block_id']}\n"
             info += f"Name: {block['block_name']}\n"
-            info += f"Length: {block['data_length']} bytes\n"
-            info += f"Default: {' '.join([f'{v:02X}' for v in block['default_value']])}\n"
+            info += f"Length: {block.get('block_size', block.get('data_length', 0))} bytes\n"
+            
+            rom_data = block.get('rom_data', block.get('default_value', ''))
+            if isinstance(rom_data, str):
+                info += f"ROM Data: {rom_data}\n"
+            else:
+                info += f"ROM Data: {' '.join([f'{v:02X}' for v in rom_data])}\n"
+            
+            ram_data = block.get('ram_data', '')
+            if ram_data:
+                info += f"RAM Data: {ram_data}\n"
+            
             info += f"\nDescription:\n{block['description']}\n"
             self.info_text.insert(1.0, info)
             
-            # Switch to NVM tab and select item
-            self.notebook.select(0)
-            self.select_nvm_item(idx)
+            # Show edit form in config panel
+            self.show_nvm_edit_form(idx)
             
         elif tags and tags[0] == 'did':
-            # Show DID details
+            # Show DID details in info panel
             idx = int(tags[1])
             did = self.config['dids'][idx]
             info = f"DID Details\n"
             info += f"{'='*30}\n"
             info += f"DID: {did['did']}\n"
             info += f"Name: {did['did_name']}\n"
-            info += f"Type: {did['data_type']}\n"
-            info += f"Length: {did['data_length']} bytes\n"
-            info += f"Read: {'✓' if did['read_access'] else '✗'}\n"
-            info += f"Write: {'✓' if did['write_access'] else '✗'}\n"
-            info += f"Sessions: {', '.join(did['session_required'])}\n"
-            info += f"Security: Level {did['security_level']}\n"
-            if 'nvm_block_id' in did:
-                info += f"NVM Block: {did['nvm_block_id']}\n"
-            info += f"\nDescription:\n{did['description']}\n"
+            info += f"Length: {'Fixed' if did.get('fixed_length', True) else 'Variable'} ({did.get('expected_length', 0)} bytes)\n"
+            if not did.get('fixed_length', True):
+                info += f"Range: {did.get('min_length', 0)}-{did.get('max_length', 0)} bytes\n"
+            if 'read_config' in did:
+                info += f"Read: ✓ ({did['read_config'].get('callback', 'N/A')})\n"
+            if 'write_config' in did:
+                info += f"Write: ✓ ({did['write_config'].get('callback', 'N/A')})\n"
+            info += f"\nDescription:\n{did.get('description', '')}\n"
             self.info_text.insert(1.0, info)
             
-            # Switch to DID tab and select item
-            self.notebook.select(1)
-            self.select_did_item(idx)
+            # Show edit form in config panel
+            self.show_did_edit_form(idx)
         
         self.info_text.config(state=tk.DISABLED)
     
-    def select_nvm_item(self, index):
-        """Select NVM item in tree by index"""
-        children = self.nvm_tree.get_children()
-        if index < len(children):
-            self.nvm_tree.selection_set(children[index])
-            self.nvm_tree.focus(children[index])
-            self.nvm_tree.see(children[index])
+    def show_context_menu(self, event):
+        """Show context menu on right-click"""
+        # Identify clicked item
+        item_id = self.nav_tree.identify_row(event.y)
+        if not item_id:
+            return
+        
+        self.nav_tree.selection_set(item_id)
+        item = self.nav_tree.item(item_id)
+        tags = item['tags']
+        
+        # Create context menu
+        menu = tk.Menu(self.root, tearoff=0)
+        
+        if tags and tags[0] == 'nvm_root':
+            menu.add_command(label="➕ Add New NVM Block", command=self.add_nvm_block)
+        elif tags and tags[0] == 'did_root':
+            menu.add_command(label="➕ Add New DID", command=self.add_did)
+        elif tags and tags[0] == 'nvm':
+            menu.add_command(label="✏️ Edit Block", command=self.edit_nvm_block)
+            menu.add_command(label="🗑️ Delete Block", command=self.delete_nvm_block)
+        elif tags and tags[0] == 'did':
+            menu.add_command(label="✏️ Edit DID", command=self.edit_did)
+            menu.add_command(label="🗑️ Delete DID", command=self.delete_did)
+        else:
+            return
+        
+        menu.post(event.x_root, event.y_root)
     
-    def select_did_item(self, index):
-        """Select DID item in tree by index"""
-        children = self.did_tree.get_children()
-        if index < len(children):
-            self.did_tree.selection_set(children[index])
-            self.did_tree.focus(children[index])
-            self.did_tree.see(children[index])
+    def show_nvm_edit_form(self, index):
+        """Show NVM block edit form in config panel"""
+        # Clear config panel
+        for widget in self.config_panel_frame.winfo_children():
+            widget.destroy()
+        
+        block = self.config['nvm_blocks'][index]
+        
+        # Create form
+        form_frame = ttk.Frame(self.config_panel_frame, padding="10")
+        form_frame.pack(fill=tk.BOTH, expand=True)
+        
+        ttk.Label(form_frame, text=f"Edit NVM Block", font=('', 12, 'bold')).grid(row=0, column=0, columnspan=2, pady=10, sticky=tk.W)
+        
+        # Block ID
+        ttk.Label(form_frame, text="Block ID:").grid(row=1, column=0, sticky=tk.W, pady=5)
+        block_id_var = tk.IntVar(value=block['block_id'])
+        ttk.Entry(form_frame, textvariable=block_id_var, width=30).grid(row=1, column=1, sticky=(tk.W, tk.E), pady=5)
+        
+        # Block Name
+        ttk.Label(form_frame, text="Block Name:").grid(row=2, column=0, sticky=tk.W, pady=5)
+        block_name_var = tk.StringVar(value=block['block_name'])
+        ttk.Entry(form_frame, textvariable=block_name_var, width=30).grid(row=2, column=1, sticky=(tk.W, tk.E), pady=5)
+        
+        # Data Length
+        ttk.Label(form_frame, text="Block Size:").grid(row=3, column=0, sticky=tk.W, pady=5)
+        block_size_var = tk.IntVar(value=block.get('block_size', block.get('data_length', 0)))
+        ttk.Entry(form_frame, textvariable=block_size_var, width=30).grid(row=3, column=1, sticky=(tk.W, tk.E), pady=5)
+        
+        # ROM Data Array Name
+        ttk.Label(form_frame, text="ROM Array Name:").grid(row=4, column=0, sticky=tk.W, pady=5)
+        rom_var = tk.StringVar(value=block.get('rom_data', ''))
+        ttk.Entry(form_frame, textvariable=rom_var, width=30).grid(row=4, column=1, sticky=(tk.W, tk.E), pady=5)
+        
+        # RAM Data Array Name
+        ttk.Label(form_frame, text="RAM Array Name:").grid(row=5, column=0, sticky=tk.W, pady=5)
+        ram_var = tk.StringVar(value=block.get('ram_data', ''))
+        ttk.Entry(form_frame, textvariable=ram_var, width=30).grid(row=5, column=1, sticky=(tk.W, tk.E), pady=5)
+        
+        # Description
+        ttk.Label(form_frame, text="Description:").grid(row=6, column=0, sticky=tk.W, pady=5)
+        desc_var = tk.StringVar(value=block['description'])
+        ttk.Entry(form_frame, textvariable=desc_var, width=30).grid(row=6, column=1, sticky=(tk.W, tk.E), pady=5)
+        
+        # Auto-save on field change
+        def save_changes(*args):
+            try:
+                # Update config silently
+                self.config['nvm_blocks'][index]['block_id'] = block_id_var.get()
+                self.config['nvm_blocks'][index]['block_name'] = block_name_var.get()
+                self.config['nvm_blocks'][index]['block_size'] = block_size_var.get()
+                self.config['nvm_blocks'][index]['rom_data'] = rom_var.get().strip()
+                self.config['nvm_blocks'][index]['ram_data'] = ram_var.get().strip()
+                self.config['nvm_blocks'][index]['description'] = desc_var.get()
+                self.set_modified()
+                self.refresh_ui()
+            except Exception as e:
+                pass
+        
+        # Bind to save on focus out
+        for var in [block_id_var, block_name_var, block_size_var, rom_var, ram_var, desc_var]:
+            var.trace('w', save_changes)
+        
+        form_frame.columnconfigure(1, weight=1)
+    
+    def show_did_edit_form(self, index):
+        """Show DID edit form in config panel - new structure"""
+        # Clear config panel
+        for widget in self.config_panel_frame.winfo_children():
+            widget.destroy()
+        
+        did = self.config['dids'][index]
+        
+        # Create form with scrollbar (same style as NVM)
+        canvas = tk.Canvas(self.config_panel_frame, bg='white')
+        scrollbar = ttk.Scrollbar(self.config_panel_frame, orient=tk.VERTICAL, command=canvas.yview)
+        form_frame = ttk.Frame(canvas, padding="10")
+        
+        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        canvas_frame = canvas.create_window((0, 0), window=form_frame, anchor=tk.NW)
+        
+        ttk.Label(form_frame, text="Edit DID", font=('', 12, 'bold')).grid(row=0, column=0, columnspan=2, pady=10, sticky=tk.W)
+        
+        row = 1
+        
+        # DID
+        ttk.Label(form_frame, text="DID (hex):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        did_var = tk.StringVar(value=did['did'])
+        ttk.Entry(form_frame, textvariable=did_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
+        row += 1
+        
+        # DID Name
+        ttk.Label(form_frame, text="DID Name:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        did_name_var = tk.StringVar(value=did['did_name'])
+        ttk.Entry(form_frame, textvariable=did_name_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
+        row += 1
+        
+        # Fixed Length
+        fixed_var = tk.BooleanVar(value=did.get('fixed_length', True))
+        ttk.Checkbutton(form_frame, text="Fixed Length", variable=fixed_var).grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Expected Length
+        ttk.Label(form_frame, text="Expected Length:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        expected_len_var = tk.IntVar(value=did.get('expected_length', 0))
+        ttk.Entry(form_frame, textvariable=expected_len_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
+        row += 1
+        
+        # Min/Max Length
+        ttk.Label(form_frame, text="Min Length:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        min_len_var = tk.IntVar(value=did.get('min_length', 0))
+        ttk.Entry(form_frame, textvariable=min_len_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
+        row += 1
+        
+        ttk.Label(form_frame, text="Max Length:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        max_len_var = tk.IntVar(value=did.get('max_length', 0))
+        ttk.Entry(form_frame, textvariable=max_len_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
+        row += 1
+        
+        # Separator
+        ttk.Separator(form_frame, orient=tk.HORIZONTAL).grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
+        row += 1
+        
+        # Read Config
+        ttk.Label(form_frame, text="Read Configuration", font=('', 10, 'bold')).grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=5)
+        row += 1
+        
+        read_callback_var = tk.StringVar(value=did.get('read_config', {}).get('callback', ''))
+        ttk.Label(form_frame, text="Callback:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(form_frame, textvariable=read_callback_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
+        row += 1
+        
+        read_length_getter_var = tk.StringVar(value=did.get('read_config', {}).get('length_getter', '') or '')
+        ttk.Label(form_frame, text="Length Getter:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(form_frame, textvariable=read_length_getter_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
+        row += 1
+        
+        read_session_var = tk.IntVar(value=did.get('read_config', {}).get('session_mask', 0))
+        ttk.Label(form_frame, text="Session Mask:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(form_frame, textvariable=read_session_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
+        row += 1
+        
+        read_security_var = tk.IntVar(value=did.get('read_config', {}).get('security_mask', 0))
+        ttk.Label(form_frame, text="Security Mask:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(form_frame, textvariable=read_security_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
+        row += 1
+        
+        # Separator
+        ttk.Separator(form_frame, orient=tk.HORIZONTAL).grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
+        row += 1
+        
+        # Write Config
+        ttk.Label(form_frame, text="Write Configuration", font=('', 10, 'bold')).grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=5)
+        row += 1
+        
+        write_callback_var = tk.StringVar(value=did.get('write_config', {}).get('callback', ''))
+        ttk.Label(form_frame, text="Callback:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(form_frame, textvariable=write_callback_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
+        row += 1
+        
+        write_session_var = tk.IntVar(value=did.get('write_config', {}).get('session_mask', 0))
+        ttk.Label(form_frame, text="Session Mask:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(form_frame, textvariable=write_session_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
+        row += 1
+        
+        write_security_var = tk.IntVar(value=did.get('write_config', {}).get('security_mask', 0))
+        ttk.Label(form_frame, text="Security Mask:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(form_frame, textvariable=write_security_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
+        row += 1
+        
+        write_validation_var = tk.BooleanVar(value=did.get('write_config', {}).get('semantic_validation', False))
+        ttk.Checkbutton(form_frame, text="Semantic Validation", variable=write_validation_var).grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Description
+        ttk.Label(form_frame, text="Description:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        desc_var = tk.StringVar(value=did.get('description', ''))
+        ttk.Entry(form_frame, textvariable=desc_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
+        row += 1
+        
+        # Save button
+        def save_changes():
+            try:
+                # Update config with new structure
+                self.config['dids'][index]['did'] = did_var.get()
+                self.config['dids'][index]['did_name'] = did_name_var.get()
+                self.config['dids'][index]['fixed_length'] = fixed_var.get()
+                self.config['dids'][index]['expected_length'] = expected_len_var.get()
+                self.config['dids'][index]['min_length'] = min_len_var.get()
+                self.config['dids'][index]['max_length'] = max_len_var.get()
+                
+                # Read config
+                read_cfg = {}
+                if read_callback_var.get():
+                    read_cfg['callback'] = read_callback_var.get()
+                    read_cfg['length_getter'] = read_length_getter_var.get() if read_length_getter_var.get() else None
+                    read_cfg['session_mask'] = read_session_var.get()
+                    read_cfg['security_mask'] = read_security_var.get()
+                    self.config['dids'][index]['read_config'] = read_cfg
+                elif 'read_config' in self.config['dids'][index]:
+                    del self.config['dids'][index]['read_config']
+                
+                # Write config
+                write_cfg = {}
+                if write_callback_var.get():
+                    write_cfg['callback'] = write_callback_var.get()
+                    write_cfg['session_mask'] = write_session_var.get()
+                    write_cfg['security_mask'] = write_security_var.get()
+                    write_cfg['semantic_validation'] = write_validation_var.get()
+                    self.config['dids'][index]['write_config'] = write_cfg
+                elif 'write_config' in self.config['dids'][index]:
+                    del self.config['dids'][index]['write_config']
+                
+                self.config['dids'][index]['description'] = desc_var.get()
+                
+                self.set_modified()
+                self.refresh_ui()
+            except Exception as e:
+                pass
+        
+        # Bind to save on change
+        for var in [did_var, did_name_var, fixed_var, expected_len_var, min_len_var, max_len_var,
+                    read_callback_var, read_length_getter_var, read_session_var, read_security_var,
+                    write_callback_var, write_session_var, write_security_var, write_validation_var, desc_var]:
+            if hasattr(var, 'trace'):
+                var.trace('w', save_changes)
+        
+        form_frame.columnconfigure(1, weight=1)
+        
+        # Update scroll region and bind canvas width
+        def on_frame_configure(event=None):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        
+        def on_canvas_configure(event):
+            canvas.itemconfig(canvas_frame, width=event.width)
+        
+        form_frame.bind('<Configure>', on_frame_configure)
+        canvas.bind('<Configure>', on_canvas_configure)
+        
+        # Initial update
+        form_frame.update_idletasks()
+        canvas.configure(scrollregion=canvas.bbox("all"))
     
     def new_config(self):
         """Create new configuration"""
@@ -437,7 +763,8 @@ class ConfigEditor:
             "dids": []
         }
         self.refresh_ui()
-        self.modified = True
+        self.set_modified()
+        self.update_title()
         self.status_var.set("New configuration created")
     
     def open_config(self):
@@ -461,7 +788,8 @@ class ConfigEditor:
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(self.config, f, indent=2)
             
-            self.modified = False
+            self.set_modified(False)
+            self.update_title()
             self.status_var.set(f"Saved: {self.config_file}")
             messagebox.showinfo("Success", "Configuration saved successfully!")
         except Exception as e:
@@ -490,7 +818,7 @@ class ConfigEditor:
             
             self.config['nvm_blocks'].append(dialog.result)
             self.refresh_ui()
-            self.modified = True
+            self.set_modified()
     
     def edit_nvm_block(self):
         """Edit selected NVM block"""
@@ -509,7 +837,7 @@ class ConfigEditor:
             if dialog.result:
                 block.update(dialog.result)
                 self.refresh_ui()
-                self.modified = True
+                self.set_modified()
     
     def delete_nvm_block(self):
         """Delete selected NVM block"""
@@ -523,11 +851,11 @@ class ConfigEditor:
             block_id = int(item['values'][0])
             self.config['nvm_blocks'] = [b for b in self.config['nvm_blocks'] if b['block_id'] != block_id]
             self.refresh_ui()
-            self.modified = True
+            self.set_modified()
     
     def add_did(self):
         """Add new DID"""
-        dialog = DidDialog(self.root, None, self.config['nvm_blocks'])
+        dialog = DidDialog(self.root, None)
         if dialog.result:
             # Check for duplicate DID
             for did in self.config['dids']:
@@ -537,7 +865,7 @@ class ConfigEditor:
             
             self.config['dids'].append(dialog.result)
             self.refresh_ui()
-            self.modified = True
+            self.set_modified()
     
     def edit_did(self):
         """Edit selected DID"""
@@ -552,11 +880,11 @@ class ConfigEditor:
         # Find DID
         did = next((d for d in self.config['dids'] if d['did'] == did_value), None)
         if did:
-            dialog = DidDialog(self.root, did, self.config['nvm_blocks'])
+            dialog = DidDialog(self.root, did)
             if dialog.result:
                 did.update(dialog.result)
                 self.refresh_ui()
-                self.modified = True
+                self.set_modified()
     
     def delete_did(self):
         """Delete selected DID"""
@@ -570,7 +898,7 @@ class ConfigEditor:
             did_value = item['values'][0]
             self.config['dids'] = [d for d in self.config['dids'] if d['did'] != did_value]
             self.refresh_ui()
-            self.modified = True
+            self.set_modified()
     
     def generate_code(self):
         """Generate code from configuration"""
@@ -578,11 +906,45 @@ class ConfigEditor:
             # Save first
             self.save_config()
             
-            # Generate
-            generator = CodeGenerator(self.config_file)
-            generator.generate_all()
+            # Validate first
+            nvm_valid, nvm_errors, nvm_warnings = validate_nvm_blocks(self.config['nvm_blocks'])
+            did_valid, did_errors, did_warnings = validate_dids(self.config['dids'])
             
-            messagebox.showinfo("Success", "Code generated successfully!")
+            if not nvm_valid or not did_valid:
+                error_msg = "Validation failed:\n"
+                if nvm_errors:
+                    error_msg += "\nNVM Errors:\n" + "\n".join(nvm_errors)
+                if did_errors:
+                    error_msg += "\nDID Errors:\n" + "\n".join(did_errors)
+                messagebox.showerror("Validation Error", error_msg)
+                return
+            
+            # Generate code
+            output_path = self.output_path_var.get() or "GenCode"
+            
+            # Convert to absolute path if relative
+            if not os.path.isabs(output_path):
+                if self.config_file and os.path.exists(self.config_file):
+                    # Relative to config file location
+                    config_dir = os.path.dirname(os.path.abspath(self.config_file))
+                    output_path = os.path.join(config_dir, output_path)
+                else:
+                    # Relative to current working directory
+                    output_path = os.path.abspath(output_path)
+            
+            # Create output directory if not exists
+            os.makedirs(output_path, exist_ok=True)
+            
+            project_name = self.config['project']['name']
+            version = self.config['project']['version']
+            
+            print(f"[DEBUG] Generating code to: {output_path}")
+            
+            nvm_files = generate_nvm_code(self.config['nvm_blocks'], project_name, version, output_path)
+            did_files = generate_did_code(self.config['dids'], project_name, version, output_path)
+            
+            all_files = nvm_files + did_files
+            messagebox.showinfo("Success", f"Generated {len(all_files)} files:\n" + "\n".join([os.path.basename(f) for f in all_files]))
             self.status_var.set("Code generation complete")
         except Exception as e:
             messagebox.showerror("Error", f"Code generation failed: {e}")
@@ -590,31 +952,29 @@ class ConfigEditor:
     def validate_config(self):
         """Validate configuration"""
         try:
-            # Basic validation
-            errors = []
+            # Validate using modules
+            nvm_valid, nvm_errors, nvm_warnings = validate_nvm_blocks(self.config['nvm_blocks'])
+            did_valid, did_errors, did_warnings = validate_dids(self.config['dids'])
             
+            # Collect all messages
+            all_errors = nvm_errors + did_errors
+            all_warnings = nvm_warnings + did_warnings
+            
+            # Basic project validation
             if not self.config['project']['name']:
-                errors.append("Project name is empty")
+                all_errors.append("Project name is empty")
             
-            if not self.config['nvm_blocks']:
-                errors.append("No NVM blocks defined")
-            
-            if not self.config['dids']:
-                errors.append("No DIDs defined")
-            
-            # Check for duplicate IDs
-            block_ids = [b['block_id'] for b in self.config['nvm_blocks']]
-            if len(block_ids) != len(set(block_ids)):
-                errors.append("Duplicate NVM block IDs found")
-            
-            did_values = [d['did'] for d in self.config['dids']]
-            if len(did_values) != len(set(did_values)):
-                errors.append("Duplicate DIDs found")
-            
-            if errors:
-                messagebox.showwarning("Validation Errors", "\n".join(errors))
+            # Show results
+            if all_errors:
+                msg = "❌ Validation Failed:\n\n" + "\n".join(all_errors)
+                if all_warnings:
+                    msg += "\n\n⚠️ Warnings:\n" + "\n".join(all_warnings)
+                messagebox.showerror("Validation Errors", msg)
+            elif all_warnings:
+                msg = "⚠️ Validation Passed with Warnings:\n\n" + "\n".join(all_warnings)
+                messagebox.showwarning("Validation Warnings", msg)
             else:
-                messagebox.showinfo("Validation", "Configuration is valid!")
+                messagebox.showinfo("Validation", "✓ Configuration is valid!")
         except Exception as e:
             messagebox.showerror("Error", f"Validation failed: {e}")
     
@@ -653,41 +1013,51 @@ class NvmBlockDialog:
         ttk.Entry(form_frame, textvariable=block_name_var, width=40).grid(row=1, column=1, sticky=tk.W, pady=5)
         
         # Data Length
-        ttk.Label(form_frame, text="Data Length:").grid(row=2, column=0, sticky=tk.W, pady=5)
-        data_length_var = tk.IntVar(value=block_data['data_length'] if block_data else 4)
+        ttk.Label(form_frame, text="Block Size:").grid(row=2, column=0, sticky=tk.W, pady=5)
+        data_length_var = tk.IntVar(value=block_data.get('block_size', block_data.get('data_length', 4)) if block_data else 4)
         ttk.Entry(form_frame, textvariable=data_length_var, width=20).grid(row=2, column=1, sticky=tk.W, pady=5)
         
         # Default Value
-        ttk.Label(form_frame, text="Default Value (hex):").grid(row=3, column=0, sticky=tk.W, pady=5)
-        default_str = ' '.join([f"{v:02X}" for v in block_data['default_value']]) if block_data else "00 00 00 00"
-        default_var = tk.StringVar(value=default_str)
+        ttk.Label(form_frame, text="ROM Array Name:").grid(row=3, column=0, sticky=tk.W, pady=5)
+        rom_data = block_data.get('rom_data', block_data.get('default_value', '')) if block_data else ''
+        if isinstance(rom_data, list):
+            # Old format - convert to suggested name
+            rom_data = f"rom_{block_data.get('block_name', 'data').lower()}"
+        default_var = tk.StringVar(value=rom_data)
         ttk.Entry(form_frame, textvariable=default_var, width=40).grid(row=3, column=1, sticky=tk.W, pady=5)
-        ttk.Label(form_frame, text="(space-separated hex values)", font=('', 8)).grid(row=4, column=1, sticky=tk.W)
+        ttk.Label(form_frame, text="(array name, e.g. rom_default_vin)", font=('', 8)).grid(row=4, column=1, sticky=tk.W)
+        
+        # RAM Array Name
+        ttk.Label(form_frame, text="RAM Array Name:").grid(row=5, column=0, sticky=tk.W, pady=5)
+        ram_data = block_data.get('ram_data', '') if block_data else ''
+        if isinstance(ram_data, list):
+            ram_data = f"ram_{block_data.get('block_name', 'data').lower()}"
+        ram_var = tk.StringVar(value=ram_data)
+        ttk.Entry(form_frame, textvariable=ram_var, width=40).grid(row=5, column=1, sticky=tk.W, pady=5)
+        ttk.Label(form_frame, text="(optional, e.g. ram_mirror_vin)", font=('', 8)).grid(row=6, column=1, sticky=tk.W)
         
         # Description
-        ttk.Label(form_frame, text="Description:").grid(row=5, column=0, sticky=tk.W, pady=5)
+        ttk.Label(form_frame, text="Description:").grid(row=7, column=0, sticky=tk.W, pady=5)
         description_var = tk.StringVar(value=block_data['description'] if block_data else "")
-        ttk.Entry(form_frame, textvariable=description_var, width=40).grid(row=5, column=1, sticky=tk.W, pady=5)
+        ttk.Entry(form_frame, textvariable=description_var, width=40).grid(row=7, column=1, sticky=tk.W, pady=5)
         
         # Buttons
         button_frame = ttk.Frame(dialog)
         button_frame.pack(side=tk.BOTTOM, pady=10)
         
         def on_ok():
-            try:
-                # Parse default value
-                default_values = [int(x, 16) for x in default_var.get().split()]
-                
-                self.result = {
-                    "block_id": block_id_var.get(),
-                    "block_name": block_name_var.get().upper(),
-                    "data_length": data_length_var.get(),
-                    "default_value": default_values,
-                    "description": description_var.get()
-                }
-                dialog.destroy()
-            except ValueError:
-                messagebox.showerror("Error", "Invalid hex values in default data")
+            self.result = {
+                "block_id": block_id_var.get(),
+                "block_name": block_name_var.get().upper(),
+                "block_size": data_length_var.get(),
+                "block_type": "NATIVE",
+                "rom_data": default_var.get().strip(),
+                "ram_data": ram_var.get().strip(),
+                "write_protection": False,
+                "use_crc": True,
+                "description": description_var.get()
+            }
+            dialog.destroy()
         
         ttk.Button(button_frame, text="OK", command=on_ok, width=10).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Cancel", command=dialog.destroy, width=10).pack(side=tk.LEFT, padx=5)
@@ -696,133 +1066,171 @@ class NvmBlockDialog:
 
 
 class DidDialog:
-    """Dialog for adding/editing DID"""
-    def __init__(self, parent, did_data, nvm_blocks):
+    """Dialog for adding/editing DID - new schema"""
+    def __init__(self, parent, did_data):
         self.result = None
-        self.nvm_blocks = nvm_blocks
         
         dialog = tk.Toplevel(parent)
         dialog.title("DID Editor")
-        dialog.geometry("600x550")
+        dialog.geometry("550x650")
         dialog.transient(parent)
         dialog.grab_set()
         
-        # Form
-        form_frame = ttk.Frame(dialog, padding="20")
-        form_frame.pack(fill=tk.BOTH, expand=True)
+        # Form with scrollbar
+        canvas = tk.Canvas(dialog)
+        scrollbar = ttk.Scrollbar(dialog, orient=tk.VERTICAL, command=canvas.yview)
+        form_frame = ttk.Frame(canvas, padding="20")
+        
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        canvas.create_window((0, 0), window=form_frame, anchor=tk.NW)
         
         row = 0
         
         # DID
-        ttk.Label(form_frame, text="DID:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Label(form_frame, text="DID (hex):").grid(row=row, column=0, sticky=tk.W, pady=5)
         did_var = tk.StringVar(value=did_data['did'] if did_data else "0xF190")
-        ttk.Entry(form_frame, textvariable=did_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Entry(form_frame, textvariable=did_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
         row += 1
         
         # DID Name
         ttk.Label(form_frame, text="DID Name:").grid(row=row, column=0, sticky=tk.W, pady=5)
         did_name_var = tk.StringVar(value=did_data['did_name'] if did_data else "")
-        ttk.Entry(form_frame, textvariable=did_name_var, width=40).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Entry(form_frame, textvariable=did_name_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Fixed Length
+        fixed_var = tk.BooleanVar(value=did_data.get('fixed_length', True) if did_data else True)
+        ttk.Checkbutton(form_frame, text="Fixed Length", variable=fixed_var).grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Expected Length
+        ttk.Label(form_frame, text="Expected Length:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        expected_len_var = tk.IntVar(value=did_data.get('expected_length', 4) if did_data else 4)
+        ttk.Entry(form_frame, textvariable=expected_len_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Min Length (for variable)
+        ttk.Label(form_frame, text="Min Length:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        min_len_var = tk.IntVar(value=did_data.get('min_length', 0) if did_data else 0)
+        ttk.Entry(form_frame, textvariable=min_len_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Max Length (for variable)
+        ttk.Label(form_frame, text="Max Length:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        max_len_var = tk.IntVar(value=did_data.get('max_length', 0) if did_data else 0)
+        ttk.Entry(form_frame, textvariable=max_len_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Separator
+        ttk.Separator(form_frame, orient=tk.HORIZONTAL).grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
+        row += 1
+        
+        # Read Configuration
+        ttk.Label(form_frame, text="Read Configuration", font=('TkDefaultFont', 9, 'bold')).grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=5)
+        row += 1
+        
+        ttk.Label(form_frame, text="Read Callback:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        read_cb_var = tk.StringVar(value=did_data.get('read_config', {}).get('callback', '') if did_data else '')
+        ttk.Entry(form_frame, textvariable=read_cb_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
+        ttk.Label(form_frame, text="Length Getter:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        read_len_var = tk.StringVar(value=did_data.get('read_config', {}).get('length_getter', '') if did_data else '')
+        ttk.Entry(form_frame, textvariable=read_len_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
+        ttk.Label(form_frame, text="Session Mask:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        read_session_var = tk.IntVar(value=did_data.get('read_config', {}).get('session_mask', 1) if did_data else 1)
+        ttk.Entry(form_frame, textvariable=read_session_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
+        ttk.Label(form_frame, text="Security Mask:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        read_security_var = tk.IntVar(value=did_data.get('read_config', {}).get('security_mask', 0) if did_data else 0)
+        ttk.Entry(form_frame, textvariable=read_security_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Separator
+        ttk.Separator(form_frame, orient=tk.HORIZONTAL).grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
+        row += 1
+        
+        # Write Configuration
+        ttk.Label(form_frame, text="Write Configuration", font=('TkDefaultFont', 9, 'bold')).grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=5)
+        row += 1
+        
+        ttk.Label(form_frame, text="Write Callback:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        write_cb_var = tk.StringVar(value=did_data.get('write_config', {}).get('callback', '') if did_data else '')
+        ttk.Entry(form_frame, textvariable=write_cb_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
+        ttk.Label(form_frame, text="Session Mask:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        write_session_var = tk.IntVar(value=did_data.get('write_config', {}).get('session_mask', 2) if did_data else 2)
+        ttk.Entry(form_frame, textvariable=write_session_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
+        ttk.Label(form_frame, text="Security Mask:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        write_security_var = tk.IntVar(value=did_data.get('write_config', {}).get('security_mask', 0) if did_data else 0)
+        ttk.Entry(form_frame, textvariable=write_security_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
+        write_validation_var = tk.BooleanVar(value=did_data.get('write_config', {}).get('semantic_validation', False) if did_data else False)
+        ttk.Checkbutton(form_frame, text="Semantic Validation", variable=write_validation_var).grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Separator
+        ttk.Separator(form_frame, orient=tk.HORIZONTAL).grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
         row += 1
         
         # Description
         ttk.Label(form_frame, text="Description:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        description_var = tk.StringVar(value=did_data['description'] if did_data else "")
-        ttk.Entry(form_frame, textvariable=description_var, width=40).grid(row=row, column=1, sticky=tk.W, pady=5)
-        row += 1
-        
-        # Data Type
-        ttk.Label(form_frame, text="Data Type:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        data_type_var = tk.StringVar(value=did_data['data_type'] if did_data else "NVM")
-        type_combo = ttk.Combobox(form_frame, textvariable=data_type_var, values=["STATIC", "NVM", "DYNAMIC"], width=15, state="readonly")
-        type_combo.grid(row=row, column=1, sticky=tk.W, pady=5)
-        row += 1
-        
-        # NVM Block ID
-        ttk.Label(form_frame, text="NVM Block:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        nvm_block_var = tk.IntVar(value=did_data.get('nvm_block_id', 0) if did_data else 0)
-        block_names = [f"{b['block_id']}: {b['block_name']}" for b in nvm_blocks]
-        nvm_combo = ttk.Combobox(form_frame, values=block_names, width=37, state="readonly")
-        if did_data and 'nvm_block_id' in did_data:
-            nvm_combo.current(did_data['nvm_block_id'])
-        nvm_combo.grid(row=row, column=1, sticky=tk.W, pady=5)
-        row += 1
-        
-        # Data Length
-        ttk.Label(form_frame, text="Data Length:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        data_length_var = tk.IntVar(value=did_data['data_length'] if did_data else 4)
-        ttk.Entry(form_frame, textvariable=data_length_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
-        row += 1
-        
-        # Access
-        ttk.Label(form_frame, text="Access:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        access_frame = ttk.Frame(form_frame)
-        access_frame.grid(row=row, column=1, sticky=tk.W, pady=5)
-        read_var = tk.BooleanVar(value=did_data['read_access'] if did_data else True)
-        write_var = tk.BooleanVar(value=did_data['write_access'] if did_data else False)
-        ttk.Checkbutton(access_frame, text="Read (0x22)", variable=read_var).pack(side=tk.LEFT, padx=5)
-        ttk.Checkbutton(access_frame, text="Write (0x2E)", variable=write_var).pack(side=tk.LEFT, padx=5)
-        row += 1
-        
-        # Session Required
-        ttk.Label(form_frame, text="Session Required:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        session_frame = ttk.Frame(form_frame)
-        session_frame.grid(row=row, column=1, sticky=tk.W, pady=5)
-        default_sess_var = tk.BooleanVar(value="DEFAULT" in did_data.get('session_required', []) if did_data else True)
-        prog_sess_var = tk.BooleanVar(value="PROGRAMMING" in did_data.get('session_required', []) if did_data else False)
-        ext_sess_var = tk.BooleanVar(value="EXTENDED_DIAGNOSTIC" in did_data.get('session_required', []) if did_data else False)
-        ttk.Checkbutton(session_frame, text="Default", variable=default_sess_var).pack(anchor=tk.W)
-        ttk.Checkbutton(session_frame, text="Programming", variable=prog_sess_var).pack(anchor=tk.W)
-        ttk.Checkbutton(session_frame, text="Extended Diagnostic", variable=ext_sess_var).pack(anchor=tk.W)
-        row += 1
-        
-        # Security Level
-        ttk.Label(form_frame, text="Security Level:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        security_var = tk.IntVar(value=did_data.get('security_level', 0) if did_data else 0)
-        ttk.Entry(form_frame, textvariable=security_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
+        description_var = tk.StringVar(value=did_data.get('description', '') if did_data else "")
+        ttk.Entry(form_frame, textvariable=description_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
         row += 1
         
         # Buttons
-        button_frame = ttk.Frame(dialog)
-        button_frame.pack(side=tk.BOTTOM, pady=10)
+        button_frame = ttk.Frame(form_frame)
+        button_frame.grid(row=row, column=0, columnspan=2, pady=20)
         
         def on_ok():
-            try:
-                # Build session list
-                sessions = []
-                if default_sess_var.get():
-                    sessions.append("DEFAULT")
-                if prog_sess_var.get():
-                    sessions.append("PROGRAMMING")
-                if ext_sess_var.get():
-                    sessions.append("EXTENDED_DIAGNOSTIC")
-                
-                # Get NVM block ID from combo
-                nvm_block_id = None
-                if data_type_var.get() == "NVM" and nvm_combo.get():
-                    nvm_block_id = int(nvm_combo.get().split(':')[0])
-                
-                self.result = {
-                    "did": did_var.get(),
-                    "did_name": did_name_var.get().upper(),
-                    "description": description_var.get(),
-                    "data_type": data_type_var.get(),
-                    "data_length": data_length_var.get(),
-                    "read_access": read_var.get(),
-                    "write_access": write_var.get(),
-                    "session_required": sessions,
-                    "security_level": security_var.get()
+            result = {
+                "did": did_var.get(),
+                "did_name": did_name_var.get().upper(),
+                "fixed_length": fixed_var.get(),
+                "expected_length": expected_len_var.get(),
+                "min_length": min_len_var.get(),
+                "max_length": max_len_var.get(),
+                "description": description_var.get()
+            }
+            
+            # Add read config if callback provided
+            if read_cb_var.get():
+                result['read_config'] = {
+                    "callback": read_cb_var.get(),
+                    "length_getter": read_len_var.get() if read_len_var.get() else None,
+                    "session_mask": read_session_var.get(),
+                    "security_mask": read_security_var.get()
                 }
-                
-                if nvm_block_id is not None:
-                    self.result['nvm_block_id'] = nvm_block_id
-                
-                dialog.destroy()
-            except Exception as e:
-                messagebox.showerror("Error", f"Invalid input: {e}")
+            
+            # Add write config if callback provided
+            if write_cb_var.get():
+                result['write_config'] = {
+                    "callback": write_cb_var.get(),
+                    "session_mask": write_session_var.get(),
+                    "security_mask": write_security_var.get(),
+                    "semantic_validation": write_validation_var.get()
+                }
+            
+            self.result = result
+            dialog.destroy()
         
         ttk.Button(button_frame, text="OK", command=on_ok, width=10).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Cancel", command=dialog.destroy, width=10).pack(side=tk.LEFT, padx=5)
+        
+        # Update scroll region
+        form_frame.update_idletasks()
+        canvas.configure(scrollregion=canvas.bbox("all"))
         
         dialog.wait_window()
 

@@ -7,7 +7,7 @@ CONFIG_LOG_TAG(UDS_0x10, true)
 /**
  * @brief Service 0x10 handler - Diagnostic Session Control
  */
-Std_ReturnType uds_service_0x10_handler(const uds_message_t *message, uint8_t *error_code)
+Std_ReturnType uds_service_0x10_handler(const uds_message_t *message, ErrorCode_t *error_code)
 {
     // Phase 1: Parse and validate
     if (message->request_len != 2) {

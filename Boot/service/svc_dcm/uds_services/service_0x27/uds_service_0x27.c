@@ -9,7 +9,7 @@ CONFIG_LOG_TAG(UDS_0x27, true)
 /**
  * @brief Service 0x27 handler - Security Access
  */
-Std_ReturnType uds_service_0x27_handler(const uds_message_t *message, uint8_t *error_code)
+Std_ReturnType uds_service_0x27_handler(const uds_message_t *message, ErrorCode_t *error_code)
 {
     // Phase 1: Validate minimum request length (SID + Sub-function)
     if (message->request_len < 2) {

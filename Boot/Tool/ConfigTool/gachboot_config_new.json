@@ -1,0 +1,43 @@
+{
+  "project": {
+    "name": "GachBoot",
+    "version": "1.0.0",
+    "generated_path": "GenCode"
+  },
+  "nvm_blocks": [
+    {
+      "block_id": 1,
+      "block_name": "NVM_BLOCK_VIN",
+      "block_size": 17,
+      "block_type": "NATIVE",
+      "rom_data": "rom_default_vin",
+      "ram_data": "ram_mirror_vin",
+      "write_protection": false,
+      "use_crc": true,
+      "description": "Vehicle Identification Number"
+    }
+  ],
+  "dids": [
+    {
+      "did": "0xF190",
+      "did_name": "DID_VIN",
+      "fixed_length": true,
+      "expected_length": 17,
+      "min_length": 0,
+      "max_length": 0,
+      "read_config": {
+        "callback": "uds_did_read_vin",
+        "length_getter": null,
+        "session_mask": 1,
+        "security_mask": 0
+      },
+      "write_config": {
+        "callback": "uds_did_write_vin",
+        "session_mask": 2,
+        "security_mask": 1,
+        "semantic_validation": false
+      },
+      "description": "Vehicle Identification Number"
+    }
+  ]
+}

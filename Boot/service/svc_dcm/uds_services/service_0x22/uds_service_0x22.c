@@ -9,7 +9,7 @@ CONFIG_LOG_TAG(UDS_0x22, true)
 /**
  * @brief Service 0x22 handler - Read Data By Identifier
  */
-Std_ReturnType uds_service_0x22_handler(const uds_message_t *message, uint8_t *error_code)
+Std_ReturnType uds_service_0x22_handler(const uds_message_t *message, ErrorCode_t *error_code)
 {
     // Phase 1: Validate request length (minimum: SID + 1 DID)
     if (message->request_len < 3) {

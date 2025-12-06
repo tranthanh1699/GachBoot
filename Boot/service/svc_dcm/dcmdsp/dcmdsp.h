@@ -20,7 +20,7 @@ typedef struct {
  * @param error_code NRC if error (output) - separate parameter
  * @return Std_ReturnType E_OK (positive response), E_NOT_OK (negative response), DCM_E_PENDING (send 0x78)
  */
-typedef Std_ReturnType (*uds_service_handler_t)(const uds_message_t *message, uint8_t *error_code);
+typedef Std_ReturnType (*uds_service_handler_t)(const uds_message_t *message, ErrorCode_t *error_code);
 
 /**
  * @brief Service handler table entry
@@ -42,7 +42,7 @@ Std_ReturnType dcmdsp_init(void);
  * @param error_code NRC if error (output)
  * @return Std_ReturnType E_OK (handler found and success), E_NOT_OK (handler found but error), DCM_E_PENDING (handler pending)
  */
-Std_ReturnType dcmdsp_process_service(uint8_t service_id, const uds_message_t *message, uint8_t *error_code);
+Std_ReturnType dcmdsp_process_service(uint8_t service_id, const uds_message_t *message, ErrorCode_t *error_code);
 
 /**
  * @brief Build negative response

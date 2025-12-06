@@ -35,7 +35,7 @@ Std_ReturnType dcmdsp_init(void)
 /**
  * @brief Process UDS service request (unified interface)
  */
-Std_ReturnType dcmdsp_process_service(uint8_t service_id, const uds_message_t *message, uint8_t *error_code)
+Std_ReturnType dcmdsp_process_service(uint8_t service_id, const uds_message_t *message, ErrorCode_t *error_code)
 {
     // Find service handler in table
     for (uint16_t i = 0; i < SERVICE_TABLE_SIZE; i++) {

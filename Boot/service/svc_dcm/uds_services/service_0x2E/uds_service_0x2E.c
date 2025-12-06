@@ -9,7 +9,7 @@ CONFIG_LOG_TAG(UDS_0x2E, true)
 /**
  * @brief Service 0x2E handler - Write Data By Identifier
  */
-Std_ReturnType uds_service_0x2e_handler(const uds_message_t *message, uint8_t *error_code)
+Std_ReturnType uds_service_0x2e_handler(const uds_message_t *message, ErrorCode_t *error_code)
 {
     // Phase 1: Validate request length (minimum: SID + DID + 1 byte data)
     if (message->request_len < 4) {
@@ -90,7 +90,7 @@ Std_ReturnType uds_service_0x2e_handler(const uds_message_t *message, uint8_t *e
     }
 
     // Phase 6: Call DID write callback - all validation done, just write
-    Std_ReturnType result = did_entry->write_config.callback(data, data_len);
+    Std_ReturnType result = did_entry->write_config.callback(data, error_code);
 
     if (result == DCM_E_PENDING) {
         DBG_OUT_I("DID 0x%04X write pending", did);
@@ -99,12 +99,12 @@ Std_ReturnType uds_service_0x2e_handler(const uds_message_t *message, uint8_t *e
     }
     else if (result != E_OK) {
         DBG_OUT_E("DID 0x%04X write failed", did);
-        // Check if semantic validation is enabled for better error reporting
-        if (did_entry->write_config.semantic_validation) {
-            *error_code = UDS_NRC_REQUEST_OUT_OF_RANGE;  // Invalid data semantics
-        } else {
-            *error_code = UDS_NRC_CONDITIONS_NOT_CORRECT;  // Write operation failed
-        }
+        // // Check if semantic validation is enabled for better error reporting
+        // if (did_entry->write_config.semantic_validation) {
+        //     *error_code = UDS_NRC_REQUEST_OUT_OF_RANGE;  // Invalid data semantics
+        // } else {
+        //     *error_code = UDS_NRC_CONDITIONS_NOT_CORRECT;  // Write operation failed
+        // }
         return E_NOT_OK;
     }
 
