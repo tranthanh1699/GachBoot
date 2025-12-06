@@ -8,8 +8,9 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import json
 import os
-from nvm_module import validate_nvm_blocks, generate_nvm_code
-from did_module import validate_dids, generate_did_code
+from Module.nvm_module import validate_nvm_blocks, generate_nvm_code
+from Module.did_module import validate_dids, generate_did_code
+from Module.cmake_module import generate_cmake_file
 
 class ConfigEditor:
     def __init__(self, root):
@@ -942,8 +943,9 @@ class ConfigEditor:
             
             nvm_files = generate_nvm_code(self.config['nvm_blocks'], project_name, version, output_path)
             did_files = generate_did_code(self.config['dids'], project_name, version, output_path)
+            cmake_file = generate_cmake_file(output_path, project_name, version)
             
-            all_files = nvm_files + did_files
+            all_files = nvm_files + did_files + [cmake_file]
             messagebox.showinfo("Success", f"Generated {len(all_files)} files:\n" + "\n".join([os.path.basename(f) for f in all_files]))
             self.status_var.set("Code generation complete")
         except Exception as e:

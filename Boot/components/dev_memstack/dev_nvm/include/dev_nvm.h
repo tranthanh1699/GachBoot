@@ -4,16 +4,7 @@
 #include "dev_common.h"
 #include <stdint.h>
 #include <stdbool.h>
-
-/**
- * @brief NVM Block Management Types (AUTOSAR-like)
- */
-
-// NVM Block Management Type
-typedef enum {
-    DEV_NVM_BLOCK_NATIVE = 0,           // Single copy (no redundancy)
-    DEV_NVM_BLOCK_REDUNDANT = 1         // Dual copy with CRC validation
-} dev_nvm_block_type_t;
+#include "NvM_PBCfg.h"
 
 // NVM Block State
 typedef enum {
@@ -32,19 +23,6 @@ typedef enum {
     DEV_NVM_REQ_NOT_OK = 5              // Operation failed
 } dev_nvm_request_result_t;
 
-/**
- * @brief NVM Block Configuration (AUTOSAR NvM compliant)
- * Note: nv_address removed - FLS manages flash addressing dynamically
- */
-typedef struct {
-    uint16_t block_id;                  // Unique block identifier
-    uint16_t block_size;                // Data size in bytes
-    const uint8_t *rom_address;         // Default ROM data (const array)
-    uint8_t *ram_address;               // RAM mirror address
-    dev_nvm_block_type_t block_type;    // Native or Redundant
-    bool write_protection;              // Write protection flag
-    bool use_crc;                       // Enable CRC validation
-} dev_nvm_block_config_t;
 
 /**
  * @brief NVM Block in Flash Layout (AUTOSAR style)

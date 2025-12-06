@@ -6,6 +6,30 @@ NVM Module - Validation and Code Generation for NVM Blocks
 from typing import Dict, List, Tuple
 from datetime import datetime
 
+nvmTypedefs = """
+
+/**
+ * @brief NVM Block Management Types (AUTOSAR-like)
+ */
+
+// NVM Block Management Type
+typedef enum {
+    DEV_NVM_BLOCK_NATIVE = 0,           // Single copy (no redundancy)
+    DEV_NVM_BLOCK_REDUNDANT = 1         // Dual copy with CRC validation
+} dev_nvm_block_type_t;
+
+
+typedef struct {
+    uint16_t block_id;                  // Unique block identifier
+    uint16_t block_size;                // Data size in bytes
+    const uint8_t *rom_address;         // Default ROM data (const array)
+    uint8_t *ram_address;               // RAM mirror address
+    dev_nvm_block_type_t block_type;    // Native or Redundant
+    bool write_protection;              // Write protection flag
+    bool use_crc;                       // Enable CRC validation
+} dev_nvm_block_config_t;
+"""
+
 class NvmValidator:
     """Validator for NVM blocks configuration"""
     
@@ -106,8 +130,12 @@ class NvmCodeGenerator:
         content = self._file_header("NvM_PBCfg.h", "NVM Block Configuration Declarations")
         content += "#ifndef NVM_PBCFG_H\n"
         content += "#define NVM_PBCFG_H\n\n"
-        content += '#include "dev_nvm.h"\n'
-        content += "#include <stdint.h>\n\n"
+        content += '#include <stdio.h>' + "\n"
+        content += '#include <stdint.h>' + "\n"
+        content += '#include <stdbool.h>' + "\n" + "\n"
+        
+        # Add typedefs
+        content += nvmTypedefs + "\n"
         
         # Block count
         content += f"// NVM Block Configuration\n"
@@ -211,10 +239,11 @@ def generate_nvm_code(blocks: List[Dict], project_name: str, version: str, outpu
     header_content = generator.generate_header(blocks)
     source_content = generator.generate_source(blocks)
     
-    # Write to files
-    os.makedirs(output_path, exist_ok=True)
-    header_file = os.path.join(output_path, "NvM_PBCfg.h")
-    source_file = os.path.join(output_path, "NvM_PBCfg.c")
+    # Create NvM_Gen subfolder
+    nvm_output_path = os.path.join(output_path, "NvM_Gen")
+    os.makedirs(nvm_output_path, exist_ok=True)
+    header_file = os.path.join(nvm_output_path, "NvM_PBCfg.h")
+    source_file = os.path.join(nvm_output_path, "NvM_PBCfg.c")
     
     with open(header_file, 'w', encoding='utf-8') as f:
         f.write(header_content)

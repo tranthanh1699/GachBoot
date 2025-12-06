@@ -1,5 +1,4 @@
 #include "dev_nvm.h"
-#include "dev_nvm_config.h"
 #include "dev_crc.h"
 #include "dev_memif.h"
 #include <string.h>

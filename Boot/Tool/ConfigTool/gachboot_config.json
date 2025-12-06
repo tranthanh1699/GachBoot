@@ -2,7 +2,7 @@
   "project": {
     "name": "GachBoot",
     "version": "1.0.0",
-    "generated_path": "GenCode"
+    "generated_path": "..\\..\\GenerateCode"
   },
   "nvm_blocks": [
     {

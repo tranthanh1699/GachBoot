@@ -133,18 +133,10 @@ bool uds_did_validate_length(uint16_t did, uint8_t service, uint16_t length)
 
 Std_ReturnType uds_did_read_vin(uint8_t *data)
 {
-    // Example VIN: "1HGCM82633A123456"
-    const char vin[17] = "1HGCM82633A123456";
-    memcpy(data, vin, 17);
-    
-    DBG_OUT_I("[DID 0xF190] VIN read: %s", vin);
-    return E_OK;
+    return E_OK; 
 }
 
 Std_ReturnType uds_did_write_vin(const uint8_t *data, ErrorCode_t * ErrorCode)
 {
-    // VIN is read-only in this example
-    DBG_OUT_W("[DID 0xF190] Attempt to write read-only VIN");
-    *ErrorCode = UDS_NRC_REQUEST_OUT_OF_RANGE;
-    return E_NOT_OK;
+    return E_OK; 
 }
