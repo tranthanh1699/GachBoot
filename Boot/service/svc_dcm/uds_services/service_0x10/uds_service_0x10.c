@@ -1,7 +1,7 @@
 #include "uds_service_0x10.h"
 #include "svc_dcm.h"
 #include "dcmdsl/dcmdsl.h"
-#include "Dcm_Session_PBCfg.h"
+#include "DCM_Session_PBCfg.h"
 
 CONFIG_LOG_TAG(UDS_0x10, true)
 

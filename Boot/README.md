@@ -48,6 +48,17 @@
 
 **GachBoot** is an automotive-grade bootloader for STM32H743 microcontroller, implementing the complete **UDS (Unified Diagnostic Services)** protocol stack according to **ISO 14229-1** standard. The project combines embedded firmware with modern Python tooling for a complete diagnostic solution.
 
+### Recent Updates (December 2025)
+
+**Major Architecture Refactoring:**
+- ✅ **Dynamic API Migration:** Moved from hardcoded session/security masks to config-driven dynamic API
+- ✅ **Unified DID Registry:** Single configuration point for all services (0x22, 0x2E, 0x2F)
+- ✅ **Configuration Tool Enhancements:** Added checkbox-based security level selection with auto-calculated bitmasks
+- ✅ **NVM Persistence:** Fixed data loss on reboot with block headers and flash scanning
+- ✅ **Code Quality:** Buffer initialization, bug fixes, and improved maintainability
+
+See [AI_CONVERSATION/CONVERSATION_HISTORY.md](AI_CONVERSATION/CONVERSATION_HISTORY.md) for complete development context and technical decisions.
+
 ### Why GachBoot?
 
 - ✅ **ISO 14229-1 Compliant** - Full UDS protocol implementation
@@ -65,10 +76,13 @@
 | Feature | Description |
 |---------|-------------|
 | **UDS Protocol Stack** | 7 diagnostic services (0x10, 0x11, 0x22, 0x27, 0x2E, 0x31, 0x3E) |
+| **Dynamic API Architecture** | Config-driven session/security with `dcm_service_access` & `dcm_did_access` modules |
+| **Unified DID Registry** | Single configuration point for Read/Write/IO Control services |
 | **Session Management** | Default, Programming, Extended Diagnostic modes |
 | **Security Access** | Multi-level (Level 1/2) with pluggable algorithms |
 | **NVM Module** | AUTOSAR 4-layer memory stack (NvM → MemIf → Fee → Fls) |
-| **Block Management** | NATIVE/REDUNDANT types with CRC32 validation |
+| **Block Management** | NATIVE/REDUNDANT types with CRC32 validation, block headers for persistence |
+| **Flash Scanning** | Automatic block discovery on boot (fixes data loss issue) |
 | **Wear Leveling** | 2-sector ping-pong strategy (256KB flash) |
 | **MIN Protocol** | Lightweight transport layer over UART |
 | **Registry System** | Configurable DIDs, RIDs with access control |
@@ -78,11 +92,14 @@
 ### Tool Features
 | Feature | Description |
 |---------|-------------|
+| **Configuration Tool** | Python GUI for Sessions, Security, DIDs, NVM with auto code generation |
+| **Checkbox Security Masks** | User-friendly security level selection (no manual bitmask calculation) |
+| **Real-time Validation** | Input validation with auto-save on changes |
+| **Code Generation** | Produces valid C header/source files with comments |
 | **MinTool GUI** | Modern tkinter-based diagnostic application |
 | **One-Click Security** | Auto seed/key handling with callback system |
 | **Script Automation** | Text-based scripting with SA command |
 | **Live Logging** | TX/RX monitoring with timestamps |
-| **Configuration** | JSON-based settings for easy customization |
 | **Standalone Exe** | Portable executables for Windows |
 
 ---
@@ -265,6 +282,9 @@ Boot/
 ├── 📁 service/                       # UDS services
 │   └── svc_dcm/                      # Diagnostic Communication Manager
 │       ├── 📄 svc_dcm.c/.h          # DCM main interface
+│       ├── 📄 dcm_service_access.c/.h    # **Dynamic session/security mask conversion API**
+│       ├── 📄 dcm_did_access.c/.h        # **Centralized DID access validation**
+│       ├── 📄 Service_PBCfg.c/.h    # **Generated service configuration**
 │       ├── dcmdsl/                   # Session Layer
 │       ├── dcmdsp/                   # Service Processor
 │       ├── dcmdsd/                   # Transport Dispatcher
@@ -282,8 +302,29 @@ Boot/
 │               ├── uds_did_callbacks.c/.h     # DID callback implementations
 │               └── CMakeLists.txt    # Static library build
 │
+├── 📁 GenerateCode/                  # **Auto-generated configuration files**
+│   ├── DCM_Session_Gen/              # Session configuration (from config tool)
+│   │   ├── DCM_Session_PBCfg.h
+│   │   └── DCM_Session_PBCfg.c
+│   ├── Security_Gen/                 # Security level configuration
+│   │   ├── Security_PBCfg.h
+│   │   └── Security_PBCfg.c
+│   ├── DID_Gen/                      # DID registry configuration
+│   │   ├── DID_PBCfg.h
+│   │   └── DID_PBCfg.c
+│   └── CMakeLists.txt                # Generated build configuration
+│
 └── 📁 Tool/                          # Python diagnostic tools
     ├── 📄 MinTool_modular.py        # GUI app entry point
+    ├── ConfigTool/                   # **Configuration tool with code generator**
+    │   ├── 📄 config_editor.py      # Main GUI (2036 lines)
+    │   ├── 📄 gachboot_config.json  # Project configuration
+    │   └── Module/                   # Validation & generation modules
+    │       ├── session_module.py     # Session config validation/generation
+    │       ├── security_module.py    # Security config validation/generation
+    │       ├── did_module.py         # DID config validation/generation
+    │       ├── nvm_module.py         # NVM config validation/generation
+    │       └── cmake_module.py       # CMakeLists.txt generation
     ├── config/                       # Configuration management
     ├── core/                         # MIN protocol handler
     ├── ui/                           # GUI windows & dialogs
@@ -1114,15 +1155,32 @@ static Std_ReturnType routine_handler(
 ### ✅ Completed Features
 
 - [x] **Core Services:** 0x10, 0x11, 0x22, 0x27, 0x2E, 0x31, 0x3E
+- [x] **Dynamic API Architecture:** Config-driven session/security mask conversion (refactored Dec 2025)
+  - `dcm_service_access` module - Converts session/security values to masks using generated tables
+  - `dcm_did_access` module - Centralized DID access validation
+  - All services refactored to use dynamic API instead of hardcoded masks
+  - Single source of truth from configuration tool
 - [x] **Session Management:** Default/Programming/Extended with S3 timeout
 - [x] **Security System:** Multi-level with pluggable algorithms
+- [x] **Configuration Tool:** Python GUI for managing Sessions, Security, DIDs, NVM
+  - Checkbox-based security level selection (auto-calculates bitmasks)
+  - Real-time validation and auto-save
+  - C code generation with proper formatting
+  - CMakeLists.txt generation for build integration
+- [x] **Unified DID Registry:** Single configuration point for services 0x22, 0x2E, 0x2F
+  - Per-service callbacks and access control
+  - Session and security mask integration
+  - Type-safe compile-time validation
 - [x] **NVM Module:** AUTOSAR-compliant 4-layer memory stack (NvM → MemIf → Fee → Fls)
   - Block management with CRC32 validation
+  - Block headers with ID/length for persistence across reboots
+  - Flash scanning to discover existing blocks on init
   - NATIVE/REDUNDANT block types with automatic redundancy
   - Wear leveling with 2-sector ping-pong strategy
   - Dynamic address allocation with Fee sector management
   - RAM mirrors for fast read access
   - Power-loss protection with inline CRC
+  - **Note:** 32-byte alignment required by STM32H7 hardware (62.5% flash waste unavoidable)
 - [x] **MinTool GUI:** Full-featured diagnostic application
 - [x] **SecurityUnlock:** Standalone key calculator
 - [x] **Automation:** Script runner with SA command
