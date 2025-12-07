@@ -242,6 +242,13 @@ def generate_nvm_code(blocks: List[Dict], project_name: str, version: str, outpu
     # Create NvM_Gen subfolder
     nvm_output_path = os.path.join(output_path, "NvM_Gen")
     os.makedirs(nvm_output_path, exist_ok=True)
+    
+    # Clean old files in NvM_Gen folder
+    for old_file in os.listdir(nvm_output_path):
+        old_file_path = os.path.join(nvm_output_path, old_file)
+        if os.path.isfile(old_file_path):
+            os.remove(old_file_path)
+    
     header_file = os.path.join(nvm_output_path, "NvM_PBCfg.h")
     source_file = os.path.join(nvm_output_path, "NvM_PBCfg.c")
     

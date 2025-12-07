@@ -10,6 +10,8 @@ import json
 import os
 from Module.nvm_module import validate_nvm_blocks, generate_nvm_code
 from Module.did_module import validate_dids, generate_did_code
+from Module.session_module import validate_sessions, generate_session_code
+from Module.security_module import validate_security_levels, generate_security_code
 from Module.cmake_module import generate_cmake_file
 
 class ConfigEditor:
@@ -90,6 +92,8 @@ class ConfigEditor:
         # Initialize tree widgets (hidden)
         self.setup_nvm_tab()
         self.setup_did_tab()
+        self.setup_session_tab()
+        self.setup_security_tab()
         
         # Status bar
         self.status_var = tk.StringVar(value="Ready")
@@ -230,6 +234,76 @@ class ConfigEditor:
         self.did_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
     
+    def setup_session_tab(self):
+        """Setup Sessions tab"""
+        session_frame = ttk.Frame(self.config_panel_frame)
+        
+        # Toolbar
+        toolbar = ttk.Frame(session_frame)
+        toolbar.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
+        
+        ttk.Button(toolbar, text="➕ Add Session", command=self.add_session).pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="✏️ Edit Session", command=self.edit_session).pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="🗑️ Delete Session", command=self.delete_session).pack(side=tk.LEFT, padx=2)
+        
+        ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
+        ttk.Label(toolbar, text=f"Total Sessions: ", font=('', 9)).pack(side=tk.LEFT, padx=5)
+        self.session_count_var = tk.StringVar(value="0")
+        ttk.Label(toolbar, textvariable=self.session_count_var, font=('', 9, 'bold')).pack(side=tk.LEFT)
+        
+        # Treeview
+        tree_frame = ttk.Frame(session_frame)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        columns = ("Name", "Value", "Description")
+        self.session_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=15)
+        
+        widths = {"Name": 300, "Value": 100, "Description": 550}
+        for col in columns:
+            self.session_tree.heading(col, text=col)
+            self.session_tree.column(col, width=widths.get(col, 100))
+        
+        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.session_tree.yview)
+        self.session_tree.configure(yscrollcommand=scrollbar.set)
+        
+        self.session_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+    
+    def setup_security_tab(self):
+        """Setup Security Access tab"""
+        security_frame = ttk.Frame(self.config_panel_frame)
+        
+        # Toolbar
+        toolbar = ttk.Frame(security_frame)
+        toolbar.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
+        
+        ttk.Button(toolbar, text="➕ Add Security Level", command=self.add_security_level).pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="✏️ Edit Security Level", command=self.edit_security_level).pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="🗑️ Delete Security Level", command=self.delete_security_level).pack(side=tk.LEFT, padx=2)
+        
+        ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
+        ttk.Label(toolbar, text=f"Total Levels: ", font=('', 9)).pack(side=tk.LEFT, padx=5)
+        self.security_count_var = tk.StringVar(value="0")
+        ttk.Label(toolbar, textvariable=self.security_count_var, font=('', 9, 'bold')).pack(side=tk.LEFT)
+        
+        # Treeview
+        tree_frame = ttk.Frame(security_frame)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        columns = ("Level", "Seed Sub", "Key Sub", "Seed Size", "Key Size", "Max Attempts", "Delay")
+        self.security_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=15)
+        
+        widths = {"Level": 60, "Seed Sub": 100, "Key Sub": 100, "Seed Size": 90, "Key Size": 90, "Max Attempts": 110, "Delay": 100}
+        for col in columns:
+            self.security_tree.heading(col, text=col)
+            self.security_tree.column(col, width=widths.get(col, 100))
+        
+        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.security_tree.yview)
+        self.security_tree.configure(yscrollcommand=scrollbar.set)
+        
+        self.security_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+    
     def load_config(self):
         """Load configuration from file"""
         try:
@@ -304,6 +378,32 @@ class ConfigEditor:
                 did.get('description', '')
             ))
         self.did_count_var.set(str(len(self.config['dids'])))
+        
+        # Sessions
+        self.session_tree.delete(*self.session_tree.get_children())
+        sessions = self.config.get('sessions', [])
+        for session in sessions:
+            self.session_tree.insert('', tk.END, values=(
+                session['session_name'],
+                session['session_value'],
+                session.get('description', '')
+            ))
+        self.session_count_var.set(str(len(sessions)))
+        
+        # Security Levels
+        self.security_tree.delete(*self.security_tree.get_children())
+        security_levels = self.config.get('security_levels', [])
+        for sec in security_levels:
+            self.security_tree.insert('', tk.END, values=(
+                sec['security_level'],
+                sec['seed_request_sub'],
+                sec['key_request_sub'],
+                sec['seed_size'],
+                sec['key_size'],
+                sec['max_attempts'],
+                f"{sec['delay_time']} ms"
+            ))
+        self.security_count_var.set(str(len(security_levels)))
     
     def refresh_nav_tree(self):
         """Refresh navigation tree"""
@@ -332,6 +432,24 @@ class ConfigEditor:
             self.nav_tree.insert(did_root, tk.END, 
                 text=f"  {did['did']} - {did['did_name']}", 
                 tags=('did', str(i)))
+        
+        # Sessions branch with count
+        sessions = self.config.get('sessions', [])
+        session_count = len(sessions)
+        session_root = self.nav_tree.insert(root, tk.END, text=f"🔐 Sessions ({session_count})", open=True, tags=('session_root',))
+        for i, session in enumerate(sessions):
+            self.nav_tree.insert(session_root, tk.END,
+                text=f"  {session['session_name']}",
+                tags=('session', str(i)))
+        
+        # Security Levels branch with count
+        security_levels = self.config.get('security_levels', [])
+        security_count = len(security_levels)
+        security_root = self.nav_tree.insert(root, tk.END, text=f"🔒 Security Access ({security_count})", open=True, tags=('security_root',))
+        for i, sec in enumerate(security_levels):
+            self.nav_tree.insert(security_root, tk.END,
+                text=f"  Level {sec['security_level']} (0x{int(sec['seed_request_sub'], 16):02X}/0x{int(sec['key_request_sub'], 16):02X})" if isinstance(sec['seed_request_sub'], str) else f"  Level {sec['security_level']}",
+                tags=('security', str(i)))
     
     def browse_config_file(self):
         """Browse for config file"""
@@ -475,6 +593,43 @@ class ConfigEditor:
             # Show edit form in config panel
             self.show_did_edit_form(idx)
         
+        elif tags and tags[0] == 'session':
+            # Show Session details in info panel
+            idx = int(tags[1])
+            session = self.config['sessions'][idx]
+            info = f"Session Details\n"
+            info += f"{'='*30}\n"
+            info += f"Name: {session['session_name']}\n"
+            info += f"Value: {session['session_value']}\n"
+            info += f"\nDescription:\n{session.get('description', '')}\n"
+            self.info_text.insert(1.0, info)
+            
+            # Show edit form in config panel
+            self.show_session_edit_form(idx)
+        
+        elif tags and tags[0] == 'security':
+            # Show Security details in info panel
+            idx = int(tags[1])
+            sec = self.config['security_levels'][idx]
+            info = f"Security Level Details\n"
+            info += f"{'='*30}\n"
+            info += f"Level: {sec['security_level']}\n"
+            info += f"Seed Request: {sec['seed_request_sub']}\n"
+            info += f"Key Request: {sec['key_request_sub']}\n"
+            info += f"Seed Size: {sec['seed_size']} bytes\n"
+            info += f"Key Size: {sec['key_size']} bytes\n"
+            info += f"Max Attempts: {sec['max_attempts']}\n"
+            info += f"Delay Time: {sec['delay_time']} ms\n"
+            info += f"Get Seed Func: {sec['get_seed_func']}\n"
+            info += f"Compare Key Func: {sec['compare_key_func']}\n"
+            info += f"\nSupported Sessions:\n"
+            for sess in sec.get('supported_sessions', []):
+                info += f"  • {sess}\n"
+            self.info_text.insert(1.0, info)
+            
+            # Show edit form in config panel
+            self.show_security_edit_form(idx)
+        
         self.info_text.config(state=tk.DISABLED)
     
     def show_context_menu(self, event):
@@ -495,12 +650,22 @@ class ConfigEditor:
             menu.add_command(label="➕ Add New NVM Block", command=self.add_nvm_block)
         elif tags and tags[0] == 'did_root':
             menu.add_command(label="➕ Add New DID", command=self.add_did)
+        elif tags and tags[0] == 'session_root':
+            menu.add_command(label="➕ Add New Session", command=self.add_session)
+        elif tags and tags[0] == 'security_root':
+            menu.add_command(label="➕ Add New Security Level", command=self.add_security_level)
         elif tags and tags[0] == 'nvm':
             menu.add_command(label="✏️ Edit Block", command=self.edit_nvm_block)
             menu.add_command(label="🗑️ Delete Block", command=self.delete_nvm_block)
         elif tags and tags[0] == 'did':
             menu.add_command(label="✏️ Edit DID", command=self.edit_did)
             menu.add_command(label="🗑️ Delete DID", command=self.delete_did)
+        elif tags and tags[0] == 'session':
+            menu.add_command(label="✏️ Edit Session", command=self.edit_session)
+            menu.add_command(label="🗑️ Delete Session", command=self.delete_session)
+        elif tags and tags[0] == 'security':
+            menu.add_command(label="✏️ Edit Security Level", command=self.edit_security_level)
+            menu.add_command(label="🗑️ Delete Security Level", command=self.delete_security_level)
         else:
             return
         
@@ -646,14 +811,36 @@ class ConfigEditor:
         ttk.Entry(form_frame, textvariable=read_length_getter_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
         row += 1
         
-        read_session_var = tk.IntVar(value=did.get('read_config', {}).get('session_mask', 0))
-        ttk.Label(form_frame, text="Session Mask:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(form_frame, textvariable=read_session_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
+        # Read Session Support
+        ttk.Label(form_frame, text="Session Support:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        read_session_frame = ttk.Frame(form_frame)
+        read_session_frame.grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
+        
+        # Get available sessions
+        available_sessions = self.config.get('sessions', [])
+        read_session_vars = {}
+        current_read_sessions = did.get('read_config', {}).get('supported_sessions', [])
+        
+        for i, session in enumerate(available_sessions):
+            var = tk.BooleanVar(value=session['session_name'] in current_read_sessions)
+            read_session_vars[session['session_name']] = var
+            ttk.Checkbutton(read_session_frame, text=session['session_name'], variable=var).grid(row=i, column=0, sticky=tk.W)
         row += 1
         
-        read_security_var = tk.IntVar(value=did.get('read_config', {}).get('security_mask', 0))
-        ttk.Label(form_frame, text="Security Mask:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(form_frame, textvariable=read_security_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
+        # Read Security Levels
+        ttk.Label(form_frame, text="Required Security:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        read_security_frame = ttk.Frame(form_frame)
+        read_security_frame.grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
+        
+        available_security = self.config.get('security_levels', [])
+        read_security_vars = {}
+        current_read_security = did.get('read_config', {}).get('required_security_levels', [])
+        
+        for i, sec in enumerate(available_security):
+            sec_name = f"Level {sec['security_level']}"
+            var = tk.BooleanVar(value=sec['security_level'] in current_read_security)
+            read_security_vars[sec['security_level']] = var
+            ttk.Checkbutton(read_security_frame, text=sec_name, variable=var).grid(row=i, column=0, sticky=tk.W)
         row += 1
         
         # Separator
@@ -669,14 +856,33 @@ class ConfigEditor:
         ttk.Entry(form_frame, textvariable=write_callback_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
         row += 1
         
-        write_session_var = tk.IntVar(value=did.get('write_config', {}).get('session_mask', 0))
-        ttk.Label(form_frame, text="Session Mask:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(form_frame, textvariable=write_session_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
+        # Write Session Support
+        ttk.Label(form_frame, text="Session Support:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        write_session_frame = ttk.Frame(form_frame)
+        write_session_frame.grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
+        
+        write_session_vars = {}
+        current_write_sessions = did.get('write_config', {}).get('supported_sessions', [])
+        
+        for i, session in enumerate(available_sessions):
+            var = tk.BooleanVar(value=session['session_name'] in current_write_sessions)
+            write_session_vars[session['session_name']] = var
+            ttk.Checkbutton(write_session_frame, text=session['session_name'], variable=var).grid(row=i, column=0, sticky=tk.W)
         row += 1
         
-        write_security_var = tk.IntVar(value=did.get('write_config', {}).get('security_mask', 0))
-        ttk.Label(form_frame, text="Security Mask:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(form_frame, textvariable=write_security_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
+        # Write Security Levels
+        ttk.Label(form_frame, text="Required Security:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        write_security_frame = ttk.Frame(form_frame)
+        write_security_frame.grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
+        
+        write_security_vars = {}
+        current_write_security = did.get('write_config', {}).get('required_security_levels', [])
+        
+        for i, sec in enumerate(available_security):
+            sec_name = f"Level {sec['security_level']}"
+            var = tk.BooleanVar(value=sec['security_level'] in current_write_security)
+            write_security_vars[sec['security_level']] = var
+            ttk.Checkbutton(write_security_frame, text=sec_name, variable=var).grid(row=i, column=0, sticky=tk.W)
         row += 1
         
         write_validation_var = tk.BooleanVar(value=did.get('write_config', {}).get('semantic_validation', False))
@@ -705,8 +911,12 @@ class ConfigEditor:
                 if read_callback_var.get():
                     read_cfg['callback'] = read_callback_var.get()
                     read_cfg['length_getter'] = read_length_getter_var.get() if read_length_getter_var.get() else None
-                    read_cfg['session_mask'] = read_session_var.get()
-                    read_cfg['security_mask'] = read_security_var.get()
+                    # Save selected sessions
+                    selected_read_sessions = [name for name, var in read_session_vars.items() if var.get()]
+                    read_cfg['supported_sessions'] = selected_read_sessions
+                    # Save selected security levels
+                    selected_read_security = [level for level, var in read_security_vars.items() if var.get()]
+                    read_cfg['required_security_levels'] = selected_read_security
                     self.config['dids'][index]['read_config'] = read_cfg
                 elif 'read_config' in self.config['dids'][index]:
                     del self.config['dids'][index]['read_config']
@@ -715,8 +925,12 @@ class ConfigEditor:
                 write_cfg = {}
                 if write_callback_var.get():
                     write_cfg['callback'] = write_callback_var.get()
-                    write_cfg['session_mask'] = write_session_var.get()
-                    write_cfg['security_mask'] = write_security_var.get()
+                    # Save selected sessions
+                    selected_write_sessions = [name for name, var in write_session_vars.items() if var.get()]
+                    write_cfg['supported_sessions'] = selected_write_sessions
+                    # Save selected security levels
+                    selected_write_security = [level for level, var in write_security_vars.items() if var.get()]
+                    write_cfg['required_security_levels'] = selected_write_security
                     write_cfg['semantic_validation'] = write_validation_var.get()
                     self.config['dids'][index]['write_config'] = write_cfg
                 elif 'write_config' in self.config['dids'][index]:
@@ -731,10 +945,28 @@ class ConfigEditor:
         
         # Bind to save on change
         for var in [did_var, did_name_var, fixed_var, expected_len_var, min_len_var, max_len_var,
-                    read_callback_var, read_length_getter_var, read_session_var, read_security_var,
-                    write_callback_var, write_session_var, write_security_var, write_validation_var, desc_var]:
+                    read_callback_var, read_length_getter_var,
+                    write_callback_var, write_validation_var, desc_var]:
             if hasattr(var, 'trace'):
-                var.trace('w', save_changes)
+                var.trace('w', lambda *args: save_changes())
+        
+        # Bind session checkboxes
+        for var in read_session_vars.values():
+            if hasattr(var, 'trace'):
+                var.trace('w', lambda *args: save_changes())
+        
+        for var in write_session_vars.values():
+            if hasattr(var, 'trace'):
+                var.trace('w', lambda *args: save_changes())
+        
+        # Bind security level checkboxes
+        for var in read_security_vars.values():
+            if hasattr(var, 'trace'):
+                var.trace('w', lambda *args: save_changes())
+        
+        for var in write_security_vars.values():
+            if hasattr(var, 'trace'):
+                var.trace('w', lambda *args: save_changes())
         
         form_frame.columnconfigure(1, weight=1)
         
@@ -752,6 +984,82 @@ class ConfigEditor:
         form_frame.update_idletasks()
         canvas.configure(scrollregion=canvas.bbox("all"))
     
+    def show_session_edit_form(self, index):
+        """Show Session edit form in config panel"""
+        # Clear config panel
+        for widget in self.config_panel_frame.winfo_children():
+            widget.destroy()
+        
+        session = self.config['sessions'][index]
+        
+        # Create scrollable form
+        canvas = tk.Canvas(self.config_panel_frame)
+        scrollbar = ttk.Scrollbar(self.config_panel_frame, orient="vertical", command=canvas.yview)
+        form_frame = ttk.Frame(canvas, padding="10")
+        
+        canvas.create_window((0, 0), window=form_frame, anchor="nw", tags="canvas_frame")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        ttk.Label(form_frame, text=f"Edit Session", font=('', 12, 'bold')).grid(row=0, column=0, columnspan=2, pady=10, sticky=tk.W)
+        
+        row = 1
+        
+        # Session Name
+        ttk.Label(form_frame, text="Session Name:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        session_name_var = tk.StringVar(value=session['session_name'])
+        ttk.Entry(form_frame, textvariable=session_name_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
+        row += 1
+        
+        # Session Value
+        ttk.Label(form_frame, text="Session Value (hex):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        session_value_var = tk.StringVar(value=session['session_value'])
+        ttk.Entry(form_frame, textvariable=session_value_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
+        row += 1
+        
+        # Description
+        ttk.Label(form_frame, text="Description:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        desc_var = tk.StringVar(value=session.get('description', ''))
+        ttk.Entry(form_frame, textvariable=desc_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
+        row += 1
+        
+        # Save changes function
+        def save_changes(*args):
+            try:
+                self.config['sessions'][index]['session_name'] = session_name_var.get()
+                self.config['sessions'][index]['session_value'] = session_value_var.get()
+                self.config['sessions'][index]['description'] = desc_var.get()
+                
+                self.set_modified()
+                self.refresh_ui()
+            except Exception as e:
+                pass
+        
+        # Bind to save on change
+        for var in [session_name_var, session_value_var, desc_var]:
+            if hasattr(var, 'trace'):
+                var.trace('w', save_changes)
+        
+        form_frame.columnconfigure(1, weight=1)
+        
+        # Update scroll region
+        def on_frame_configure(event=None):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        
+        def on_canvas_configure(event):
+            canvas_frame = canvas.find_withtag("canvas_frame")
+            if canvas_frame:
+                canvas.itemconfig(canvas_frame[0], width=event.width)
+        
+        form_frame.bind('<Configure>', on_frame_configure)
+        canvas.bind('<Configure>', on_canvas_configure)
+        
+        # Initial update
+        form_frame.update_idletasks()
+        canvas.configure(scrollregion=canvas.bbox("all"))
+    
     def new_config(self):
         """Create new configuration"""
         self.config = {
@@ -761,7 +1069,8 @@ class ConfigEditor:
                 "generated_path": "../../service/svc_dcm/generated"
             },
             "nvm_blocks": [],
-            "dids": []
+            "dids": [],
+            "sessions": []
         }
         self.refresh_ui()
         self.set_modified()
@@ -792,7 +1101,6 @@ class ConfigEditor:
             self.set_modified(False)
             self.update_title()
             self.status_var.set(f"Saved: {self.config_file}")
-            messagebox.showinfo("Success", "Configuration saved successfully!")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save config: {e}")
     
@@ -856,7 +1164,7 @@ class ConfigEditor:
     
     def add_did(self):
         """Add new DID"""
-        dialog = DidDialog(self.root, None)
+        dialog = DidDialog(self.root, None, self.config.get('sessions', []), self.config.get('security_levels', []))
         if dialog.result:
             # Check for duplicate DID
             for did in self.config['dids']:
@@ -881,7 +1189,7 @@ class ConfigEditor:
         # Find DID
         did = next((d for d in self.config['dids'] if d['did'] == did_value), None)
         if did:
-            dialog = DidDialog(self.root, did)
+            dialog = DidDialog(self.root, did, self.config.get('sessions', []), self.config.get('security_levels', []))
             if dialog.result:
                 did.update(dialog.result)
                 self.refresh_ui()
@@ -901,6 +1209,224 @@ class ConfigEditor:
             self.refresh_ui()
             self.set_modified()
     
+    def add_session(self):
+        """Add new Session"""
+        dialog = SessionDialog(self.root, None)
+        if dialog.result:
+            # Check for duplicate name/value
+            for session in self.config.get('sessions', []):
+                if session['session_name'] == dialog.result['session_name']:
+                    messagebox.showerror("Error", f"Session name {dialog.result['session_name']} already exists!")
+                    return
+                if session['session_value'] == dialog.result['session_value']:
+                    messagebox.showerror("Error", f"Session value {dialog.result['session_value']} already exists!")
+                    return
+            
+            if 'sessions' not in self.config:
+                self.config['sessions'] = []
+            
+            self.config['sessions'].append(dialog.result)
+            self.refresh_ui()
+            self.set_modified()
+    
+    def edit_session(self):
+        """Edit selected Session"""
+        selection = self.session_tree.selection()
+        if not selection:
+            messagebox.showwarning("Warning", "Please select a session to edit")
+            return
+        
+        item = self.session_tree.item(selection[0])
+        session_name = item['values'][0]
+        session = next((s for s in self.config.get('sessions', []) if s['session_name'] == session_name), None)
+        
+        if session:
+            dialog = SessionDialog(self.root, session)
+            if dialog.result:
+                # Update session
+                idx = self.config['sessions'].index(session)
+                self.config['sessions'][idx] = dialog.result
+                self.refresh_ui()
+                self.set_modified()
+    
+    def delete_session(self):
+        """Delete selected Session"""
+        selection = self.session_tree.selection()
+        if not selection:
+            messagebox.showwarning("Warning", "Please select a session to delete")
+            return
+        
+        if messagebox.askyesno("Confirm", "Delete selected session?"):
+            item = self.session_tree.item(selection[0])
+            session_name = item['values'][0]
+            self.config['sessions'] = [s for s in self.config.get('sessions', []) if s['session_name'] != session_name]
+            self.refresh_ui()
+            self.set_modified()
+    
+    def add_security_level(self):
+        """Add new Security Level"""
+        available_sessions = [s['session_name'] for s in self.config.get('sessions', [])]
+        dialog = SecurityLevelDialog(self.root, None, available_sessions)
+        if dialog.result:
+            # Check for duplicate level
+            for sec in self.config.get('security_levels', []):
+                if sec['security_level'] == dialog.result['security_level']:
+                    messagebox.showerror("Error", f"Security level {dialog.result['security_level']} already exists!")
+                    return
+            
+            if 'security_levels' not in self.config:
+                self.config['security_levels'] = []
+            
+            self.config['security_levels'].append(dialog.result)
+            self.refresh_ui()
+            self.set_modified()
+    
+    def edit_security_level(self):
+        """Edit selected Security Level"""
+        selection = self.security_tree.selection()
+        if not selection:
+            messagebox.showwarning("Warning", "Please select a security level to edit")
+            return
+        
+        item = self.security_tree.item(selection[0])
+        level = item['values'][0]
+        sec = next((s for s in self.config.get('security_levels', []) if s['security_level'] == level), None)
+        
+        if sec:
+            available_sessions = [s['session_name'] for s in self.config.get('sessions', [])]
+            dialog = SecurityLevelDialog(self.root, sec, available_sessions)
+            if dialog.result:
+                # Update security level
+                idx = self.config['security_levels'].index(sec)
+                self.config['security_levels'][idx] = dialog.result
+                self.refresh_ui()
+                self.set_modified()
+    
+    def delete_security_level(self):
+        """Delete selected Security Level"""
+        selection = self.security_tree.selection()
+        if not selection:
+            messagebox.showwarning("Warning", "Please select a security level to delete")
+            return
+        
+        if messagebox.askyesno("Confirm", "Delete selected security level?"):
+            item = self.security_tree.item(selection[0])
+            level = item['values'][0]
+            self.config['security_levels'] = [s for s in self.config.get('security_levels', []) if s['security_level'] != level]
+            self.refresh_ui()
+            self.set_modified()
+    
+    def show_security_edit_form(self, index):
+        """Show Security Level edit form in config panel"""
+        # Clear config panel
+        for widget in self.config_panel_frame.winfo_children():
+            widget.destroy()
+        
+        sec = self.config['security_levels'][index]
+        
+        # Create form
+        form_frame = ttk.Frame(self.config_panel_frame, padding="10")
+        form_frame.pack(fill=tk.BOTH, expand=True)
+        
+        ttk.Label(form_frame, text=f"Edit Security Level {sec['security_level']}", font=('', 12, 'bold')).grid(row=0, column=0, columnspan=2, pady=10, sticky=tk.W)
+        
+        row = 1
+        
+        # Level
+        ttk.Label(form_frame, text="Security Level:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        level_var = tk.IntVar(value=sec['security_level'])
+        ttk.Entry(form_frame, textvariable=level_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Seed Request Sub
+        ttk.Label(form_frame, text="Seed Request Sub:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        seed_sub_var = tk.StringVar(value=sec['seed_request_sub'])
+        ttk.Entry(form_frame, textvariable=seed_sub_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Key Request Sub
+        ttk.Label(form_frame, text="Key Request Sub:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        key_sub_var = tk.StringVar(value=sec['key_request_sub'])
+        ttk.Entry(form_frame, textvariable=key_sub_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Seed Size
+        ttk.Label(form_frame, text="Seed Size (bytes):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        seed_size_var = tk.IntVar(value=sec['seed_size'])
+        ttk.Entry(form_frame, textvariable=seed_size_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Key Size
+        ttk.Label(form_frame, text="Key Size (bytes):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        key_size_var = tk.IntVar(value=sec['key_size'])
+        ttk.Entry(form_frame, textvariable=key_size_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Max Attempts
+        ttk.Label(form_frame, text="Max Attempts:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        max_attempts_var = tk.IntVar(value=sec['max_attempts'])
+        ttk.Entry(form_frame, textvariable=max_attempts_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Delay Time
+        ttk.Label(form_frame, text="Delay Time (ms):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        delay_time_var = tk.IntVar(value=sec['delay_time'])
+        ttk.Entry(form_frame, textvariable=delay_time_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Get Seed Function
+        ttk.Label(form_frame, text="Get Seed Func:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        get_seed_var = tk.StringVar(value=sec['get_seed_func'])
+        ttk.Entry(form_frame, textvariable=get_seed_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Compare Key Function
+        ttk.Label(form_frame, text="Compare Key Func:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        compare_key_var = tk.StringVar(value=sec['compare_key_func'])
+        ttk.Entry(form_frame, textvariable=compare_key_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Sessions
+        ttk.Label(form_frame, text="Supported Sessions:", font=('', 10, 'bold')).grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=(10, 5))
+        row += 1
+        
+        session_frame = ttk.LabelFrame(form_frame, text="Select Sessions", padding="10")
+        session_frame.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+        row += 1
+        
+        session_vars = {}
+        available_sessions = [s['session_name'] for s in self.config.get('sessions', [])]
+        for sess_name in available_sessions:
+            var = tk.BooleanVar(value=sess_name in sec.get('supported_sessions', []))
+            ttk.Checkbutton(session_frame, text=sess_name, variable=var).pack(anchor=tk.W)
+            session_vars[sess_name] = var
+            var.trace_add('write', lambda *args, idx=index, svars=session_vars: self.update_security_sessions(idx, svars))
+        
+        # Save button
+        button_frame = ttk.Frame(form_frame)
+        button_frame.grid(row=row, column=0, columnspan=2, pady=20)
+        
+        def save_changes():
+            self.config['security_levels'][index]['security_level'] = level_var.get()
+            self.config['security_levels'][index]['seed_request_sub'] = seed_sub_var.get()
+            self.config['security_levels'][index]['key_request_sub'] = key_sub_var.get()
+            self.config['security_levels'][index]['seed_size'] = seed_size_var.get()
+            self.config['security_levels'][index]['key_size'] = key_size_var.get()
+            self.config['security_levels'][index]['max_attempts'] = max_attempts_var.get()
+            self.config['security_levels'][index]['delay_time'] = delay_time_var.get()
+            self.config['security_levels'][index]['get_seed_func'] = get_seed_var.get()
+            self.config['security_levels'][index]['compare_key_func'] = compare_key_var.get()
+            self.refresh_ui()
+            self.set_modified()
+        
+        ttk.Button(button_frame, text="💾 Save Changes", command=save_changes).pack(side=tk.LEFT, padx=5)
+    
+    def update_security_sessions(self, index, session_vars):
+        """Update security level supported sessions"""
+        selected_sessions = [name for name, var in session_vars.items() if var.get()]
+        self.config['security_levels'][index]['supported_sessions'] = selected_sessions
+        self.set_modified()
+    
     def generate_code(self):
         """Generate code from configuration"""
         try:
@@ -910,13 +1436,19 @@ class ConfigEditor:
             # Validate first
             nvm_valid, nvm_errors, nvm_warnings = validate_nvm_blocks(self.config['nvm_blocks'])
             did_valid, did_errors, did_warnings = validate_dids(self.config['dids'])
+            session_valid, session_errors, session_warnings = validate_sessions(self.config.get('sessions', []))
+            security_valid, security_errors, security_warnings = validate_security_levels(self.config.get('security_levels', []))
             
-            if not nvm_valid or not did_valid:
+            if not nvm_valid or not did_valid or not session_valid or not security_valid:
                 error_msg = "Validation failed:\n"
                 if nvm_errors:
                     error_msg += "\nNVM Errors:\n" + "\n".join(nvm_errors)
                 if did_errors:
                     error_msg += "\nDID Errors:\n" + "\n".join(did_errors)
+                if session_errors:
+                    error_msg += "\nSession Errors:\n" + "\n".join(session_errors)
+                if security_errors:
+                    error_msg += "\nSecurity Errors:\n" + "\n".join(security_errors)
                 messagebox.showerror("Validation Error", error_msg)
                 return
             
@@ -942,10 +1474,23 @@ class ConfigEditor:
             print(f"[DEBUG] Generating code to: {output_path}")
             
             nvm_files = generate_nvm_code(self.config['nvm_blocks'], project_name, version, output_path)
-            did_files = generate_did_code(self.config['dids'], project_name, version, output_path)
+            did_files = generate_did_code(self.config['dids'], self.config.get('sessions', []), 
+                                          self.config.get('security_levels', []), project_name, version, output_path)
+            session_files = []
+            if self.config.get('sessions'):
+                session_success = generate_session_code(self.config['sessions'], output_path)
+                if session_success:
+                    session_files = [
+                        os.path.join(output_path, "DCM_Session_Gen", "DCM_Session_PBCfg.h"),
+                        os.path.join(output_path, "DCM_Session_Gen", "DCM_Session_PBCfg.c")
+                    ]
+            security_files = []
+            if self.config.get('security_levels'):
+                security_files = generate_security_code(self.config['security_levels'], self.config.get('sessions', []), 
+                                                       project_name, version, output_path)
             cmake_file = generate_cmake_file(output_path, project_name, version)
             
-            all_files = nvm_files + did_files + [cmake_file]
+            all_files = nvm_files + did_files + session_files + security_files + [cmake_file]
             messagebox.showinfo("Success", f"Generated {len(all_files)} files:\n" + "\n".join([os.path.basename(f) for f in all_files]))
             self.status_var.set("Code generation complete")
         except Exception as e:
@@ -957,10 +1502,12 @@ class ConfigEditor:
             # Validate using modules
             nvm_valid, nvm_errors, nvm_warnings = validate_nvm_blocks(self.config['nvm_blocks'])
             did_valid, did_errors, did_warnings = validate_dids(self.config['dids'])
+            session_valid, session_errors, session_warnings = validate_sessions(self.config.get('sessions', []))
+            security_valid, security_errors, security_warnings = validate_security_levels(self.config.get('security_levels', []))
             
             # Collect all messages
-            all_errors = nvm_errors + did_errors
-            all_warnings = nvm_warnings + did_warnings
+            all_errors = nvm_errors + did_errors + session_errors + security_errors
+            all_warnings = nvm_warnings + did_warnings + session_warnings + security_warnings
             
             # Basic project validation
             if not self.config['project']['name']:
@@ -1069,8 +1616,10 @@ class NvmBlockDialog:
 
 class DidDialog:
     """Dialog for adding/editing DID - new schema"""
-    def __init__(self, parent, did_data):
+    def __init__(self, parent, did_data, available_sessions=None, available_security=None):
         self.result = None
+        self.available_sessions = available_sessions or []
+        self.available_security = available_security or []
         
         dialog = tk.Toplevel(parent)
         dialog.title("DID Editor")
@@ -1144,14 +1693,27 @@ class DidDialog:
         ttk.Entry(form_frame, textvariable=read_len_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
         row += 1
         
-        ttk.Label(form_frame, text="Session Mask:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        read_session_var = tk.IntVar(value=did_data.get('read_config', {}).get('session_mask', 1) if did_data else 1)
-        ttk.Entry(form_frame, textvariable=read_session_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(form_frame, text="Session Support:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        read_session_frame = ttk.Frame(form_frame)
+        read_session_frame.grid(row=row, column=1, sticky=tk.W, pady=5)
+        read_session_vars = {}
+        current_read_sessions = did_data.get('read_config', {}).get('supported_sessions', []) if did_data else []
+        for i, session in enumerate(self.available_sessions):
+            var = tk.BooleanVar(value=session['session_name'] in current_read_sessions)
+            read_session_vars[session['session_name']] = var
+            ttk.Checkbutton(read_session_frame, text=session['session_name'], variable=var).grid(row=i, column=0, sticky=tk.W)
         row += 1
         
-        ttk.Label(form_frame, text="Security Mask:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        read_security_var = tk.IntVar(value=did_data.get('read_config', {}).get('security_mask', 0) if did_data else 0)
-        ttk.Entry(form_frame, textvariable=read_security_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(form_frame, text="Required Security:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        read_security_frame = ttk.Frame(form_frame)
+        read_security_frame.grid(row=row, column=1, sticky=tk.W, pady=5)
+        read_security_vars = {}
+        current_read_security = did_data.get('read_config', {}).get('required_security_levels', []) if did_data else []
+        for i, sec in enumerate(self.available_security):
+            sec_name = f"Level {sec['security_level']}"
+            var = tk.BooleanVar(value=sec['security_level'] in current_read_security)
+            read_security_vars[sec['security_level']] = var
+            ttk.Checkbutton(read_security_frame, text=sec_name, variable=var).grid(row=i, column=0, sticky=tk.W)
         row += 1
         
         # Separator
@@ -1167,14 +1729,27 @@ class DidDialog:
         ttk.Entry(form_frame, textvariable=write_cb_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
         row += 1
         
-        ttk.Label(form_frame, text="Session Mask:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        write_session_var = tk.IntVar(value=did_data.get('write_config', {}).get('session_mask', 2) if did_data else 2)
-        ttk.Entry(form_frame, textvariable=write_session_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(form_frame, text="Session Support:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        write_session_frame = ttk.Frame(form_frame)
+        write_session_frame.grid(row=row, column=1, sticky=tk.W, pady=5)
+        write_session_vars = {}
+        current_write_sessions = did_data.get('write_config', {}).get('supported_sessions', []) if did_data else []
+        for i, session in enumerate(self.available_sessions):
+            var = tk.BooleanVar(value=session['session_name'] in current_write_sessions)
+            write_session_vars[session['session_name']] = var
+            ttk.Checkbutton(write_session_frame, text=session['session_name'], variable=var).grid(row=i, column=0, sticky=tk.W)
         row += 1
         
-        ttk.Label(form_frame, text="Security Mask:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        write_security_var = tk.IntVar(value=did_data.get('write_config', {}).get('security_mask', 0) if did_data else 0)
-        ttk.Entry(form_frame, textvariable=write_security_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(form_frame, text="Required Security:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        write_security_frame = ttk.Frame(form_frame)
+        write_security_frame.grid(row=row, column=1, sticky=tk.W, pady=5)
+        write_security_vars = {}
+        current_write_security = did_data.get('write_config', {}).get('required_security_levels', []) if did_data else []
+        for i, sec in enumerate(self.available_security):
+            sec_name = f"Level {sec['security_level']}"
+            var = tk.BooleanVar(value=sec['security_level'] in current_write_security)
+            write_security_vars[sec['security_level']] = var
+            ttk.Checkbutton(write_security_frame, text=sec_name, variable=var).grid(row=i, column=0, sticky=tk.W)
         row += 1
         
         write_validation_var = tk.BooleanVar(value=did_data.get('write_config', {}).get('semantic_validation', False) if did_data else False)
@@ -1208,21 +1783,236 @@ class DidDialog:
             
             # Add read config if callback provided
             if read_cb_var.get():
+                selected_read_sessions = [name for name, var in read_session_vars.items() if var.get()]
+                selected_read_security = [level for level, var in read_security_vars.items() if var.get()]
                 result['read_config'] = {
                     "callback": read_cb_var.get(),
                     "length_getter": read_len_var.get() if read_len_var.get() else None,
-                    "session_mask": read_session_var.get(),
-                    "security_mask": read_security_var.get()
+                    "supported_sessions": selected_read_sessions,
+                    "required_security_levels": selected_read_security
                 }
             
             # Add write config if callback provided
             if write_cb_var.get():
+                selected_write_sessions = [name for name, var in write_session_vars.items() if var.get()]
+                selected_write_security = [level for level, var in write_security_vars.items() if var.get()]
                 result['write_config'] = {
                     "callback": write_cb_var.get(),
-                    "session_mask": write_session_var.get(),
-                    "security_mask": write_security_var.get(),
+                    "supported_sessions": selected_write_sessions,
+                    "required_security_levels": selected_write_security,
                     "semantic_validation": write_validation_var.get()
                 }
+            
+            self.result = result
+            dialog.destroy()
+        
+        ttk.Button(button_frame, text="OK", command=on_ok, width=10).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=dialog.destroy, width=10).pack(side=tk.LEFT, padx=5)
+        
+        # Update scroll region
+        form_frame.update_idletasks()
+        canvas.configure(scrollregion=canvas.bbox("all"))
+        
+        dialog.wait_window()
+
+
+class SessionDialog:
+    """Dialog for adding/editing Session"""
+    def __init__(self, parent, session_data):
+        self.result = None
+        
+        dialog = tk.Toplevel(parent)
+        dialog.title("Session Editor")
+        dialog.geometry("550x500")
+        dialog.transient(parent)
+        dialog.grab_set()
+        
+        # Form with scrollbar
+        canvas = tk.Canvas(dialog)
+        scrollbar = ttk.Scrollbar(dialog, orient=tk.VERTICAL, command=canvas.yview)
+        form_frame = ttk.Frame(canvas, padding="20")
+        
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        canvas.create_window((0, 0), window=form_frame, anchor=tk.NW)
+        
+        row = 0
+        
+        # Session Name
+        ttk.Label(form_frame, text="Session Name:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        session_name_var = tk.StringVar(value=session_data['session_name'] if session_data else "DCM_DEFAULT_SESSION")
+        ttk.Entry(form_frame, textvariable=session_name_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Session Value
+        ttk.Label(form_frame, text="Session Value (hex):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        session_value_var = tk.StringVar(value=session_data['session_value'] if session_data else "0x01")
+        ttk.Entry(form_frame, textvariable=session_value_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Description
+        ttk.Label(form_frame, text="Description:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        description_var = tk.StringVar(value=session_data.get('description', '') if session_data else "")
+        ttk.Entry(form_frame, textvariable=description_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Buttons
+        button_frame = ttk.Frame(form_frame)
+        button_frame.grid(row=row, column=0, columnspan=2, pady=20)
+        
+        def on_ok():
+            result = {
+                "session_name": session_name_var.get().upper(),
+                "session_value": session_value_var.get(),
+                "description": description_var.get()
+            }
+            
+            self.result = result
+            dialog.destroy()
+        
+        ttk.Button(button_frame, text="OK", command=on_ok, width=10).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=dialog.destroy, width=10).pack(side=tk.LEFT, padx=5)
+        
+        # Update scroll region
+        form_frame.update_idletasks()
+        canvas.configure(scrollregion=canvas.bbox("all"))
+        
+        dialog.wait_window()
+
+
+class SecurityLevelDialog:
+    """Dialog for adding/editing Security Level"""
+    def __init__(self, parent, security_data, available_sessions):
+        self.result = None
+        
+        dialog = tk.Toplevel(parent)
+        dialog.title("Security Level Editor")
+        dialog.geometry("600x700")
+        dialog.transient(parent)
+        dialog.grab_set()
+        
+        # Form with scrollbar
+        canvas = tk.Canvas(dialog)
+        scrollbar = ttk.Scrollbar(dialog, orient=tk.VERTICAL, command=canvas.yview)
+        form_frame = ttk.Frame(canvas, padding="20")
+        
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        canvas.create_window((0, 0), window=form_frame, anchor=tk.NW)
+        
+        row = 0
+        
+        # Security Level
+        ttk.Label(form_frame, text="Security Level:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        level_var = tk.IntVar(value=security_data['security_level'] if security_data else 1)
+        ttk.Entry(form_frame, textvariable=level_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Seed Request Sub
+        ttk.Label(form_frame, text="Seed Request Sub (hex):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        seed_sub_var = tk.StringVar(value=security_data['seed_request_sub'] if security_data else "0x01")
+        ttk.Entry(form_frame, textvariable=seed_sub_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(form_frame, text="(odd: 0x01, 0x03, 0x05...)", foreground="gray").grid(row=row, column=2, sticky=tk.W, padx=5)
+        row += 1
+        
+        # Key Request Sub (auto-calculated)
+        ttk.Label(form_frame, text="Key Request Sub (hex):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        key_sub_var = tk.StringVar(value=security_data['key_request_sub'] if security_data else "0x02")
+        key_entry = ttk.Entry(form_frame, textvariable=key_sub_var, width=20, state='readonly')
+        key_entry.grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(form_frame, text="(auto: seed + 1)", foreground="gray").grid(row=row, column=2, sticky=tk.W, padx=5)
+        row += 1
+        
+        def update_key_sub(*args):
+            try:
+                seed_val = int(seed_sub_var.get(), 16) if seed_sub_var.get().startswith('0x') else int(seed_sub_var.get())
+                key_sub_var.set(f"0x{seed_val + 1:02X}")
+            except:
+                pass
+        
+        seed_sub_var.trace_add('write', update_key_sub)
+        
+        # Seed Size
+        ttk.Label(form_frame, text="Seed Size (bytes):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        seed_size_var = tk.IntVar(value=security_data['seed_size'] if security_data else 4)
+        ttk.Entry(form_frame, textvariable=seed_size_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(form_frame, text="(1-16)", foreground="gray").grid(row=row, column=2, sticky=tk.W, padx=5)
+        row += 1
+        
+        # Key Size
+        ttk.Label(form_frame, text="Key Size (bytes):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        key_size_var = tk.IntVar(value=security_data['key_size'] if security_data else 4)
+        ttk.Entry(form_frame, textvariable=key_size_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(form_frame, text="(1-16)", foreground="gray").grid(row=row, column=2, sticky=tk.W, padx=5)
+        row += 1
+        
+        # Max Attempts
+        ttk.Label(form_frame, text="Max Attempts:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        max_attempts_var = tk.IntVar(value=security_data['max_attempts'] if security_data else 3)
+        ttk.Entry(form_frame, textvariable=max_attempts_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Delay Time
+        ttk.Label(form_frame, text="Delay Time (ms):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        delay_time_var = tk.IntVar(value=security_data['delay_time'] if security_data else 10000)
+        ttk.Entry(form_frame, textvariable=delay_time_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Get Seed Function
+        ttk.Label(form_frame, text="Get Seed Function:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        get_seed_var = tk.StringVar(value=security_data['get_seed_func'] if security_data else f"security_get_seed_level_{level_var.get()}")
+        ttk.Entry(form_frame, textvariable=get_seed_var, width=35).grid(row=row, column=1, columnspan=2, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Compare Key Function
+        ttk.Label(form_frame, text="Compare Key Function:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        compare_key_var = tk.StringVar(value=security_data['compare_key_func'] if security_data else f"security_compare_key_level_{level_var.get()}")
+        ttk.Entry(form_frame, textvariable=compare_key_var, width=35).grid(row=row, column=1, columnspan=2, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Supported Sessions
+        ttk.Label(form_frame, text="Supported Sessions:", font=('', 10, 'bold')).grid(row=row, column=0, columnspan=3, sticky=tk.W, pady=(10, 5))
+        row += 1
+        
+        session_frame = ttk.LabelFrame(form_frame, text="Select Sessions", padding="10")
+        session_frame.grid(row=row, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=5)
+        row += 1
+        
+        session_vars = {}
+        current_sessions = security_data.get('supported_sessions', []) if security_data else []
+        
+        for sess_name in available_sessions:
+            var = tk.BooleanVar(value=sess_name in current_sessions)
+            ttk.Checkbutton(session_frame, text=sess_name, variable=var).pack(anchor=tk.W)
+            session_vars[sess_name] = var
+        
+        # Buttons
+        button_frame = ttk.Frame(form_frame)
+        button_frame.grid(row=row, column=0, columnspan=3, pady=20)
+        
+        def on_ok():
+            selected_sessions = [name for name, var in session_vars.items() if var.get()]
+            
+            if not selected_sessions:
+                messagebox.showerror("Error", "Please select at least one session")
+                return
+            
+            result = {
+                "security_level": level_var.get(),
+                "seed_request_sub": seed_sub_var.get(),
+                "key_request_sub": key_sub_var.get(),
+                "seed_size": seed_size_var.get(),
+                "key_size": key_size_var.get(),
+                "max_attempts": max_attempts_var.get(),
+                "delay_time": delay_time_var.get(),
+                "supported_sessions": selected_sessions,
+                "get_seed_func": get_seed_var.get(),
+                "compare_key_func": compare_key_var.get()
+            }
             
             self.result = result
             dialog.destroy()

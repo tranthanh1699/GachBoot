@@ -1,7 +1,7 @@
 #include "dcmdsl.h"
 #include "svc_dcm.h"
 #include "dcmdsd/dcmdsd.h"
-#include "../uds_services/service_0x27/uds_security_config.h"
+#include "../uds_services/service_0x27/uds_service_0x27.h"
 
 CONFIG_LOG_TAG(DCMDSL, true)
 

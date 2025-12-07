@@ -247,8 +247,36 @@ class DidCodeGenerator:
         content += "\n#endif // DID_PBCFG_H\n"
         return content
     
-    def generate_registry_source(self, dids: List[Dict]) -> str:
+    def generate_registry_source(self, dids: List[Dict], session_map: Dict = None, security_map: Dict = None) -> str:
         """Generate DID_PBCfg.c"""
+        session_map = session_map or {}
+        security_map = security_map or {}
+        
+        def calculate_session_mask(supported_sessions):
+            """Calculate session mask from list of session names"""
+            if not supported_sessions or not session_map:
+                return 0
+            mask = 0
+            for session_name in supported_sessions:
+                if session_name in session_map:
+                    session = session_map[session_name]
+                    value_str = session['session_value']
+                    if value_str.startswith('0x') or value_str.startswith('0X'):
+                        value = int(value_str, 16)
+                    else:
+                        value = int(value_str)
+                    mask |= (1 << value)
+            return mask
+        
+        def calculate_security_mask(required_security_levels):
+            """Calculate security mask from list of security levels"""
+            if not required_security_levels or not security_map:
+                return 0
+            mask = 0
+            for level in required_security_levels:
+                mask |= (1 << level)
+            return mask
+        
         content = self._file_header("DID_PBCfg.c", "DID Registry Implementation")
         content += '#include "DID_PBCfg.h"\n'
         content += '#include <stddef.h>\n\n'
@@ -272,8 +300,17 @@ class DidCodeGenerator:
                 length_getter = did['read_config'].get('length_getter', '') or ''
                 length_getter = length_getter.strip()
                 content += f"            .length_getter = {length_getter if length_getter else 'NULL'},\n"
-                content += f"            .session_mask = {did['read_config'].get('session_mask', '0')},\n"
-                content += f"            .security_mask = {did['read_config'].get('security_mask', '0')}\n"
+                
+                # Calculate session_mask from supported_sessions
+                supported_sessions = did['read_config'].get('supported_sessions', [])
+                session_mask = calculate_session_mask(supported_sessions)
+                content += f"            .session_mask = {session_mask},  /* {', '.join(supported_sessions) if supported_sessions else 'None'} */\n"
+                
+                # Calculate security_mask from required_security_levels
+                required_security = did['read_config'].get('required_security_levels', [])
+                security_mask = calculate_security_mask(required_security)
+                security_comment = ', '.join([f"Level {lvl}" for lvl in required_security]) if required_security else 'None'
+                content += f"            .security_mask = {security_mask}  /* {security_comment} */\n"
             else:
                 content += f"            .callback = NULL,\n"
                 content += f"            .length_getter = NULL,\n"
@@ -285,8 +322,18 @@ class DidCodeGenerator:
             content += f"        .write_config = {{\n"
             if 'write_config' in did and did['write_config'].get('callback'):
                 content += f"            .callback = {did['write_config']['callback']},\n"
-                content += f"            .session_mask = {did['write_config'].get('session_mask', '0')},\n"
-                content += f"            .security_mask = {did['write_config'].get('security_mask', '0')},\n"
+                
+                # Calculate session_mask from supported_sessions
+                supported_sessions = did['write_config'].get('supported_sessions', [])
+                session_mask = calculate_session_mask(supported_sessions)
+                content += f"            .session_mask = {session_mask},  /* {', '.join(supported_sessions) if supported_sessions else 'None'} */\n"
+                
+                # Calculate security_mask from required_security_levels
+                required_security = did['write_config'].get('required_security_levels', [])
+                security_mask = calculate_security_mask(required_security)
+                security_comment = ', '.join([f"Level {lvl}" for lvl in required_security]) if required_security else 'None'
+                content += f"            .security_mask = {security_mask},  /* {security_comment} */\n"
+                
                 content += f"            .semantic_validation = {'true' if did['write_config'].get('semantic_validation', False) else 'false'}\n"
             else:
                 content += f"            .callback = NULL,\n"
@@ -333,19 +380,31 @@ def validate_dids(dids: List[Dict]) -> Tuple[bool, List[str], List[str]]:
     return validator.validate(dids)
 
 
-def generate_did_code(dids: List[Dict], project_name: str, version: str, output_path: str):
+def generate_did_code(dids: List[Dict], sessions: List[Dict], security_levels: List[Dict], project_name: str, version: str, output_path: str):
     """Generate DID configuration files"""
     import os
     
+    # Create session lookup map
+    session_map = {s['session_name']: s for s in sessions}
+    
+    # Create security level lookup map
+    security_map = {s['security_level']: s for s in security_levels}
+    
     generator = DidCodeGenerator(project_name, version)
     
-    # Generate files
+    # Generate files with session and security maps
     registry_h = generator.generate_registry_header(dids)
-    registry_c = generator.generate_registry_source(dids)
+    registry_c = generator.generate_registry_source(dids, session_map, security_map)
     
     # Create DID_Gen subfolder
     did_output_path = os.path.join(output_path, "DID_Gen")
     os.makedirs(did_output_path, exist_ok=True)
+    
+    # Clean old files in DID_Gen folder
+    for old_file in os.listdir(did_output_path):
+        old_file_path = os.path.join(did_output_path, old_file)
+        if os.path.isfile(old_file_path):
+            os.remove(old_file_path)
     
     files = []
     for filename, content in [

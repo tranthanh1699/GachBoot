@@ -40,6 +40,24 @@ if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/DID_Gen)
     message(STATUS "Added DID_Gen sources: ${{DID_GEN_SOURCES}}")
 endif()
 
+# Add DCM Session Generated Code
+if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/DCM_Session_Gen)
+    file(GLOB DCM_SESSION_GEN_SOURCES 
+        "${{CMAKE_CURRENT_SOURCE_DIR}}/DCM_Session_Gen/*.c"
+    )
+    list(APPEND GENERATED_SOURCES ${{DCM_SESSION_GEN_SOURCES}})
+    message(STATUS "Added DCM_Session_Gen sources: ${{DCM_SESSION_GEN_SOURCES}}")
+endif()
+
+# Add Security Access Generated Code
+if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Security_Gen)
+    file(GLOB SECURITY_GEN_SOURCES 
+        "${{CMAKE_CURRENT_SOURCE_DIR}}/Security_Gen/*.c"
+    )
+    list(APPEND GENERATED_SOURCES ${{SECURITY_GEN_SOURCES}})
+    message(STATUS "Added Security_Gen sources: ${{SECURITY_GEN_SOURCES}}")
+endif()
+
 # Create library from generated code
 add_library(GenerateCode STATIC ${{GENERATED_SOURCES}})
 
@@ -53,6 +71,18 @@ endif()
 if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/DID_Gen)
     target_include_directories(GenerateCode PUBLIC
         ${{CMAKE_CURRENT_SOURCE_DIR}}/DID_Gen
+    )
+endif()
+
+if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/DCM_Session_Gen)
+    target_include_directories(GenerateCode PUBLIC
+        ${{CMAKE_CURRENT_SOURCE_DIR}}/DCM_Session_Gen
+    )
+endif()
+
+if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Security_Gen)
+    target_include_directories(GenerateCode PUBLIC
+        ${{CMAKE_CURRENT_SOURCE_DIR}}/Security_Gen
     )
 endif()
 

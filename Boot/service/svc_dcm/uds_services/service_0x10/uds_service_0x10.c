@@ -1,8 +1,32 @@
 #include "uds_service_0x10.h"
 #include "svc_dcm.h"
 #include "dcmdsl/dcmdsl.h"
+#include "Dcm_Session_PBCfg.h"
 
 CONFIG_LOG_TAG(UDS_0x10, true)
+
+static Std_ReturnType validate_session_type(uint8_t session_type)
+{
+    for (uint16_t i = 0; i < SVC_DCM_SESSION_COUNT; i++) {
+        if (svc_dcm_session_table[i].session_value == session_type) {
+            return E_OK;
+        }
+    }
+    return E_NOT_OK;
+}
+
+/**
+ * @brief Get session configuration by session type
+ */
+static const svc_dcm_session_config_t *get_session_config(uint8_t session_type)
+{
+    for (uint16_t i = 0; i < SVC_DCM_SESSION_COUNT; i++) {
+        if (svc_dcm_session_table[i].session_value == session_type) {
+            return &svc_dcm_session_table[i];
+        }
+    }
+    return NULL;
+}
 
 /**
  * @brief Service 0x10 handler - Diagnostic Session Control
@@ -19,10 +43,9 @@ Std_ReturnType uds_service_0x10_handler(const uds_message_t *message, ErrorCode_
     uint8_t session_type = message->request[1];
     
     // Phase 2: Validate session type
-    if (session_type != UDS_SESSION_DEFAULT && 
-        session_type != UDS_SESSION_PROGRAMMING && 
-        session_type != UDS_SESSION_EXTENDED_DIAGNOSTIC) {
-        DBG_OUT_E("Invalid session type: 0x%02X", session_type);
+    if( validate_session_type(session_type) != E_OK) 
+    {
+        DBG_OUT_W("Unsupported session type: 0x%02X", session_type);
         *error_code = UDS_NRC_SUBFUNCTION_NOT_SUPPORTED;
         return E_NOT_OK;
     }

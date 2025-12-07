@@ -28,16 +28,66 @@
       "read_config": {
         "callback": "uds_did_read_vin",
         "length_getter": null,
-        "session_mask": 1,
-        "security_mask": 0
-      },
-      "write_config": {
-        "callback": "uds_did_write_vin",
-        "session_mask": 2,
-        "security_mask": 1,
-        "semantic_validation": false
+        "supported_sessions": [
+          "DCM_DEFAULT_SESSION",
+          "DCM_PROGRAMMING_SESSION",
+          "DCM_EXTENDED_SESSION"
+        ],
+        "required_security_levels": [
+          1,
+          2
+        ]
       },
       "description": "Vehicle Identification Number"
+    }
+  ],
+  "sessions": [
+    {
+      "session_name": "DCM_DEFAULT_SESSION",
+      "session_value": "0x01",
+      "description": "Default diagnostic session"
+    },
+    {
+      "session_name": "DCM_PROGRAMMING_SESSION",
+      "session_value": "0x02",
+      "description": "Programming session for bootloader"
+    },
+    {
+      "session_name": "DCM_EXTENDED_SESSION",
+      "session_value": "0x03",
+      "description": "Extended diagnostic session"
+    }
+  ],
+  "security_levels": [
+    {
+      "security_level": 1,
+      "seed_request_sub": "0x01",
+      "key_request_sub": "0x02",
+      "seed_size": 4,
+      "key_size": 4,
+      "max_attempts": 3,
+      "delay_time": 10000,
+      "supported_sessions": [
+        "DCM_EXTENDED_SESSION",
+        "DCM_PROGRAMMING_SESSION"
+      ],
+      "get_seed_func": "security_get_seed_level_1",
+      "compare_key_func": "security_compare_key_level_1"
+    },
+    {
+      "security_level": 2,
+      "seed_request_sub": "0x03",
+      "key_request_sub": "0x04",
+      "seed_size": 8,
+      "key_size": 8,
+      "max_attempts": 3,
+      "delay_time": 30000,
+      "supported_sessions": [
+        "DCM_PROGRAMMING_SESSION",
+        "DCM_EXTENDED_SESSION"
+      ],
+      "get_seed_func": "security_get_seed_level_2",
+      "compare_key_func": "security_compare_key_level_2"
     }
   ]
 }
