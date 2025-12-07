@@ -3,6 +3,7 @@
 #include "svc_dcm.h"
 #include "dcmdsl/dcmdsl.h"
 #include "../service_0x27/uds_service_0x27.h"
+#include "dcm_service_access.h"
 
 CONFIG_LOG_TAG(UDS_0x31, true)
 
@@ -44,48 +45,31 @@ Std_ReturnType uds_service_0x31_handler(const uds_message_t *message, ErrorCode_
         return E_NOT_OK;
     }
 
-    // Phase 5: Check session support
+    // Phase 5: Get current session and security (using dynamic code gen API)
     uint8_t current_session = dcmdsl_get_session();
-    uint32_t current_session_mask = 0;
-    switch (current_session) {
-        case UDS_SESSION_DEFAULT:
-            current_session_mask = UDS_SESSION_MASK_DEFAULT;
-            break;
-        case UDS_SESSION_PROGRAMMING:
-            current_session_mask = UDS_SESSION_MASK_PROGRAMMING;
-            break;
-        case UDS_SESSION_EXTENDED_DIAGNOSTIC:
-            current_session_mask = UDS_SESSION_MASK_EXTENDED;
-            break;
-        default:
-            current_session_mask = UDS_SESSION_MASK_DEFAULT;
-            break;
-    }
+    uint8_t current_security_level = uds_security_get_active_level();
+    
+    // Convert to masks using generated config
+    uint32_t current_session_mask = dcm_service_get_session_mask(current_session);
+    uint32_t current_security_mask = dcm_service_get_security_mask(current_security_level);
 
+    // Phase 6: Check session support
     if ((routine_entry->session_mask & current_session_mask) == 0) {
-        DBG_OUT_E("RID 0x%04X not supported in session 0x%02X", rid, current_session);
+        DBG_OUT_E("RID 0x%04X not supported in session 0x%02X (mask=0x%08X)", rid, current_session, current_session_mask);
         *error_code = UDS_NRC_CONDITIONS_NOT_CORRECT;
         return E_NOT_OK;
     }
 
-    // Phase 6: Check security access
-    uint8_t current_level = uds_security_get_active_level();
-    uint32_t current_security_mask = UDS_SECURITY_MASK_LOCKED;
-    
-    if (current_level == UDS_SECURITY_LEVEL_1) {
-        current_security_mask = UDS_SECURITY_MASK_LEVEL_1;
-    } else if (current_level == UDS_SECURITY_LEVEL_2) {
-        current_security_mask = UDS_SECURITY_MASK_LEVEL_2;
-    }
-    
+    // Phase 7: Check security access
     if ((routine_entry->security_mask & current_security_mask) == 0) {
-        DBG_OUT_E("RID 0x%04X requires security access", rid);
+        DBG_OUT_E("RID 0x%04X requires security access (mask=0x%08X)", rid, current_security_mask);
         *error_code = UDS_NRC_SECURITY_ACCESS_DENIED;
         return E_NOT_OK;
     }
 
     // Phase 7: Call routine callback
     uint8_t status_record[256];
+    memset(status_record, 0, sizeof(status_record));
     uint16_t status_record_len = 0;
     
     Std_ReturnType result = routine_entry->callback(sub_function, option_record, option_record_len,

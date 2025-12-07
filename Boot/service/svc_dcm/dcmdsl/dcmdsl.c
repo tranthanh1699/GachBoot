@@ -1,6 +1,7 @@
 #include "dcmdsl.h"
 #include "svc_dcm.h"
 #include "dcmdsd/dcmdsd.h"
+#include "dcmdsp/dcmdsp.h"
 #include "../uds_services/service_0x27/uds_service_0x27.h"
 
 CONFIG_LOG_TAG(DCMDSL, true)
@@ -12,7 +13,7 @@ static void session_change_security_reset_callback(uint8_t old_session, uint8_t 
 {
     // Reset security on session change (ISO 14229-1)
     // Exception: Default -> Programming keeps security
-    if (!(old_session == UDS_SESSION_DEFAULT && new_session == UDS_SESSION_PROGRAMMING)) {
+    if (!(old_session == DCM_DEFAULT_SESSION_VALUE && new_session == DCM_PROGRAMMING_SESSION_VALUE)) {
         uds_security_reset_all();
         DBG_OUT_I("Security reset due to session change");
     }
@@ -20,7 +21,7 @@ static void session_change_security_reset_callback(uint8_t old_session, uint8_t 
 
 // Session context
 static dcmdsl_session_context_t session_ctx = {
-    .current_session = UDS_SESSION_DEFAULT,
+    .current_session = DCM_DEFAULT_SESSION_VALUE,
     .s3_timeout_counter = 0,
     .session_active = false,
     .active_protocol = 0
@@ -43,7 +44,7 @@ static const dcmdsl_timing_params_t timing_params = {
 dev_err_t dcmdsl_init(void)
 {
     DBG_OUT_I("DCMDSL Initialized");
-    session_ctx.current_session = UDS_SESSION_DEFAULT;
+    session_ctx.current_session = DCM_DEFAULT_SESSION_VALUE;
     session_ctx.s3_timeout_counter = 0;
     session_ctx.session_active = false;
     
@@ -59,7 +60,7 @@ dev_err_t dcmdsl_init(void)
 void dcmdsl_main_function(uint32_t elapsed_ms)
 {
     // S3 Server timeout management
-    if (session_ctx.session_active && session_ctx.current_session != UDS_SESSION_DEFAULT) {
+    if (session_ctx.session_active && session_ctx.current_session != DCM_DEFAULT_SESSION_VALUE) {
         session_ctx.s3_timeout_counter += elapsed_ms;
         
         if (session_ctx.s3_timeout_counter >= timing_params.s3_server_timeout) {
@@ -67,7 +68,7 @@ void dcmdsl_main_function(uint32_t elapsed_ms)
             DBG_OUT_W("S3 Timeout! Returning to Default Session");
             
             // Use dcmdsl_set_session to trigger callbacks
-            dcmdsl_set_session(UDS_SESSION_DEFAULT);
+            dcmdsl_set_session(DCM_DEFAULT_SESSION_VALUE);
         }
     }
 }
@@ -117,7 +118,7 @@ void dcmdsl_set_session(uint8_t session)
     
     if (old_session != session) {
         session_ctx.current_session = session;
-        session_ctx.session_active = (session != UDS_SESSION_DEFAULT);
+        session_ctx.session_active = (session != DCM_DEFAULT_SESSION_VALUE);
         session_ctx.s3_timeout_counter = 0;
         
         DBG_OUT_I("Session changed: 0x%02X -> 0x%02X", old_session, session);

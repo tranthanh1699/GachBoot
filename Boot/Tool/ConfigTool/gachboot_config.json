@@ -33,10 +33,7 @@
           "DCM_PROGRAMMING_SESSION",
           "DCM_EXTENDED_SESSION"
         ],
-        "required_security_levels": [
-          1,
-          2
-        ]
+        "required_security_levels": []
       },
       "description": "Vehicle Identification Number"
     }
@@ -88,6 +85,77 @@
       ],
       "get_seed_func": "security_get_seed_level_2",
       "compare_key_func": "security_compare_key_level_2"
+    }
+  ],
+  "dcm_services": [
+    {
+      "service_id": "0x10",
+      "handler_name": "uds_service_diagnostic_session_control",
+      "supported_sessions": [
+        "DCM_DEFAULT_SESSION",
+        "DCM_PROGRAMMING_SESSION",
+        "DCM_EXTENDED_SESSION"
+      ],
+      "required_security_levels": []
+    },
+    {
+      "service_id": "0x22",
+      "handler_name": "uds_service_read_data_by_id",
+      "supported_sessions": [
+        "DCM_DEFAULT_SESSION",
+        "DCM_PROGRAMMING_SESSION",
+        "DCM_EXTENDED_SESSION"
+      ],
+      "required_security_levels": []
+    },
+    {
+      "service_id": "0x27",
+      "handler_name": "uds_service_security_access",
+      "supported_sessions": [
+        "DCM_EXTENDED_SESSION",
+        "DCM_PROGRAMMING_SESSION"
+      ],
+      "required_security_levels": []
+    },
+    {
+      "service_id": "0x2E",
+      "handler_name": "uds_service_write_data_by_id",
+      "supported_sessions": [
+        "DCM_EXTENDED_SESSION",
+        "DCM_PROGRAMMING_SESSION"
+      ],
+      "required_security_levels": [
+        1
+      ]
+    },
+    {
+      "service_id": "0x3E",
+      "handler_name": "uds_service_0x3e_handler",
+      "supported_sessions": [
+        "DCM_DEFAULT_SESSION",
+        "DCM_PROGRAMMING_SESSION",
+        "DCM_EXTENDED_SESSION"
+      ],
+      "required_security_levels": []
+    },
+    {
+      "service_id": "0x11",
+      "handler_name": "uds_service_0x11_handler",
+      "supported_sessions": [
+        "DCM_DEFAULT_SESSION",
+        "DCM_PROGRAMMING_SESSION",
+        "DCM_EXTENDED_SESSION"
+      ],
+      "required_security_levels": []
+    },
+    {
+      "service_id": "0x31",
+      "handler_name": "uds_service_0x31_handler",
+      "supported_sessions": [
+        "DCM_PROGRAMMING_SESSION",
+        "DCM_EXTENDED_SESSION"
+      ],
+      "required_security_levels": []
     }
   ]
 }

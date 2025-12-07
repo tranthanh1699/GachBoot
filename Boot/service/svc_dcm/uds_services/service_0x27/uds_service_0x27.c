@@ -1,6 +1,7 @@
 #include "uds_service_0x27.h"
 #include "svc_dcm.h"
 #include "dcmdsl/dcmdsl.h"
+#include "dcm_service_access.h"
 #include <string.h>
 
 CONFIG_LOG_TAG(UDS_0x27, true)
@@ -99,27 +100,13 @@ Std_ReturnType uds_service_0x27_handler(const uds_message_t *message, ErrorCode_
         return E_NOT_OK;
     }
 
-    // Phase 3: Check session support
+    // Phase 3: Check session support (using dynamic code gen API)
     uint8_t current_session = dcmdsl_get_session();
-    uint32_t current_session_mask = 0;
-    switch (current_session) {
-        case UDS_SESSION_DEFAULT:
-            current_session_mask = UDS_SESSION_MASK_DEFAULT;
-            break;
-        case UDS_SESSION_PROGRAMMING:
-            current_session_mask = UDS_SESSION_MASK_PROGRAMMING;
-            break;
-        case UDS_SESSION_EXTENDED_DIAGNOSTIC:
-            current_session_mask = UDS_SESSION_MASK_EXTENDED;
-            break;
-        default:
-            current_session_mask = UDS_SESSION_MASK_DEFAULT;
-            break;
-    }
+    uint32_t current_session_mask = dcm_service_get_session_mask(current_session);
 
     if ((config->session_mask & current_session_mask) == 0) {
-        DBG_OUT_E("Security level %d not allowed in session 0x%02X", 
-                  config->security_level, current_session);
+        DBG_OUT_E("Security level %d not allowed in session 0x%02X (mask=0x%08X)", 
+                  config->security_level, current_session, current_session_mask);
         *error_code = UDS_NRC_CONDITIONS_NOT_CORRECT;
         return E_NOT_OK;
     }

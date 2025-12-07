@@ -58,6 +58,15 @@ if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Security_Gen)
     message(STATUS "Added Security_Gen sources: ${{SECURITY_GEN_SOURCES}}")
 endif()
 
+# Add DCM Service Generated Code
+if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Service_Gen)
+    file(GLOB SERVICE_GEN_SOURCES 
+        "${{CMAKE_CURRENT_SOURCE_DIR}}/Service_Gen/*.c"
+    )
+    list(APPEND GENERATED_SOURCES ${{SERVICE_GEN_SOURCES}})
+    message(STATUS "Added Service_Gen sources: ${{SERVICE_GEN_SOURCES}}")
+endif()
+
 # Create library from generated code
 add_library(GenerateCode STATIC ${{GENERATED_SOURCES}})
 
@@ -83,6 +92,12 @@ endif()
 if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Security_Gen)
     target_include_directories(GenerateCode PUBLIC
         ${{CMAKE_CURRENT_SOURCE_DIR}}/Security_Gen
+    )
+endif()
+
+if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Service_Gen)
+    target_include_directories(GenerateCode PUBLIC
+        ${{CMAKE_CURRENT_SOURCE_DIR}}/Service_Gen
     )
 endif()
 

@@ -1,4 +1,6 @@
 #include "uds_routine_control_registry.h"
+#include "DCM_Session_PBCfg.h"
+#include "Security_PBCfg.h"
 #include <string.h>
 
 CONFIG_LOG_TAG(ROUTINE_CTRL, true)
@@ -14,9 +16,9 @@ static Std_ReturnType routine_check_memory(uint8_t sub_function, const uint8_t *
 // Routine Control Registry
 static const uds_routine_entry_t routine_registry[] = {
     // RID      Callback                                    Session Mask                                            Security Mask
-    {0xFF00,    routine_erase_memory,                       UDS_SESSION_MASK_PROGRAMMING,                          UDS_SECURITY_MASK_LEVEL_1 | UDS_SECURITY_MASK_LEVEL_2},  // Erase Memory
-    {0xFF01,    routine_check_programming_dependencies,     UDS_SESSION_MASK_PROGRAMMING,                          UDS_SECURITY_MASK_LEVEL_1 | UDS_SECURITY_MASK_LEVEL_2},  // Check Programming Dependencies
-    {0x0202,    routine_check_memory,                       UDS_SESSION_MASK_EXTENDED | UDS_SESSION_MASK_PROGRAMMING, UDS_SECURITY_MASK_ALL},                              // Check Memory
+    {0xFF00,    routine_erase_memory,                       DCM_PROGRAMMING_SESSION_MASK,                          ((1U << 1U) | (1U << 2U))},  // Erase Memory (Security Level 1 or 2)
+    {0xFF01,    routine_check_programming_dependencies,     DCM_PROGRAMMING_SESSION_MASK,                          ((1U << 1U) | (1U << 2U))},  // Check Programming Dependencies (Security Level 1 or 2)
+    {0x0202,    routine_check_memory,                       (DCM_EXTENDED_SESSION_MASK | DCM_PROGRAMMING_SESSION_MASK), 0xFFFFFFFF},  // Check Memory (All security levels)
 };
 
 #define ROUTINE_REGISTRY_SIZE (sizeof(routine_registry) / sizeof(uds_routine_entry_t))

@@ -2,6 +2,8 @@
 #include "svc_dcm.h"
 #include "dcmdsl/dcmdsl.h"
 #include "../service_0x27/uds_service_0x27.h"
+#include "dcm_service_access.h"
+#include "DCM_Session_PBCfg.h"
 
 CONFIG_LOG_TAG(UDS_0x11, true)
 
@@ -51,17 +53,18 @@ Std_ReturnType uds_service_0x11_handler(const uds_message_t *message, ErrorCode_
     // Phase 4: Check session support (reset requires Programming or Extended session)
     uint8_t current_session = dcmdsl_get_session();
     
-    if (current_session == UDS_SESSION_DEFAULT) {
+    if (current_session == DCM_DEFAULT_SESSION_VALUE) {
         DBG_OUT_E("Reset not allowed in Default session");
         *error_code = UDS_NRC_CONDITIONS_NOT_CORRECT;
         return E_NOT_OK;
     }
 
     // Phase 5: Check security for hard reset (Programming session requires security)
-    if (sub_function == UDS_RESET_HARD_RESET && current_session == UDS_SESSION_PROGRAMMING) {
+    if (sub_function == UDS_RESET_HARD_RESET && current_session == DCM_PROGRAMMING_SESSION_VALUE) {
         uint8_t current_level = uds_security_get_active_level();
         
-        if (current_level == UDS_SECURITY_LEVEL_LOCKED) {
+        // Level 0 means locked (no security unlocked)
+        if (current_level == 0) {
             DBG_OUT_E("Hard reset requires security access in Programming session");
             *error_code = UDS_NRC_SECURITY_ACCESS_DENIED;
             return E_NOT_OK;

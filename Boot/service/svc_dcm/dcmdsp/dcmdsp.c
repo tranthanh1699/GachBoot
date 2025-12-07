@@ -1,27 +1,12 @@
 #include "dcmdsp.h"
-#include "svc_dcm.h"
-#include "uds_services/service_0x10/uds_service_0x10.h"
-#include "uds_services/service_0x11/uds_service_0x11.h"
-#include "uds_services/service_0x3E/uds_service_0x3E.h"
-#include "uds_services/service_0x22/uds_service_0x22.h"
-#include "uds_services/service_0x2E/uds_service_0x2E.h"
-#include "uds_services/service_0x27/uds_service_0x27.h"
-#include "uds_services/service_0x31/uds_service_0x31.h"
+
 
 CONFIG_LOG_TAG(DCMDSP, true)
 
-// Service handler table
-static const uds_service_entry_t service_table[] = {
-    {UDS_SID_DIAGNOSTIC_SESSION_CONTROL, uds_service_0x10_handler},
-    {UDS_SID_ECU_RESET, uds_service_0x11_handler},
-    {UDS_SID_READ_DATA_BY_ID, uds_service_0x22_handler},
-    {UDS_SID_SECURITY_ACCESS, uds_service_0x27_handler},
-    {UDS_SID_WRITE_DATA_BY_ID, uds_service_0x2e_handler},
-    {UDS_SID_ROUTINE_CONTROL, uds_service_0x31_handler},
-    {UDS_SID_TESTER_PRESENT, uds_service_0x3e_handler},
-};
+#define SERVICE_TABLE           dcm_service_config_table
+#define SERVICE_TABLE_SIZE      DCM_SERVICE_COUNT 
 
-#define SERVICE_TABLE_SIZE (sizeof(service_table) / sizeof(uds_service_entry_t))
+extern uint8_t uds_security_get_active_level(void); 
 
 /**
  * @brief Initialize DSP layer
@@ -32,16 +17,66 @@ Std_ReturnType dcmdsp_init(void)
     return E_OK;
 }
 
+static const dcm_service_config_t* get_service_config(uint8_t service_id)
+{
+    for (uint16_t i = 0; i < DCM_SERVICE_COUNT; i++) 
+    {
+        if (SERVICE_TABLE[i].service_id == service_id) {
+            return &SERVICE_TABLE[i];
+        }
+    }
+    return NULL;
+}
+
+Std_ReturnType dcmdsp_check_session_security(uint8_t service_id, ErrorCode_t *error_code)
+{
+    const dcm_service_config_t * service_config = get_service_config(service_id);
+    if(service_config != NULL)
+    {
+        uint32_t session_mask = service_config->session_mask;
+        uint32_t security_mask = service_config->security_mask;
+        uint8_t current_session = dcmdsl_get_session();
+        uint8_t current_security_level = uds_security_get_active_level();
+    
+        if(security_mask != 0)
+        {
+            if((session_mask & (uint32_t)(1 << current_session)) == 0)
+            {
+                *error_code = UDS_NRC_SERVICE_NOT_SUPPORTED_IN_ACTIVE_SESSION; 
+                return E_NOT_OK;
+            }
+        }
+
+        if(security_mask != 0)
+        {
+            if((security_mask & (uint32_t)(1 << current_security_level)) == 0)
+            {
+                *error_code = UDS_NRC_SECURITY_ACCESS_DENIED; 
+                return E_NOT_OK;
+            }
+        }
+    }
+    else
+    {
+        *error_code = UDS_NRC_SERVICE_NOT_SUPPORTED; 
+        return E_NOT_OK;
+    }
+
+    *error_code = UDS_NRC_POSITIVE_RESPONSE; 
+    return E_OK;
+}
+
 /**
  * @brief Process UDS service request (unified interface)
  */
 Std_ReturnType dcmdsp_process_service(uint8_t service_id, const uds_message_t *message, ErrorCode_t *error_code)
 {
     // Find service handler in table
-    for (uint16_t i = 0; i < SERVICE_TABLE_SIZE; i++) {
-        if (service_table[i].service_id == service_id) {
-            // Call service handler
-            Std_ReturnType result = service_table[i].handler(message, error_code);
+    for (uint16_t i = 0; i < DCM_SERVICE_COUNT; i++) {
+        if (SERVICE_TABLE[i].service_id == service_id) {
+            Std_ReturnType result = E_NOT_OK;
+            
+            result = SERVICE_TABLE[i].handler(message, error_code);
 
             // Check result
             if (result == DCM_E_PENDING) {

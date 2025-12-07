@@ -90,7 +90,8 @@ Std_ReturnType uds_did_validate_access(
     }
     
     // Validate security - check if current security_mask matches required
-    if (required_security_mask != UDS_SECURITY_MASK_LOCKED && required_security_mask != UDS_SECURITY_MASK_ALL) {
+    // If required_security_mask is 0, no security is required
+    if (required_security_mask != 0) {
         if ((security_mask & required_security_mask) == 0) {
             DBG_OUT_W("[DID Registry] DID 0x%04X service 0x%02X: Security access denied", did, service);
             return E_NOT_OK;

@@ -16,19 +16,6 @@ static Std_ReturnType validate_session_type(uint8_t session_type)
 }
 
 /**
- * @brief Get session configuration by session type
- */
-static const svc_dcm_session_config_t *get_session_config(uint8_t session_type)
-{
-    for (uint16_t i = 0; i < SVC_DCM_SESSION_COUNT; i++) {
-        if (svc_dcm_session_table[i].session_value == session_type) {
-            return &svc_dcm_session_table[i];
-        }
-    }
-    return NULL;
-}
-
-/**
  * @brief Service 0x10 handler - Diagnostic Session Control
  */
 Std_ReturnType uds_service_0x10_handler(const uds_message_t *message, ErrorCode_t *error_code)

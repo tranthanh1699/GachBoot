@@ -3,6 +3,8 @@
 #include "svc_dcm.h"
 #include "dcmdsl/dcmdsl.h"
 #include "../service_0x27/uds_service_0x27.h"
+#include "dcm_service_access.h"  // New API layer
+#include "dcm_did_access.h"      // New DID access API
 
 CONFIG_LOG_TAG(UDS_0x22, true)
 
@@ -25,40 +27,21 @@ Std_ReturnType uds_service_0x22_handler(const uds_message_t *message, ErrorCode_
         return E_NOT_OK;
     }
 
-    // Phase 2: Get current session and security
+    // Phase 2: Get current session and security (using dynamic code gen API)
     uint8_t current_session = dcmdsl_get_session();
-    uint32_t current_session_mask = 0;
-    switch (current_session) {
-        case UDS_SESSION_DEFAULT:
-            current_session_mask = UDS_SESSION_MASK_DEFAULT;
-            break;
-        case UDS_SESSION_PROGRAMMING:
-            current_session_mask = UDS_SESSION_MASK_PROGRAMMING;
-            break;
-        case UDS_SESSION_EXTENDED_DIAGNOSTIC:
-            current_session_mask = UDS_SESSION_MASK_EXTENDED;
-            break;
-        default:
-            current_session_mask = UDS_SESSION_MASK_DEFAULT;
-            break;
-    }
+    uint8_t current_security_level = uds_security_get_active_level();
     
-    // Get current security level and convert to mask
-    uint8_t current_level = uds_security_get_active_level();
-    uint32_t current_security_mask = UDS_SECURITY_MASK_LOCKED;
-    
-    if (current_level == UDS_SECURITY_LEVEL_1) {
-        current_security_mask = UDS_SECURITY_MASK_LEVEL_1;
-    } else if (current_level == UDS_SECURITY_LEVEL_2) {
-        current_security_mask = UDS_SECURITY_MASK_LEVEL_2;
-    }
+    // Convert to masks using generated config
+    uint32_t current_session_mask = dcm_service_get_session_mask(current_session);
+    uint32_t current_security_mask = dcm_service_get_security_mask(current_security_level);
 
     // Phase 3: Process each DID
     uint16_t num_dids = (message->request_len - 1) / 2;
     uint16_t response_pos = 0;
     bool at_least_one_did_read = false;
 
-    DBG_OUT_I("RDBI: Processing %d DID(s) in session 0x%02X", num_dids, current_session);
+    DBG_OUT_I("RDBI: Processing %d DID(s) in session 0x%02X (mask=0x%08X)", 
+              num_dids, current_session, current_session_mask);
 
     for (uint16_t i = 0; i < num_dids; i++) {
         uint16_t did = (message->request[1 + (i * 2)] << 8) | message->request[2 + (i * 2)];
@@ -77,30 +60,13 @@ Std_ReturnType uds_service_0x22_handler(const uds_message_t *message, ErrorCode_
             continue;
         }
 
-        // Check if DID supports Read service
-        if (did_entry->read_config.callback == NULL) {
-            DBG_OUT_W("DID 0x%04X does not support Read (0x22)", did);
+        // Check DID read access (session + security) - BEFORE calling callback
+        if (dcm_did_check_read_access(did_entry, current_session_mask, current_security_mask, error_code) != E_OK) {
+            DBG_OUT_W("DID 0x%04X read access denied", did);
             if (num_dids == 1) {
-                *error_code = UDS_NRC_REQUEST_OUT_OF_RANGE;
-                return E_NOT_OK;
+                return E_NOT_OK;  // error_code already set by dcm_did_check_read_access
             }
-            continue;
-        }
-
-        // Validate session and security access
-        if (uds_did_validate_access(did, UDS_SID_READ_DATA_BY_IDENTIFIER, current_session_mask, current_security_mask) != E_OK) {
-            DBG_OUT_W("DID 0x%04X access denied (session: 0x%08X, security: 0x%08X)", 
-                      did, current_session_mask, current_security_mask);
-            if (num_dids == 1) {
-                // Return proper NRC based on which check failed
-                if ((did_entry->read_config.session_mask & current_session_mask) == 0) {
-                    *error_code = UDS_NRC_CONDITIONS_NOT_CORRECT;
-                } else {
-                    *error_code = UDS_NRC_SECURITY_ACCESS_DENIED;
-                }
-                return E_NOT_OK;
-            }
-            continue;
+            continue;  // Skip this DID
         }
 
         // Determine actual data length

@@ -49,6 +49,7 @@ void dcmdsd_process_pending(void)
     
     // Prepare response buffer
     uint8_t response_buffer[256];
+    memset(response_buffer, 0, sizeof(response_buffer));
     uint16_t response_len = 0;
     uint8_t error_code = 0;
     
@@ -149,6 +150,7 @@ dev_err_t dcmdsd_process_request(dev_com_tp_sdu_t * sdu_info_p)
     
     // Prepare response buffer
     uint8_t response_buffer[256];
+    memset(response_buffer, 0, sizeof(response_buffer));
     uint16_t response_len = 0;
     uint8_t error_code = 0;
     

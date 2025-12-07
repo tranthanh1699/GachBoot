@@ -12,7 +12,13 @@ from Module.nvm_module import validate_nvm_blocks, generate_nvm_code
 from Module.did_module import validate_dids, generate_did_code
 from Module.session_module import validate_sessions, generate_session_code
 from Module.security_module import validate_security_levels, generate_security_code
+from Module.service_module import validate_services, generate_service_code
 from Module.cmake_module import generate_cmake_file
+from Module_UI.service_ui import ServiceUI
+from Module_UI.session_ui import SessionUI
+from Module_UI.security_ui import SecurityUI
+from Module_UI.nvm_ui import NvmUI
+from Module_UI.did_ui import DidUI
 
 class ConfigEditor:
     def __init__(self, root):
@@ -23,6 +29,13 @@ class ConfigEditor:
         self.config_file = "gachboot_config.json"
         self.config = None
         self.set_modified(False)
+        
+        # Initialize UI modules
+        self.service_ui = None
+        self.session_ui = None
+        self.security_ui = None
+        self.nvm_ui = None
+        self.did_ui = None
         
         # Apply theme
         style = ttk.Style()
@@ -94,6 +107,7 @@ class ConfigEditor:
         self.setup_did_tab()
         self.setup_session_tab()
         self.setup_security_tab()
+        self.setup_service_tab()
         
         # Status bar
         self.status_var = tk.StringVar(value="Ready")
@@ -161,148 +175,83 @@ class ConfigEditor:
         project_frame.columnconfigure(1, weight=1)
     
     def setup_nvm_tab(self):
-        """Setup NVM Blocks tab"""
+        """Setup NVM Blocks tab using NvmUI module"""
         nvm_frame = ttk.Frame(self.config_panel_frame)
         
-        # Toolbar
-        toolbar = ttk.Frame(nvm_frame)
-        toolbar.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
+        # Initialize NvmUI
+        self.nvm_ui = NvmUI(nvm_frame)
         
-        ttk.Button(toolbar, text="➕ Add Block", command=self.add_nvm_block).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="✏️ Edit Block", command=self.edit_nvm_block).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="🗑️ Delete Block", command=self.delete_nvm_block).pack(side=tk.LEFT, padx=2)
+        # Setup tree and toolbar using UI module
+        self.nvm_tree = self.nvm_ui.setup_tab()
+        self.nvm_count_var = self.nvm_ui.setup_toolbar(
+            add_cmd=self.add_nvm_block,
+            edit_cmd=self.edit_nvm_block,
+            delete_cmd=self.delete_nvm_block
+        )
         
-        ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
-        ttk.Label(toolbar, text=f"Total Blocks: ", font=('', 9)).pack(side=tk.LEFT, padx=5)
-        self.nvm_count_var = tk.StringVar(value="0")
-        ttk.Label(toolbar, textvariable=self.nvm_count_var, font=('', 9, 'bold')).pack(side=tk.LEFT)
-        
-        # Treeview
-        tree_frame = ttk.Frame(nvm_frame)
-        tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        columns = ("ID", "Name", "Length", "Default", "Description")
-        self.nvm_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=15)
-        
-        for col in columns:
-            self.nvm_tree.heading(col, text=col)
-            self.nvm_tree.column(col, width=150)
-        
-        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.nvm_tree.yview)
-        self.nvm_tree.configure(yscrollcommand=scrollbar.set)
-        
-        self.nvm_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        return nvm_frame
     
     def setup_did_tab(self):
-        """Setup DIDs tab"""
+        """Setup DIDs tab using DidUI module"""
         did_frame = ttk.Frame(self.config_panel_frame)
         
-        # Toolbar
-        toolbar = ttk.Frame(did_frame)
-        toolbar.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
+        # Initialize DidUI
+        self.did_ui = DidUI(did_frame)
         
-        ttk.Button(toolbar, text="➕ Add DID", command=self.add_did).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="✏️ Edit DID", command=self.edit_did).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="🗑️ Delete DID", command=self.delete_did).pack(side=tk.LEFT, padx=2)
+        # Setup tree and toolbar using UI module
+        self.did_tree = self.did_ui.setup_tab()
+        self.did_count_var = self.did_ui.setup_toolbar(
+            add_cmd=self.add_did,
+            edit_cmd=self.edit_did,
+            delete_cmd=self.delete_did
+        )
         
-        ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
-        ttk.Label(toolbar, text=f"Total DIDs: ", font=('', 9)).pack(side=tk.LEFT, padx=5)
-        self.did_count_var = tk.StringVar(value="0")
-        ttk.Label(toolbar, textvariable=self.did_count_var, font=('', 9, 'bold')).pack(side=tk.LEFT)
-        toolbar.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
-        
-        ttk.Button(toolbar, text="Add DID", command=self.add_did).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="Edit DID", command=self.edit_did).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="Delete DID", command=self.delete_did).pack(side=tk.LEFT, padx=2)
-        
-        # Treeview
-        tree_frame = ttk.Frame(did_frame)
-        tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        columns = ("DID", "Name", "Type", "Length", "Read", "Write", "Description")
-        self.did_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=15)
-        
-        widths = {"DID": 80, "Name": 200, "Type": 80, "Length": 70, "Read": 60, "Write": 60, "Description": 300}
-        for col in columns:
-            self.did_tree.heading(col, text=col)
-            self.did_tree.column(col, width=widths.get(col, 100))
-        
-        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.did_tree.yview)
-        self.did_tree.configure(yscrollcommand=scrollbar.set)
-        
-        self.did_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        return did_frame
     
     def setup_session_tab(self):
-        """Setup Sessions tab"""
+        """Setup Sessions tab using SessionUI module"""
         session_frame = ttk.Frame(self.config_panel_frame)
         
-        # Toolbar
-        toolbar = ttk.Frame(session_frame)
-        toolbar.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
+        # Initialize SessionUI
+        self.session_ui = SessionUI(session_frame)
         
-        ttk.Button(toolbar, text="➕ Add Session", command=self.add_session).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="✏️ Edit Session", command=self.edit_session).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="🗑️ Delete Session", command=self.delete_session).pack(side=tk.LEFT, padx=2)
-        
-        ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
-        ttk.Label(toolbar, text=f"Total Sessions: ", font=('', 9)).pack(side=tk.LEFT, padx=5)
-        self.session_count_var = tk.StringVar(value="0")
-        ttk.Label(toolbar, textvariable=self.session_count_var, font=('', 9, 'bold')).pack(side=tk.LEFT)
-        
-        # Treeview
-        tree_frame = ttk.Frame(session_frame)
-        tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        columns = ("Name", "Value", "Description")
-        self.session_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=15)
-        
-        widths = {"Name": 300, "Value": 100, "Description": 550}
-        for col in columns:
-            self.session_tree.heading(col, text=col)
-            self.session_tree.column(col, width=widths.get(col, 100))
-        
-        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.session_tree.yview)
-        self.session_tree.configure(yscrollcommand=scrollbar.set)
-        
-        self.session_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        # Setup tree and toolbar using UI module
+        self.session_tree = self.session_ui.setup_tab()
+        self.session_count_var = self.session_ui.setup_toolbar(
+            add_cmd=self.add_session,
+            edit_cmd=self.edit_session,
+            delete_cmd=self.delete_session
+        )
     
     def setup_security_tab(self):
-        """Setup Security Access tab"""
+        """Setup Security Access tab using SecurityUI module"""
         security_frame = ttk.Frame(self.config_panel_frame)
         
-        # Toolbar
-        toolbar = ttk.Frame(security_frame)
-        toolbar.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
+        # Initialize SecurityUI
+        self.security_ui = SecurityUI(security_frame)
         
-        ttk.Button(toolbar, text="➕ Add Security Level", command=self.add_security_level).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="✏️ Edit Security Level", command=self.edit_security_level).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="🗑️ Delete Security Level", command=self.delete_security_level).pack(side=tk.LEFT, padx=2)
+        # Setup tree and toolbar using UI module
+        self.security_tree = self.security_ui.setup_tab()
+        self.security_count_var = self.security_ui.setup_toolbar(
+            add_cmd=self.add_security_level,
+            edit_cmd=self.edit_security_level,
+            delete_cmd=self.delete_security_level
+        )
+    
+    def setup_service_tab(self):
+        """Setup DCM Service tab using ServiceUI module"""
+        self.service_tab_frame = ttk.Frame(self.config_panel_frame)
         
-        ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
-        ttk.Label(toolbar, text=f"Total Levels: ", font=('', 9)).pack(side=tk.LEFT, padx=5)
-        self.security_count_var = tk.StringVar(value="0")
-        ttk.Label(toolbar, textvariable=self.security_count_var, font=('', 9, 'bold')).pack(side=tk.LEFT)
+        # Initialize ServiceUI
+        self.service_ui = ServiceUI(self.service_tab_frame)
         
-        # Treeview
-        tree_frame = ttk.Frame(security_frame)
-        tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        columns = ("Level", "Seed Sub", "Key Sub", "Seed Size", "Key Size", "Max Attempts", "Delay")
-        self.security_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=15)
-        
-        widths = {"Level": 60, "Seed Sub": 100, "Key Sub": 100, "Seed Size": 90, "Key Size": 90, "Max Attempts": 110, "Delay": 100}
-        for col in columns:
-            self.security_tree.heading(col, text=col)
-            self.security_tree.column(col, width=widths.get(col, 100))
-        
-        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.security_tree.yview)
-        self.security_tree.configure(yscrollcommand=scrollbar.set)
-        
-        self.security_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        # Setup tree and toolbar using UI module
+        self.service_tree = self.service_ui.setup_tab()
+        self.service_count_var = self.service_ui.setup_toolbar(
+            add_cmd=self.add_service,
+            edit_cmd=self.edit_service,
+            delete_cmd=self.delete_service
+        )
     
     def load_config(self):
         """Load configuration from file"""
@@ -345,65 +294,33 @@ class ConfigEditor:
         self.refresh_nav_tree()
         
         # NVM Blocks
-        self.nvm_tree.delete(*self.nvm_tree.get_children())
-        for block in self.config['nvm_blocks']:
-            rom_data = block.get('rom_data', block.get('default_value', ''))
-            # Check if rom_data is string (array name) or list (old format)
-            if isinstance(rom_data, str):
-                default_str = rom_data  # Display array name
-            else:
-                default_str = ' '.join([f"{v:02X}" for v in rom_data])  # Display hex values
-            
-            self.nvm_tree.insert('', tk.END, values=(
-                block['block_id'],
-                block['block_name'],
-                block.get('block_size', block.get('data_length', 0)),
-                default_str,
-                block['description']
-            ))
+        if self.nvm_ui:
+            self.nvm_ui.refresh_tree(self.config['nvm_blocks'])
         self.nvm_count_var.set(str(len(self.config['nvm_blocks'])))
         
         # DIDs
-        self.did_tree.delete(*self.did_tree.get_children())
-        for did in self.config['dids']:
-            has_read = 'read_config' in did and did['read_config'].get('callback')
-            has_write = 'write_config' in did and did['write_config'].get('callback')
-            self.did_tree.insert('', tk.END, values=(
-                did['did'],
-                did['did_name'],
-                'Fixed' if did.get('fixed_length', True) else 'Variable',
-                did.get('expected_length', 0),
-                '✓' if has_read else '✗',
-                '✓' if has_write else '✗',
-                did.get('description', '')
-            ))
+        if self.did_ui:
+            self.did_ui.refresh_tree(self.config['dids'])
         self.did_count_var.set(str(len(self.config['dids'])))
         
         # Sessions
-        self.session_tree.delete(*self.session_tree.get_children())
         sessions = self.config.get('sessions', [])
-        for session in sessions:
-            self.session_tree.insert('', tk.END, values=(
-                session['session_name'],
-                session['session_value'],
-                session.get('description', '')
-            ))
+        if self.session_ui:
+            self.session_ui.refresh_tree(sessions)
         self.session_count_var.set(str(len(sessions)))
         
         # Security Levels
-        self.security_tree.delete(*self.security_tree.get_children())
         security_levels = self.config.get('security_levels', [])
-        for sec in security_levels:
-            self.security_tree.insert('', tk.END, values=(
-                sec['security_level'],
-                sec['seed_request_sub'],
-                sec['key_request_sub'],
-                sec['seed_size'],
-                sec['key_size'],
-                sec['max_attempts'],
-                f"{sec['delay_time']} ms"
-            ))
+        if self.security_ui:
+            self.security_ui.refresh_tree(security_levels)
         self.security_count_var.set(str(len(security_levels)))
+        
+        # DCM Services
+        self.service_tree.delete(*self.service_tree.get_children())
+        services = self.config.get('dcm_services', [])
+        if self.service_ui:
+            self.service_ui.refresh_tree(services)
+        self.service_count_var.set(str(len(services)))
     
     def refresh_nav_tree(self):
         """Refresh navigation tree"""
@@ -450,6 +367,15 @@ class ConfigEditor:
             self.nav_tree.insert(security_root, tk.END,
                 text=f"  Level {sec['security_level']} (0x{int(sec['seed_request_sub'], 16):02X}/0x{int(sec['key_request_sub'], 16):02X})" if isinstance(sec['seed_request_sub'], str) else f"  Level {sec['security_level']}",
                 tags=('security', str(i)))
+        
+        # DCM Services branch with count
+        services = self.config.get('dcm_services', [])
+        service_count = len(services)
+        service_root = self.nav_tree.insert(root, tk.END, text=f"⚙️ DCM Services ({service_count})", open=True, tags=('service_root',))
+        for i, service in enumerate(services):
+            self.nav_tree.insert(service_root, tk.END,
+                text=f"  {service['service_id']} - {service['handler_name']}",
+                tags=('service', str(i)))
     
     def browse_config_file(self):
         """Browse for config file"""
@@ -547,88 +473,54 @@ class ConfigEditor:
         self.info_text.delete(1.0, tk.END)
         
         if tags and tags[0] == 'nvm':
-            # Show NVM block details in info panel
+            # Show NVM block details in info panel using NvmUI
             idx = int(tags[1])
             block = self.config['nvm_blocks'][idx]
-            info = f"NVM Block Details\n"
-            info += f"{'='*30}\n"
-            info += f"Block ID: {block['block_id']}\n"
-            info += f"Name: {block['block_name']}\n"
-            info += f"Length: {block.get('block_size', block.get('data_length', 0))} bytes\n"
-            
-            rom_data = block.get('rom_data', block.get('default_value', ''))
-            if isinstance(rom_data, str):
-                info += f"ROM Data: {rom_data}\n"
-            else:
-                info += f"ROM Data: {' '.join([f'{v:02X}' for v in rom_data])}\n"
-            
-            ram_data = block.get('ram_data', '')
-            if ram_data:
-                info += f"RAM Data: {ram_data}\n"
-            
-            info += f"\nDescription:\n{block['description']}\n"
-            self.info_text.insert(1.0, info)
+            if self.nvm_ui:
+                self.nvm_ui.show_info_panel(self.info_text, block)
             
             # Show edit form in config panel
             self.show_nvm_edit_form(idx)
             
         elif tags and tags[0] == 'did':
-            # Show DID details in info panel
+            # Show DID details in info panel using DidUI
             idx = int(tags[1])
             did = self.config['dids'][idx]
-            info = f"DID Details\n"
-            info += f"{'='*30}\n"
-            info += f"DID: {did['did']}\n"
-            info += f"Name: {did['did_name']}\n"
-            info += f"Length: {'Fixed' if did.get('fixed_length', True) else 'Variable'} ({did.get('expected_length', 0)} bytes)\n"
-            if not did.get('fixed_length', True):
-                info += f"Range: {did.get('min_length', 0)}-{did.get('max_length', 0)} bytes\n"
-            if 'read_config' in did:
-                info += f"Read: ✓ ({did['read_config'].get('callback', 'N/A')})\n"
-            if 'write_config' in did:
-                info += f"Write: ✓ ({did['write_config'].get('callback', 'N/A')})\n"
-            info += f"\nDescription:\n{did.get('description', '')}\n"
-            self.info_text.insert(1.0, info)
+            if self.did_ui:
+                self.did_ui.show_info_panel(self.info_text, did)
             
             # Show edit form in config panel
             self.show_did_edit_form(idx)
         
         elif tags and tags[0] == 'session':
-            # Show Session details in info panel
+            # Show Session details in info panel using SessionUI
             idx = int(tags[1])
             session = self.config['sessions'][idx]
-            info = f"Session Details\n"
-            info += f"{'='*30}\n"
-            info += f"Name: {session['session_name']}\n"
-            info += f"Value: {session['session_value']}\n"
-            info += f"\nDescription:\n{session.get('description', '')}\n"
-            self.info_text.insert(1.0, info)
+            if self.session_ui:
+                self.session_ui.show_info_panel(self.info_text, session)
             
             # Show edit form in config panel
             self.show_session_edit_form(idx)
         
         elif tags and tags[0] == 'security':
-            # Show Security details in info panel
+            # Show Security details in info panel using SecurityUI
             idx = int(tags[1])
             sec = self.config['security_levels'][idx]
-            info = f"Security Level Details\n"
-            info += f"{'='*30}\n"
-            info += f"Level: {sec['security_level']}\n"
-            info += f"Seed Request: {sec['seed_request_sub']}\n"
-            info += f"Key Request: {sec['key_request_sub']}\n"
-            info += f"Seed Size: {sec['seed_size']} bytes\n"
-            info += f"Key Size: {sec['key_size']} bytes\n"
-            info += f"Max Attempts: {sec['max_attempts']}\n"
-            info += f"Delay Time: {sec['delay_time']} ms\n"
-            info += f"Get Seed Func: {sec['get_seed_func']}\n"
-            info += f"Compare Key Func: {sec['compare_key_func']}\n"
-            info += f"\nSupported Sessions:\n"
-            for sess in sec.get('supported_sessions', []):
-                info += f"  • {sess}\n"
-            self.info_text.insert(1.0, info)
+            if self.security_ui:
+                self.security_ui.show_info_panel(self.info_text, sec)
             
             # Show edit form in config panel
             self.show_security_edit_form(idx)
+        
+        elif tags and tags[0] == 'service':
+            # Show Service details in info panel using ServiceUI
+            idx = int(tags[1])
+            service = self.config['dcm_services'][idx]
+            if self.service_ui:
+                self.service_ui.show_info_panel(self.info_text, service)
+            
+            # Show edit form in config panel
+            self.show_service_edit_form(idx)
         
         self.info_text.config(state=tk.DISABLED)
     
@@ -654,6 +546,8 @@ class ConfigEditor:
             menu.add_command(label="➕ Add New Session", command=self.add_session)
         elif tags and tags[0] == 'security_root':
             menu.add_command(label="➕ Add New Security Level", command=self.add_security_level)
+        elif tags and tags[0] == 'service_root':
+            menu.add_command(label="➕ Add New Service", command=self.add_service)
         elif tags and tags[0] == 'nvm':
             menu.add_command(label="✏️ Edit Block", command=self.edit_nvm_block)
             menu.add_command(label="🗑️ Delete Block", command=self.delete_nvm_block)
@@ -666,383 +560,52 @@ class ConfigEditor:
         elif tags and tags[0] == 'security':
             menu.add_command(label="✏️ Edit Security Level", command=self.edit_security_level)
             menu.add_command(label="🗑️ Delete Security Level", command=self.delete_security_level)
+        elif tags and tags[0] == 'service':
+            menu.add_command(label="✏️ Edit Service", command=self.edit_service)
+            menu.add_command(label="🗑️ Delete Service", command=self.delete_service)
         else:
             return
         
         menu.post(event.x_root, event.y_root)
     
     def show_nvm_edit_form(self, index):
-        """Show NVM block edit form in config panel"""
-        # Clear config panel
-        for widget in self.config_panel_frame.winfo_children():
-            widget.destroy()
-        
-        block = self.config['nvm_blocks'][index]
-        
-        # Create form
-        form_frame = ttk.Frame(self.config_panel_frame, padding="10")
-        form_frame.pack(fill=tk.BOTH, expand=True)
-        
-        ttk.Label(form_frame, text=f"Edit NVM Block", font=('', 12, 'bold')).grid(row=0, column=0, columnspan=2, pady=10, sticky=tk.W)
-        
-        # Block ID
-        ttk.Label(form_frame, text="Block ID:").grid(row=1, column=0, sticky=tk.W, pady=5)
-        block_id_var = tk.IntVar(value=block['block_id'])
-        ttk.Entry(form_frame, textvariable=block_id_var, width=30).grid(row=1, column=1, sticky=(tk.W, tk.E), pady=5)
-        
-        # Block Name
-        ttk.Label(form_frame, text="Block Name:").grid(row=2, column=0, sticky=tk.W, pady=5)
-        block_name_var = tk.StringVar(value=block['block_name'])
-        ttk.Entry(form_frame, textvariable=block_name_var, width=30).grid(row=2, column=1, sticky=(tk.W, tk.E), pady=5)
-        
-        # Data Length
-        ttk.Label(form_frame, text="Block Size:").grid(row=3, column=0, sticky=tk.W, pady=5)
-        block_size_var = tk.IntVar(value=block.get('block_size', block.get('data_length', 0)))
-        ttk.Entry(form_frame, textvariable=block_size_var, width=30).grid(row=3, column=1, sticky=(tk.W, tk.E), pady=5)
-        
-        # ROM Data Array Name
-        ttk.Label(form_frame, text="ROM Array Name:").grid(row=4, column=0, sticky=tk.W, pady=5)
-        rom_var = tk.StringVar(value=block.get('rom_data', ''))
-        ttk.Entry(form_frame, textvariable=rom_var, width=30).grid(row=4, column=1, sticky=(tk.W, tk.E), pady=5)
-        
-        # RAM Data Array Name
-        ttk.Label(form_frame, text="RAM Array Name:").grid(row=5, column=0, sticky=tk.W, pady=5)
-        ram_var = tk.StringVar(value=block.get('ram_data', ''))
-        ttk.Entry(form_frame, textvariable=ram_var, width=30).grid(row=5, column=1, sticky=(tk.W, tk.E), pady=5)
-        
-        # Description
-        ttk.Label(form_frame, text="Description:").grid(row=6, column=0, sticky=tk.W, pady=5)
-        desc_var = tk.StringVar(value=block['description'])
-        ttk.Entry(form_frame, textvariable=desc_var, width=30).grid(row=6, column=1, sticky=(tk.W, tk.E), pady=5)
-        
-        # Auto-save on field change
-        def save_changes(*args):
-            try:
-                # Update config silently
-                self.config['nvm_blocks'][index]['block_id'] = block_id_var.get()
-                self.config['nvm_blocks'][index]['block_name'] = block_name_var.get()
-                self.config['nvm_blocks'][index]['block_size'] = block_size_var.get()
-                self.config['nvm_blocks'][index]['rom_data'] = rom_var.get().strip()
-                self.config['nvm_blocks'][index]['ram_data'] = ram_var.get().strip()
-                self.config['nvm_blocks'][index]['description'] = desc_var.get()
-                self.set_modified()
-                self.refresh_ui()
-            except Exception as e:
-                pass
-        
-        # Bind to save on focus out
-        for var in [block_id_var, block_name_var, block_size_var, rom_var, ram_var, desc_var]:
-            var.trace('w', save_changes)
-        
-        form_frame.columnconfigure(1, weight=1)
+        """Show NVM block edit form in config panel using NvmUI"""
+        if self.nvm_ui:
+            self.nvm_ui.show_edit_form(
+                self.config_panel_frame,
+                index,
+                self.config,
+                {
+                    'set_modified': self.set_modified,
+                    'refresh_ui': self.refresh_ui
+                }
+            )
     
     def show_did_edit_form(self, index):
-        """Show DID edit form in config panel - new structure"""
-        # Clear config panel
-        for widget in self.config_panel_frame.winfo_children():
-            widget.destroy()
-        
-        did = self.config['dids'][index]
-        
-        # Create form with scrollbar (same style as NVM)
-        canvas = tk.Canvas(self.config_panel_frame, bg='white')
-        scrollbar = ttk.Scrollbar(self.config_panel_frame, orient=tk.VERTICAL, command=canvas.yview)
-        form_frame = ttk.Frame(canvas, padding="10")
-        
-        canvas.configure(yscrollcommand=scrollbar.set)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        
-        canvas_frame = canvas.create_window((0, 0), window=form_frame, anchor=tk.NW)
-        
-        ttk.Label(form_frame, text="Edit DID", font=('', 12, 'bold')).grid(row=0, column=0, columnspan=2, pady=10, sticky=tk.W)
-        
-        row = 1
-        
-        # DID
-        ttk.Label(form_frame, text="DID (hex):").grid(row=row, column=0, sticky=tk.W, pady=5)
-        did_var = tk.StringVar(value=did['did'])
-        ttk.Entry(form_frame, textvariable=did_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
-        row += 1
-        
-        # DID Name
-        ttk.Label(form_frame, text="DID Name:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        did_name_var = tk.StringVar(value=did['did_name'])
-        ttk.Entry(form_frame, textvariable=did_name_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
-        row += 1
-        
-        # Fixed Length
-        fixed_var = tk.BooleanVar(value=did.get('fixed_length', True))
-        ttk.Checkbutton(form_frame, text="Fixed Length", variable=fixed_var).grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=5)
-        row += 1
-        
-        # Expected Length
-        ttk.Label(form_frame, text="Expected Length:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        expected_len_var = tk.IntVar(value=did.get('expected_length', 0))
-        ttk.Entry(form_frame, textvariable=expected_len_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
-        row += 1
-        
-        # Min/Max Length
-        ttk.Label(form_frame, text="Min Length:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        min_len_var = tk.IntVar(value=did.get('min_length', 0))
-        ttk.Entry(form_frame, textvariable=min_len_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
-        row += 1
-        
-        ttk.Label(form_frame, text="Max Length:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        max_len_var = tk.IntVar(value=did.get('max_length', 0))
-        ttk.Entry(form_frame, textvariable=max_len_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
-        row += 1
-        
-        # Separator
-        ttk.Separator(form_frame, orient=tk.HORIZONTAL).grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
-        row += 1
-        
-        # Read Config
-        ttk.Label(form_frame, text="Read Configuration", font=('', 10, 'bold')).grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=5)
-        row += 1
-        
-        read_callback_var = tk.StringVar(value=did.get('read_config', {}).get('callback', ''))
-        ttk.Label(form_frame, text="Callback:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(form_frame, textvariable=read_callback_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
-        row += 1
-        
-        read_length_getter_var = tk.StringVar(value=did.get('read_config', {}).get('length_getter', '') or '')
-        ttk.Label(form_frame, text="Length Getter:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(form_frame, textvariable=read_length_getter_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
-        row += 1
-        
-        # Read Session Support
-        ttk.Label(form_frame, text="Session Support:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        read_session_frame = ttk.Frame(form_frame)
-        read_session_frame.grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
-        
-        # Get available sessions
-        available_sessions = self.config.get('sessions', [])
-        read_session_vars = {}
-        current_read_sessions = did.get('read_config', {}).get('supported_sessions', [])
-        
-        for i, session in enumerate(available_sessions):
-            var = tk.BooleanVar(value=session['session_name'] in current_read_sessions)
-            read_session_vars[session['session_name']] = var
-            ttk.Checkbutton(read_session_frame, text=session['session_name'], variable=var).grid(row=i, column=0, sticky=tk.W)
-        row += 1
-        
-        # Read Security Levels
-        ttk.Label(form_frame, text="Required Security:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        read_security_frame = ttk.Frame(form_frame)
-        read_security_frame.grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
-        
-        available_security = self.config.get('security_levels', [])
-        read_security_vars = {}
-        current_read_security = did.get('read_config', {}).get('required_security_levels', [])
-        
-        for i, sec in enumerate(available_security):
-            sec_name = f"Level {sec['security_level']}"
-            var = tk.BooleanVar(value=sec['security_level'] in current_read_security)
-            read_security_vars[sec['security_level']] = var
-            ttk.Checkbutton(read_security_frame, text=sec_name, variable=var).grid(row=i, column=0, sticky=tk.W)
-        row += 1
-        
-        # Separator
-        ttk.Separator(form_frame, orient=tk.HORIZONTAL).grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
-        row += 1
-        
-        # Write Config
-        ttk.Label(form_frame, text="Write Configuration", font=('', 10, 'bold')).grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=5)
-        row += 1
-        
-        write_callback_var = tk.StringVar(value=did.get('write_config', {}).get('callback', ''))
-        ttk.Label(form_frame, text="Callback:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(form_frame, textvariable=write_callback_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
-        row += 1
-        
-        # Write Session Support
-        ttk.Label(form_frame, text="Session Support:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        write_session_frame = ttk.Frame(form_frame)
-        write_session_frame.grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
-        
-        write_session_vars = {}
-        current_write_sessions = did.get('write_config', {}).get('supported_sessions', [])
-        
-        for i, session in enumerate(available_sessions):
-            var = tk.BooleanVar(value=session['session_name'] in current_write_sessions)
-            write_session_vars[session['session_name']] = var
-            ttk.Checkbutton(write_session_frame, text=session['session_name'], variable=var).grid(row=i, column=0, sticky=tk.W)
-        row += 1
-        
-        # Write Security Levels
-        ttk.Label(form_frame, text="Required Security:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        write_security_frame = ttk.Frame(form_frame)
-        write_security_frame.grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
-        
-        write_security_vars = {}
-        current_write_security = did.get('write_config', {}).get('required_security_levels', [])
-        
-        for i, sec in enumerate(available_security):
-            sec_name = f"Level {sec['security_level']}"
-            var = tk.BooleanVar(value=sec['security_level'] in current_write_security)
-            write_security_vars[sec['security_level']] = var
-            ttk.Checkbutton(write_security_frame, text=sec_name, variable=var).grid(row=i, column=0, sticky=tk.W)
-        row += 1
-        
-        write_validation_var = tk.BooleanVar(value=did.get('write_config', {}).get('semantic_validation', False))
-        ttk.Checkbutton(form_frame, text="Semantic Validation", variable=write_validation_var).grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=5)
-        row += 1
-        
-        # Description
-        ttk.Label(form_frame, text="Description:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        desc_var = tk.StringVar(value=did.get('description', ''))
-        ttk.Entry(form_frame, textvariable=desc_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
-        row += 1
-        
-        # Save button
-        def save_changes():
-            try:
-                # Update config with new structure
-                self.config['dids'][index]['did'] = did_var.get()
-                self.config['dids'][index]['did_name'] = did_name_var.get()
-                self.config['dids'][index]['fixed_length'] = fixed_var.get()
-                self.config['dids'][index]['expected_length'] = expected_len_var.get()
-                self.config['dids'][index]['min_length'] = min_len_var.get()
-                self.config['dids'][index]['max_length'] = max_len_var.get()
-                
-                # Read config
-                read_cfg = {}
-                if read_callback_var.get():
-                    read_cfg['callback'] = read_callback_var.get()
-                    read_cfg['length_getter'] = read_length_getter_var.get() if read_length_getter_var.get() else None
-                    # Save selected sessions
-                    selected_read_sessions = [name for name, var in read_session_vars.items() if var.get()]
-                    read_cfg['supported_sessions'] = selected_read_sessions
-                    # Save selected security levels
-                    selected_read_security = [level for level, var in read_security_vars.items() if var.get()]
-                    read_cfg['required_security_levels'] = selected_read_security
-                    self.config['dids'][index]['read_config'] = read_cfg
-                elif 'read_config' in self.config['dids'][index]:
-                    del self.config['dids'][index]['read_config']
-                
-                # Write config
-                write_cfg = {}
-                if write_callback_var.get():
-                    write_cfg['callback'] = write_callback_var.get()
-                    # Save selected sessions
-                    selected_write_sessions = [name for name, var in write_session_vars.items() if var.get()]
-                    write_cfg['supported_sessions'] = selected_write_sessions
-                    # Save selected security levels
-                    selected_write_security = [level for level, var in write_security_vars.items() if var.get()]
-                    write_cfg['required_security_levels'] = selected_write_security
-                    write_cfg['semantic_validation'] = write_validation_var.get()
-                    self.config['dids'][index]['write_config'] = write_cfg
-                elif 'write_config' in self.config['dids'][index]:
-                    del self.config['dids'][index]['write_config']
-                
-                self.config['dids'][index]['description'] = desc_var.get()
-                
-                self.set_modified()
-                self.refresh_ui()
-            except Exception as e:
-                pass
-        
-        # Bind to save on change
-        for var in [did_var, did_name_var, fixed_var, expected_len_var, min_len_var, max_len_var,
-                    read_callback_var, read_length_getter_var,
-                    write_callback_var, write_validation_var, desc_var]:
-            if hasattr(var, 'trace'):
-                var.trace('w', lambda *args: save_changes())
-        
-        # Bind session checkboxes
-        for var in read_session_vars.values():
-            if hasattr(var, 'trace'):
-                var.trace('w', lambda *args: save_changes())
-        
-        for var in write_session_vars.values():
-            if hasattr(var, 'trace'):
-                var.trace('w', lambda *args: save_changes())
-        
-        # Bind security level checkboxes
-        for var in read_security_vars.values():
-            if hasattr(var, 'trace'):
-                var.trace('w', lambda *args: save_changes())
-        
-        for var in write_security_vars.values():
-            if hasattr(var, 'trace'):
-                var.trace('w', lambda *args: save_changes())
-        
-        form_frame.columnconfigure(1, weight=1)
-        
-        # Update scroll region and bind canvas width
-        def on_frame_configure(event=None):
-            canvas.configure(scrollregion=canvas.bbox("all"))
-        
-        def on_canvas_configure(event):
-            canvas.itemconfig(canvas_frame, width=event.width)
-        
-        form_frame.bind('<Configure>', on_frame_configure)
-        canvas.bind('<Configure>', on_canvas_configure)
-        
-        # Initial update
-        form_frame.update_idletasks()
-        canvas.configure(scrollregion=canvas.bbox("all"))
+        """Show DID edit form in config panel using DidUI"""
+        if self.did_ui:
+            self.did_ui.show_edit_form(
+                self.config_panel_frame,
+                index,
+                self.config,
+                {
+                    'set_modified': self.set_modified,
+                    'refresh_ui': self.refresh_ui
+                }
+            )
     
     def show_session_edit_form(self, index):
-        """Show Session edit form in config panel"""
-        # Clear config panel
-        for widget in self.config_panel_frame.winfo_children():
-            widget.destroy()
-        
-        session = self.config['sessions'][index]
-        
-        # Create scrollable form
-        canvas = tk.Canvas(self.config_panel_frame)
-        scrollbar = ttk.Scrollbar(self.config_panel_frame, orient="vertical", command=canvas.yview)
-        form_frame = ttk.Frame(canvas, padding="10")
-        
-        canvas.create_window((0, 0), window=form_frame, anchor="nw", tags="canvas_frame")
-        canvas.configure(yscrollcommand=scrollbar.set)
-        
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        ttk.Label(form_frame, text=f"Edit Session", font=('', 12, 'bold')).grid(row=0, column=0, columnspan=2, pady=10, sticky=tk.W)
-        
-        row = 1
-        
-        # Session Name
-        ttk.Label(form_frame, text="Session Name:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        session_name_var = tk.StringVar(value=session['session_name'])
-        ttk.Entry(form_frame, textvariable=session_name_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
-        row += 1
-        
-        # Session Value
-        ttk.Label(form_frame, text="Session Value (hex):").grid(row=row, column=0, sticky=tk.W, pady=5)
-        session_value_var = tk.StringVar(value=session['session_value'])
-        ttk.Entry(form_frame, textvariable=session_value_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
-        row += 1
-        
-        # Description
-        ttk.Label(form_frame, text="Description:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        desc_var = tk.StringVar(value=session.get('description', ''))
-        ttk.Entry(form_frame, textvariable=desc_var, width=30).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=5)
-        row += 1
-        
-        # Save changes function
-        def save_changes(*args):
-            try:
-                self.config['sessions'][index]['session_name'] = session_name_var.get()
-                self.config['sessions'][index]['session_value'] = session_value_var.get()
-                self.config['sessions'][index]['description'] = desc_var.get()
-                
-                self.set_modified()
-                self.refresh_ui()
-            except Exception as e:
-                pass
-        
-        # Bind to save on change
-        for var in [session_name_var, session_value_var, desc_var]:
-            if hasattr(var, 'trace'):
-                var.trace('w', save_changes)
-        
-        form_frame.columnconfigure(1, weight=1)
+        """Show Session edit form in config panel using SessionUI"""
+        if self.session_ui:
+            self.session_ui.show_edit_form(
+                self.config_panel_frame, 
+                index, 
+                self.config,
+                {
+                    'set_modified': self.set_modified,
+                    'refresh_ui': self.refresh_ui
+                }
+            )
         
         # Update scroll region
         def on_frame_configure(event=None):
@@ -1317,115 +880,94 @@ class ConfigEditor:
             self.set_modified()
     
     def show_security_edit_form(self, index):
-        """Show Security Level edit form in config panel"""
-        # Clear config panel
-        for widget in self.config_panel_frame.winfo_children():
-            widget.destroy()
+        """Show Security Level edit form in config panel using SecurityUI"""
+        if self.security_ui:
+            self.security_ui.show_edit_form(
+                self.config_panel_frame,
+                index,
+                self.config,
+                {
+                    'set_modified': self.set_modified,
+                    'refresh_ui': self.refresh_ui
+                }
+            )
+    
+    # ===== DCM Service Management =====
+    def add_service(self):
+        """Add new DCM service"""
+        if 'dcm_services' not in self.config:
+            self.config['dcm_services'] = []
         
-        sec = self.config['security_levels'][index]
+        dialog = ServiceDialog(self.root, 
+                              available_sessions=[s['session_name'] for s in self.config.get('sessions', [])],
+                              available_security=[s['security_level'] for s in self.config.get('security_levels', [])])
+        self.root.wait_window(dialog.dialog)
         
-        # Create form
-        form_frame = ttk.Frame(self.config_panel_frame, padding="10")
-        form_frame.pack(fill=tk.BOTH, expand=True)
-        
-        ttk.Label(form_frame, text=f"Edit Security Level {sec['security_level']}", font=('', 12, 'bold')).grid(row=0, column=0, columnspan=2, pady=10, sticky=tk.W)
-        
-        row = 1
-        
-        # Level
-        ttk.Label(form_frame, text="Security Level:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        level_var = tk.IntVar(value=sec['security_level'])
-        ttk.Entry(form_frame, textvariable=level_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
-        row += 1
-        
-        # Seed Request Sub
-        ttk.Label(form_frame, text="Seed Request Sub:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        seed_sub_var = tk.StringVar(value=sec['seed_request_sub'])
-        ttk.Entry(form_frame, textvariable=seed_sub_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
-        row += 1
-        
-        # Key Request Sub
-        ttk.Label(form_frame, text="Key Request Sub:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        key_sub_var = tk.StringVar(value=sec['key_request_sub'])
-        ttk.Entry(form_frame, textvariable=key_sub_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
-        row += 1
-        
-        # Seed Size
-        ttk.Label(form_frame, text="Seed Size (bytes):").grid(row=row, column=0, sticky=tk.W, pady=5)
-        seed_size_var = tk.IntVar(value=sec['seed_size'])
-        ttk.Entry(form_frame, textvariable=seed_size_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
-        row += 1
-        
-        # Key Size
-        ttk.Label(form_frame, text="Key Size (bytes):").grid(row=row, column=0, sticky=tk.W, pady=5)
-        key_size_var = tk.IntVar(value=sec['key_size'])
-        ttk.Entry(form_frame, textvariable=key_size_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
-        row += 1
-        
-        # Max Attempts
-        ttk.Label(form_frame, text="Max Attempts:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        max_attempts_var = tk.IntVar(value=sec['max_attempts'])
-        ttk.Entry(form_frame, textvariable=max_attempts_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
-        row += 1
-        
-        # Delay Time
-        ttk.Label(form_frame, text="Delay Time (ms):").grid(row=row, column=0, sticky=tk.W, pady=5)
-        delay_time_var = tk.IntVar(value=sec['delay_time'])
-        ttk.Entry(form_frame, textvariable=delay_time_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
-        row += 1
-        
-        # Get Seed Function
-        ttk.Label(form_frame, text="Get Seed Func:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        get_seed_var = tk.StringVar(value=sec['get_seed_func'])
-        ttk.Entry(form_frame, textvariable=get_seed_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
-        row += 1
-        
-        # Compare Key Function
-        ttk.Label(form_frame, text="Compare Key Func:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        compare_key_var = tk.StringVar(value=sec['compare_key_func'])
-        ttk.Entry(form_frame, textvariable=compare_key_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
-        row += 1
-        
-        # Sessions
-        ttk.Label(form_frame, text="Supported Sessions:", font=('', 10, 'bold')).grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=(10, 5))
-        row += 1
-        
-        session_frame = ttk.LabelFrame(form_frame, text="Select Sessions", padding="10")
-        session_frame.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
-        row += 1
-        
-        session_vars = {}
-        available_sessions = [s['session_name'] for s in self.config.get('sessions', [])]
-        for sess_name in available_sessions:
-            var = tk.BooleanVar(value=sess_name in sec.get('supported_sessions', []))
-            ttk.Checkbutton(session_frame, text=sess_name, variable=var).pack(anchor=tk.W)
-            session_vars[sess_name] = var
-            var.trace_add('write', lambda *args, idx=index, svars=session_vars: self.update_security_sessions(idx, svars))
-        
-        # Save button
-        button_frame = ttk.Frame(form_frame)
-        button_frame.grid(row=row, column=0, columnspan=2, pady=20)
-        
-        def save_changes():
-            self.config['security_levels'][index]['security_level'] = level_var.get()
-            self.config['security_levels'][index]['seed_request_sub'] = seed_sub_var.get()
-            self.config['security_levels'][index]['key_request_sub'] = key_sub_var.get()
-            self.config['security_levels'][index]['seed_size'] = seed_size_var.get()
-            self.config['security_levels'][index]['key_size'] = key_size_var.get()
-            self.config['security_levels'][index]['max_attempts'] = max_attempts_var.get()
-            self.config['security_levels'][index]['delay_time'] = delay_time_var.get()
-            self.config['security_levels'][index]['get_seed_func'] = get_seed_var.get()
-            self.config['security_levels'][index]['compare_key_func'] = compare_key_var.get()
+        if dialog.result:
+            self.config['dcm_services'].append(dialog.result)
             self.refresh_ui()
             self.set_modified()
-        
-        ttk.Button(button_frame, text="💾 Save Changes", command=save_changes).pack(side=tk.LEFT, padx=5)
     
-    def update_security_sessions(self, index, session_vars):
-        """Update security level supported sessions"""
-        selected_sessions = [name for name, var in session_vars.items() if var.get()]
-        self.config['security_levels'][index]['supported_sessions'] = selected_sessions
-        self.set_modified()
+    def edit_service(self):
+        """Edit selected service"""
+        selection = self.nav_tree.selection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a service to edit")
+            return
+        
+        item = self.nav_tree.item(selection[0])
+        tags = item['tags']
+        
+        if not tags or tags[0] != 'service':
+            messagebox.showwarning("Invalid Selection", "Please select a service")
+            return
+        
+        index = int(tags[1])
+        service = self.config['dcm_services'][index]
+        
+        dialog = ServiceDialog(self.root, 
+                              service_data=service,
+                              available_sessions=[s['session_name'] for s in self.config.get('sessions', [])],
+                              available_security=[s['security_level'] for s in self.config.get('security_levels', [])])
+        self.root.wait_window(dialog.dialog)
+        
+        if dialog.result:
+            self.config['dcm_services'][index] = dialog.result
+            self.refresh_ui()
+            self.set_modified()
+    
+    def delete_service(self):
+        """Delete selected service"""
+        selection = self.nav_tree.selection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a service to delete")
+            return
+        
+        item = self.nav_tree.item(selection[0])
+        tags = item['tags']
+        
+        if not tags or tags[0] != 'service':
+            messagebox.showwarning("Invalid Selection", "Please select a service")
+            return
+        
+        index = int(tags[1])
+        service = self.config['dcm_services'][index]
+        
+        if messagebox.askyesno("Confirm Delete", f"Delete service {service['service_id']} ({service['handler_name']})?"):
+            del self.config['dcm_services'][index]
+            self.refresh_ui()
+            self.set_modified()
+    
+    def show_service_edit_form(self, index):
+        """Show service edit form using ServiceUI module"""
+        if self.service_ui:
+            self.service_ui.show_edit_form(
+                config_panel_frame=self.config_panel_frame,
+                index=index,
+                config=self.config,
+                on_change_callback=self.refresh_ui,
+                set_modified_callback=self.set_modified
+            )
     
     def generate_code(self):
         """Generate code from configuration"""
@@ -1438,8 +980,13 @@ class ConfigEditor:
             did_valid, did_errors, did_warnings = validate_dids(self.config['dids'])
             session_valid, session_errors, session_warnings = validate_sessions(self.config.get('sessions', []))
             security_valid, security_errors, security_warnings = validate_security_levels(self.config.get('security_levels', []))
+            service_valid, service_errors, service_warnings = validate_services(
+                self.config.get('dcm_services', []),
+                self.config.get('sessions', []),
+                self.config.get('security_levels', [])
+            )
             
-            if not nvm_valid or not did_valid or not session_valid or not security_valid:
+            if not nvm_valid or not did_valid or not session_valid or not security_valid or not service_valid:
                 error_msg = "Validation failed:\n"
                 if nvm_errors:
                     error_msg += "\nNVM Errors:\n" + "\n".join(nvm_errors)
@@ -1449,6 +996,8 @@ class ConfigEditor:
                     error_msg += "\nSession Errors:\n" + "\n".join(session_errors)
                 if security_errors:
                     error_msg += "\nSecurity Errors:\n" + "\n".join(security_errors)
+                if service_errors:
+                    error_msg += "\nService Errors:\n" + "\n".join(service_errors)
                 messagebox.showerror("Validation Error", error_msg)
                 return
             
@@ -1488,9 +1037,13 @@ class ConfigEditor:
             if self.config.get('security_levels'):
                 security_files = generate_security_code(self.config['security_levels'], self.config.get('sessions', []), 
                                                        project_name, version, output_path)
+            service_files = []
+            if self.config.get('dcm_services'):
+                service_files = generate_service_code(self.config['dcm_services'], self.config.get('sessions', []),
+                                                     self.config.get('security_levels', []), output_path)
             cmake_file = generate_cmake_file(output_path, project_name, version)
             
-            all_files = nvm_files + did_files + session_files + security_files + [cmake_file]
+            all_files = nvm_files + did_files + session_files + security_files + service_files + [cmake_file]
             messagebox.showinfo("Success", f"Generated {len(all_files)} files:\n" + "\n".join([os.path.basename(f) for f in all_files]))
             self.status_var.set("Code generation complete")
         except Exception as e:
@@ -2025,6 +1578,120 @@ class SecurityLevelDialog:
         canvas.configure(scrollregion=canvas.bbox("all"))
         
         dialog.wait_window()
+
+
+class ServiceDialog:
+    """Dialog for adding/editing DCM service"""
+    def __init__(self, parent, service_data=None, available_sessions=None, available_security=None):
+        self.result = None
+        self.available_sessions = available_sessions or []
+        self.available_security = available_security or []
+        
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("Add Service" if service_data is None else "Edit Service")
+        self.dialog.geometry("600x550")
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+        
+        # Main frame
+        main_frame = ttk.Frame(self.dialog, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Service ID
+        ttk.Label(main_frame, text="Service ID (0x10-0xFF):").grid(row=0, column=0, sticky=tk.W, pady=5)
+        self.service_id_var = tk.StringVar(value=service_data['service_id'] if service_data else "0x10")
+        ttk.Entry(main_frame, textvariable=self.service_id_var, width=20).grid(row=0, column=1, sticky=tk.W, padx=5)
+        ttk.Label(main_frame, text="Examples: 0x10, 0x22, 0x27, 0x31", foreground='gray', font=('', 8)).grid(row=0, column=2, sticky=tk.W, padx=5)
+        
+        # Handler function
+        ttk.Label(main_frame, text="Handler Function:").grid(row=1, column=0, sticky=tk.W, pady=5)
+        self.handler_var = tk.StringVar(value=service_data['handler_name'] if service_data else "")
+        ttk.Entry(main_frame, textvariable=self.handler_var, width=40).grid(row=1, column=1, columnspan=2, sticky=(tk.W, tk.E), padx=5)
+        ttk.Label(main_frame, text="Example: uds_service_0x10_handler", foreground='gray', font=('', 8)).grid(row=2, column=1, columnspan=2, sticky=tk.W, padx=5)
+        
+        # Supported sessions
+        ttk.Label(main_frame, text="Supported Sessions:").grid(row=3, column=0, sticky=(tk.N, tk.W), pady=5)
+        session_frame = ttk.LabelFrame(main_frame, text="Select Sessions", padding="10")
+        session_frame.grid(row=3, column=1, columnspan=2, sticky=(tk.W, tk.E), padx=5, pady=5)
+        
+        self.session_vars = {}
+        current_sessions = service_data.get('supported_sessions', []) if service_data else []
+        
+        if self.available_sessions:
+            for i, sess_name in enumerate(self.available_sessions):
+                var = tk.BooleanVar(value=sess_name in current_sessions)
+                self.session_vars[sess_name] = var
+                ttk.Checkbutton(session_frame, text=sess_name, variable=var).grid(row=i, column=0, sticky=tk.W, pady=2)
+        else:
+            ttk.Label(session_frame, text="No sessions configured", foreground='gray').grid(row=0, column=0)
+        
+        # Required security levels
+        ttk.Label(main_frame, text="Required Security Levels:").grid(row=4, column=0, sticky=(tk.N, tk.W), pady=5)
+        security_frame = ttk.LabelFrame(main_frame, text="Select Security Levels (Optional)", padding="10")
+        security_frame.grid(row=4, column=1, columnspan=2, sticky=(tk.W, tk.E), padx=5, pady=5)
+        
+        self.security_vars = {}
+        current_security = service_data.get('required_security_levels', []) if service_data else []
+        
+        if self.available_security:
+            for i, level in enumerate(self.available_security):
+                var = tk.BooleanVar(value=level in current_security)
+                self.security_vars[level] = var
+                ttk.Checkbutton(security_frame, text=f"Level {level}", variable=var).grid(row=i, column=0, sticky=tk.W, pady=2)
+        else:
+            ttk.Label(security_frame, text="No security levels configured (not required)", foreground='gray').grid(row=0, column=0)
+        
+        # Buttons
+        button_frame = ttk.Frame(main_frame)
+        button_frame.grid(row=5, column=0, columnspan=3, pady=20)
+        
+        ttk.Button(button_frame, text="OK", command=self.on_ok).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=self.dialog.destroy).pack(side=tk.LEFT, padx=5)
+        
+        # Configure grid weights
+        main_frame.columnconfigure(1, weight=1)
+    
+    def on_ok(self):
+        """Validate and save"""
+        service_id = self.service_id_var.get().strip()
+        handler = self.handler_var.get().strip()
+        
+        if not service_id:
+            messagebox.showerror("Error", "Service ID is required")
+            return
+        
+        if not handler:
+            messagebox.showerror("Error", "Handler function name is required")
+            return
+        
+        # Validate hex format
+        import re
+        if not re.match(r'^0x[0-9A-Fa-f]{2}$', service_id):
+            messagebox.showerror("Error", "Service ID must be in format 0xXX (e.g., 0x10)")
+            return
+        
+        # Validate handler name (C identifier)
+        if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', handler):
+            messagebox.showerror("Error", "Handler name must be valid C identifier")
+            return
+        
+        # Get selected sessions
+        selected_sessions = [name for name, var in self.session_vars.items() if var.get()]
+        if not selected_sessions:
+            messagebox.showerror("Error", "At least one session must be selected")
+            return
+        
+        # Get selected security levels (optional)
+        selected_security = [level for level, var in self.security_vars.items() if var.get()]
+        
+        self.result = {
+            'service_id': service_id,
+            'handler_name': handler,
+            'supported_sessions': selected_sessions,
+            'required_security_levels': selected_security
+        }
+        
+        self.dialog.destroy()
 
 
 def main():

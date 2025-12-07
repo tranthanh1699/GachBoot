@@ -2,11 +2,11 @@
 
 > **📋 Purpose:** This document preserves the complete context of AI-assisted development for maintaining continuity across machines and sessions.
 
-**Date:** December 3, 2025  
+**Date:** December 3-7, 2025  
 **Project:** GachBoot - STM32H7 Bootloader  
 **Repository:** https://github.com/tranthanh1699/GachBoot  
-**Branch:** main  
-**Topic:** Unified DID Registry & NVM Data Persistence  
+**Branch:** dev/config_tool  
+**Topic:** Unified DID Registry & NVM Data Persistence & Configuration Tool Development  
 
 ---
 
@@ -41,6 +41,7 @@ AI: [Appends new section with timestamp, changes, and reasoning]
 1. **Unify DID Registry:** Create single configuration point for services 0x22 (Read), 0x2E (Write), 0x2F (IO Control)
 2. **Fix Data Persistence:** Solve NVM data loss on reboot
 3. **Optimize Flash Usage:** Reduce wasted space in flash memory
+4. **Configuration Tool:** Build Python GUI tool for managing UDS configurations (Sessions, Security, DIDs, NVM)
 
 ### Technical Environment
 - **MCU:** STM32H743 (Cortex-M7, 2MB Flash, 1MB RAM)
@@ -54,6 +55,9 @@ AI: [Appends new section with timestamp, changes, and reasoning]
 ✅ **NVM Headers:** Added block identification  
 ✅ **Flash Scan:** Automatic block discovery on boot  
 ⚠️ **Flash Waste:** 62.5% waste unavoidable due to STM32H7 hardware constraints  
+✅ **Configuration Tool:** Python GUI with Session, Security, DID, and NVM configuration modules
+✅ **Code Generation:** Automatic C code generation from JSON configuration
+✅ **Security Integration:** DIDs can reference security levels via checkboxes (auto-calculated masks)  
 
 ---
 
@@ -1166,6 +1170,432 @@ For questions about this conversation history, refer to:
 - GitHub Copilot Chat in VS Code
 - This markdown file: `CONVERSATION_HISTORY.md`
 - Project README: `README.md`
+
+---
+
+## 🧩 Problem 3: Configuration Tool Development
+
+### User Request
+> "Oke chạy ỏn phần session rồi giờ qua config service 27" (Session works, now move to configure Security Access Service 0x27)
+
+**Context:** After implementing Session configuration, user wanted to add Security Access (Service 0x27) configuration support to the Python GUI tool.
+
+### Configuration Tool Architecture
+
+**Tool Location:** `Tool/ConfigTool/`
+
+**Core Components:**
+1. **config_editor.py** (2036 lines) - Main Tkinter GUI application
+2. **gachboot_config.json** - Configuration data storage
+3. **Module/** - Validation and code generation modules
+   - `session_module.py` - Session validation/generation
+   - `security_module.py` - Security validation/generation
+   - `did_module.py` - DID validation/generation
+   - `nvm_module.py` - NVM validation/generation
+   - `cmake_module.py` - CMakeLists.txt generation
+
+**Tool Features:**
+- ✅ Multi-tab interface (Sessions, Security, DIDs, NVM)
+- ✅ Tree navigation showing all configured items
+- ✅ Add/Edit/Delete operations for all entity types
+- ✅ Real-time validation
+- ✅ Auto-save on checkbox toggles
+- ✅ C code generation with proper formatting
+- ✅ CMakeLists.txt generation for build integration
+
+### Sub-Problem 3.1: Security Access Configuration
+
+#### User Requirements
+
+**Security Access (Service 0x27) Configuration Needs:**
+1. `seed_request_sub` - Seed request sub-function (must be odd: 0x01, 0x03, 0x05...)
+2. `key_request_sub` - Key send sub-function (must be seed_sub + 1)
+3. `seed_size` - Seed length in bytes (1-16)
+4. `key_size` - Key length in bytes (1-16)
+5. `max_attempts` - Maximum failed attempts before lockout
+6. `delay_time` - Lockout delay in milliseconds
+7. `supported_sessions` - Which sessions allow this security level
+8. `get_seed_func` - Callback to generate seed
+9. `compare_key_func` - Callback to validate key
+
+#### Implementation
+
+**JSON Structure:**
+```json
+{
+  "security_levels": [
+    {
+      "security_level": 1,
+      "seed_request_sub": "0x01",
+      "key_request_sub": "0x02",
+      "seed_size": 4,
+      "key_size": 4,
+      "max_attempts": 3,
+      "delay_time": 10000,
+      "supported_sessions": ["DCM_EXTENDED_SESSION", "DCM_PROGRAMMING_SESSION"],
+      "get_seed_func": "security_get_seed_level_1",
+      "compare_key_func": "security_compare_key_level_1"
+    }
+  ]
+}
+```
+
+**Generated Code Structure (Security_PBCfg.h):**
+```c
+#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
+
+// Forward declarations (self-contained header)
+#ifndef STD_TYPES_H
+typedef uint8_t Std_ReturnType;
+typedef uint8_t ErrorCode_t;
+#define E_OK 0x00u
+#define E_NOT_OK 0x01u
+#endif
+
+// Callback function typedefs
+typedef Std_ReturnType (*uds_security_get_seed_t)(uint8_t security_level, uint8_t *seed);
+typedef Std_ReturnType (*uds_security_compare_key_t)(uint8_t security_level, const uint8_t *key);
+
+// Security level configuration structure
+typedef struct {
+    uint8_t security_level;
+    uint8_t security_sub_function_seed;
+    uint8_t security_sub_function_key;
+    uint8_t seed_size;
+    uint8_t key_size;
+    uint8_t num_failed_security_access;
+    uint32_t security_delay_time_ms;
+    uint32_t session_mask;
+    uds_security_get_seed_t get_seed_callback;
+    uds_security_compare_key_t compare_key_callback;
+} dcm_security_level_config_t;
+
+// Extern declarations for user-implemented callbacks
+extern Std_ReturnType security_get_seed_level_1(uint8_t security_level, uint8_t *seed);
+extern Std_ReturnType security_compare_key_level_1(uint8_t security_level, const uint8_t *key);
+
+// Config table
+#define SECURITY_LEVEL_COUNT 1
+extern const dcm_security_level_config_t security_level_config_table[SECURITY_LEVEL_COUNT];
+```
+
+**UI Features:**
+- Security tab with treeview showing all security levels
+- Columns: Level, Seed Sub, Key Sub, Seed Size, Key Size, Max Attempts, Delay
+- Add/Edit/Delete buttons
+- Dialog form with:
+  - Security level input (1-255)
+  - Seed/Key sub-function inputs (hex format)
+  - Size inputs with validation (1-16 bytes)
+  - Max attempts input
+  - Delay time input (milliseconds)
+  - Session checkboxes (auto-calculate session_mask)
+  - Callback function name inputs
+
+**Validation Rules:**
+1. Security level must be unique (1-255)
+2. `seed_request_sub` must be odd (0x01, 0x03, 0x05, ...)
+3. `key_request_sub` must equal `seed_request_sub + 1`
+4. Seed/key sizes must be 1-16 bytes
+5. At least one session must be selected
+6. Callback function names must be valid C identifiers
+
+**Issues Encountered & Fixed:**
+
+**Issue 1: ImportError - validate_security_levels**
+```
+ModuleNotFoundError: No module named 'validate_security_levels'
+```
+**Cause:** Function not exported from `security_module.py`
+**Fix:** Added export wrapper:
+```python
+def validate_security_levels(security_levels):
+    validator = SecurityValidator()
+    return validator.validate_security_levels(security_levels)
+```
+
+**Issue 2: F-string syntax error**
+```
+SyntaxError: f-string: unterminated expression
+```
+**Cause:** Unescaped `{` in f-string used for C code generation:
+```python
+f"extern Std_ReturnType {func_name}(uint8_t security_level, uint8_t *seed);\n"
+```
+The `{func_name}` was interpreted as f-string expression, but adjacent C code had literal `{`.
+**Fix:** Escaped braces in C code:
+```python
+f"typedef struct {{\n"  # {{ becomes literal {
+```
+
+**Issue 3: Code generation mismatch**
+User modified header to be self-contained (include stdio.h, stdint.h) instead of including dev_common.h.
+**Fix:** Updated `generate_header()` to match user's template:
+- Include `<stdio.h>`, `<stdint.h>`, `<stdbool.h>`
+- Add forward declarations with `#ifndef STD_TYPES_H` guard
+- Define typedefs inline
+- Declare extern callbacks (no implementation stubs)
+
+### Sub-Problem 3.2: DID-Security Integration
+
+#### User Request
+> "Giờ thiết kết nối phần refer security level vào did đi" (Now design the connection for DIDs to reference security levels)
+
+**Context:** User wanted DIDs to reference security levels the same way they reference sessions - through a user-friendly checkbox interface instead of manual bitmask calculation.
+
+#### Before State
+
+**Manual Security Mask Input:**
+```python
+# DID configuration required manual bitmask entry
+security_mask_label = ttk.Label(form_frame, text="Read Security Mask:")
+security_mask_entry = ttk.Entry(form_frame)  # User enters: 6 (for levels 1 & 2)
+```
+
+**JSON Structure:**
+```json
+{
+  "read_config": {
+    "callback": "uds_did_read_vin",
+    "supported_sessions": ["DCM_DEFAULT_SESSION"],
+    "security_mask": 6  // User must calculate: (1<<1) | (1<<2) = 6
+  }
+}
+```
+
+**Problems:**
+1. Users must manually calculate bitmasks (error-prone)
+2. No visibility into which levels are selected
+3. Inconsistent UX (sessions use checkboxes, security uses integers)
+
+#### Solution Design
+
+**Decision:** Match the session pattern - use checkboxes with auto-calculated masks
+
+**New JSON Structure:**
+```json
+{
+  "read_config": {
+    "callback": "uds_did_read_vin",
+    "supported_sessions": ["DCM_DEFAULT_SESSION"],
+    "required_security_levels": [1, 2]  // Array of level numbers
+  }
+}
+```
+
+**UI Changes:**
+
+**1. DID Edit Form (Main Window):**
+```python
+# Read security level checkboxes
+read_security_frame = ttk.LabelFrame(form_frame, text="Read Security Levels")
+available_security = self.config.get('security_levels', [])
+read_security_vars = {}
+current_read_security = did.get('read_config', {}).get('required_security_levels', [])
+
+for sec in available_security:
+    sec_name = f"Level {sec['security_level']}"
+    var = tk.BooleanVar(value=sec['security_level'] in current_read_security)
+    read_security_vars[sec['security_level']] = var
+    cb = ttk.Checkbutton(read_security_frame, text=sec_name, variable=var)
+    cb.grid(...)
+```
+
+**2. Auto-Save on Checkbox Toggle:**
+```python
+# Bind checkbox variables to auto-save
+for var in read_security_vars.values():
+    var.trace_add('write', lambda *args: self.save_changes())
+
+# save_changes() collects checked levels
+def save_changes(self):
+    selected_read_security = [
+        level for level, var in read_security_vars.items() if var.get()
+    ]
+    read_cfg['required_security_levels'] = selected_read_security
+```
+
+**3. DidDialog (Add/Edit Dialog):**
+```python
+class DidDialog:
+    def __init__(self, parent, did_data=None, available_sessions=None, 
+                 available_security=None):  # NEW parameter
+        # ... create security checkboxes similar to sessions
+        
+        self.read_security_vars = {}
+        for sec in available_security:
+            var = tk.BooleanVar(value=sec['security_level'] in current_levels)
+            self.read_security_vars[sec['security_level']] = var
+```
+
+**4. Code Generation with Auto-Calculated Mask:**
+```python
+# did_module.py
+def calculate_security_mask(required_security_levels):
+    """Calculate bitmask from security level array"""
+    mask = 0
+    for level in required_security_levels:
+        mask |= (1 << level)  # Level 1 → bit 1, Level 2 → bit 2
+    return mask
+
+def generate_registry_source(did_configs, session_map, security_map):
+    for did in did_configs:
+        req_levels = did['read_config'].get('required_security_levels', [])
+        security_mask = calculate_security_mask(req_levels)
+        
+        # Generate with helpful comment
+        level_names = ', '.join([f"Level {l}" for l in req_levels])
+        code += f"    .security_mask = {security_mask}  /* {level_names} */\n"
+```
+
+**Generated Code Example:**
+```c
+// DID 0xF190 (VIN)
+{
+    .did = 0xF190,
+    .read_config = {
+        .callback = uds_did_read_vin,
+        .session_mask = 1,  /* DCM_DEFAULT_SESSION */
+        .security_mask = 0  /*  */
+    },
+    // ...
+},
+
+// DID 0xF15B (Fingerprint)
+{
+    .did = 0xF15B,
+    .read_config = {
+        .callback = uds_did_read_fingerprint,
+        .session_mask = 14,  /* DCM_DEFAULT_SESSION, DCM_PROGRAMMING_SESSION, DCM_EXTENDED_SESSION */
+        .security_mask = 6  /* Level 1, Level 2 */
+    },
+    // ...
+}
+```
+
+#### Benefits Achieved
+
+1. ✅ **Consistent UX:** Security levels use same checkbox pattern as sessions
+2. ✅ **No Manual Calculation:** Tool auto-calculates bitmask from selections
+3. ✅ **Visibility:** Comments in generated code show which levels are selected
+4. ✅ **Error Prevention:** Impossible to enter invalid bitmask values
+5. ✅ **Maintainability:** Easier to understand and modify configurations
+
+#### Files Modified
+
+**Configuration Tool:**
+- `config_editor.py`:
+  - Lines 830-865: Added security checkboxes to DID edit form (read_config)
+  - Lines 880-895: Added security checkboxes to DID edit form (write_config)
+  - Lines 920-945: Updated `save_changes()` to save `required_security_levels` array
+  - Lines 1620-1810: Updated `DidDialog` to support security level checkboxes
+  - Lines 1167, 1192: Pass `available_security` to DidDialog
+
+- `Module/did_module.py`:
+  - Lines 270-277: Added `calculate_security_mask()` helper function
+  - Lines 305-310: Auto-calculate read security_mask with comment
+  - Lines 325-331: Auto-calculate write security_mask with comment
+  - Lines 383-395: Updated `generate_did_code()` to accept security_levels parameter
+
+- `gachboot_config.json`:
+  - Changed from `"security_mask": 0` to `"required_security_levels": []`
+
+#### Calculation Formula
+
+**Bitmask Calculation:**
+```
+For security_levels = [1, 2]:
+  mask = 0
+  mask |= (1 << 1)  → mask = 2   (binary: 0b0010)
+  mask |= (1 << 2)  → mask = 6   (binary: 0b0110)
+  
+Result: security_mask = 6
+
+Binary representation:
+  Bit 0: (unused)
+  Bit 1: Level 1 ✓
+  Bit 2: Level 2 ✓
+  Bit 3: (unused)
+```
+
+**Example Configurations:**
+| Selected Levels | Calculation | Mask Value | Binary |
+|----------------|-------------|------------|--------|
+| None           | 0           | 0          | 0b0000 |
+| [1]            | 1 << 1      | 2          | 0b0010 |
+| [2]            | 1 << 2      | 4          | 0b0100 |
+| [1, 2]         | 2 \| 4       | 6          | 0b0110 |
+| [1, 2, 3]      | 2 \| 4 \| 8  | 14         | 0b1110 |
+
+### Configuration Tool Summary
+
+**Current Status:**
+- ✅ Session configuration fully implemented
+- ✅ Security configuration fully implemented
+- ✅ DID configuration with session/security integration
+- ✅ NVM configuration (basic support)
+- ✅ Code generation for all modules
+- ✅ CMake integration
+- ✅ Auto-save and validation
+
+**Tool Capabilities:**
+1. **Multi-Module Configuration:** Sessions, Security, DIDs, NVM in one tool
+2. **Visual Editing:** Treeview navigation, dialog forms, checkboxes
+3. **Validation:** Real-time checks for all inputs
+4. **Code Generation:** Produces valid C header/source files
+5. **Build Integration:** Generates CMakeLists.txt
+6. **User-Friendly:** Checkboxes instead of manual bitmask entry
+7. **Self-Documenting:** Generated code includes explanatory comments
+
+**Files Structure:**
+```
+Tool/ConfigTool/
+├── config_editor.py          (2036 lines) - Main GUI
+├── gachboot_config.json      - Configuration data
+└── Module/
+    ├── session_module.py     - Session validation/generation
+    ├── security_module.py    (310 lines) - Security validation/generation
+    ├── did_module.py         (406 lines) - DID validation/generation
+    ├── nvm_module.py         - NVM validation/generation
+    └── cmake_module.py       - CMake generation
+```
+
+**Generated Code Locations:**
+```
+Generated/
+├── Session_Gen/
+│   ├── Session_PBCfg.h
+│   └── Session_PBCfg.c
+├── Security_Gen/
+│   ├── Security_PBCfg.h
+│   └── Security_PBCfg.c
+├── DID_Gen/
+│   ├── DID_PBCfg.h
+│   └── DID_PBCfg.c
+└── CMakeLists.txt
+```
+
+---
+
+## Testing Checklist
+
+- [x] Build compiles successfully
+- [x] Unified DID registry APIs functional
+- [x] NVM writes data with headers
+- [x] Flash scan finds existing blocks after reboot
+- [x] Block header validation works
+- [x] Configuration tool launches without errors
+- [x] Session configuration works
+- [x] Security configuration works
+- [x] DID-Security integration with checkboxes works
+- [x] Code generation produces valid C files
+- [x] Auto-save on checkbox toggle works
+- [ ] Data persists across power cycles (needs verification)
+- [ ] CRC validation catches corruption
+- [ ] Redundant mode recovers from primary failure
+- [ ] Sector switching works when full
 
 ---
 

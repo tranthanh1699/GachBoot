@@ -6,7 +6,7 @@ CONFIG_LOG_TAG(UDS_0x3E, false)
 /**
  * @brief Service 0x3E handler - Tester Present
  */
-Std_ReturnType uds_service_0x3e_handler(const uds_message_t *message, ErrorCode_t *error_code)
+Std_ReturnType uds_service_0x3E_handler(const uds_message_t *message, ErrorCode_t *error_code)
 {
     // Phase 1: Parse and validate
     if (message->request_len != 2) {

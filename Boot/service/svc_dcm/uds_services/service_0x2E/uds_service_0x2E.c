@@ -3,13 +3,15 @@
 #include "svc_dcm.h"
 #include "dcmdsl/dcmdsl.h"
 #include "../service_0x27/uds_service_0x27.h"
+#include "dcm_service_access.h"  // New API layer
+#include "dcm_did_access.h"      // New DID access API
 
 CONFIG_LOG_TAG(UDS_0x2E, true)
 
 /**
- * @brief Service 0x2E handler - Write Data By Identifier
+ * @brief Service 0x2E handler - Write Data By Identifier (WDBI)
  */
-Std_ReturnType uds_service_0x2e_handler(const uds_message_t *message, ErrorCode_t *error_code)
+Std_ReturnType uds_service_0x2E_handler(const uds_message_t *message, ErrorCode_t *error_code)
 {
     // Phase 1: Validate request length (minimum: SID + DID + 1 byte data)
     if (message->request_len < 4) {
@@ -34,62 +36,31 @@ Std_ReturnType uds_service_0x2e_handler(const uds_message_t *message, ErrorCode_
         return E_NOT_OK;
     }
 
-    // Check if DID supports Write service
-    if (did_entry->write_config.callback == NULL) {
-        DBG_OUT_W("DID 0x%04X does not support Write (0x2E)", did);
-        *error_code = UDS_NRC_REQUEST_OUT_OF_RANGE;
-        return E_NOT_OK;
-    }
-
-    // Phase 4: Check session and security support
+    // Phase 4: Get current session and security state (using dynamic code gen API)
     uint8_t current_session = dcmdsl_get_session();
-    uint32_t current_session_mask = 0;
-    switch (current_session) {
-        case UDS_SESSION_DEFAULT:
-            current_session_mask = UDS_SESSION_MASK_DEFAULT;
-            break;
-        case UDS_SESSION_PROGRAMMING:
-            current_session_mask = UDS_SESSION_MASK_PROGRAMMING;
-            break;
-        case UDS_SESSION_EXTENDED_DIAGNOSTIC:
-            current_session_mask = UDS_SESSION_MASK_EXTENDED;
-            break;
-        default:
-            current_session_mask = UDS_SESSION_MASK_DEFAULT;
-            break;
-    }
+    uint8_t current_security_level = uds_security_get_active_level();
     
-    // Get current security level and convert to mask
-    uint8_t current_level = uds_security_get_active_level();
-    uint32_t current_security_mask = UDS_SECURITY_MASK_LOCKED;  // Default: locked
+    // Convert to masks using generated config
+    uint32_t current_session_mask = dcm_service_get_session_mask(current_session);
+    uint32_t current_security_mask = dcm_service_get_security_mask(current_security_level);
     
-    if (current_level == UDS_SECURITY_LEVEL_1) {
-        current_security_mask = UDS_SECURITY_MASK_LEVEL_1;
-    } else if (current_level == UDS_SECURITY_LEVEL_2) {
-        current_security_mask = UDS_SECURITY_MASK_LEVEL_2;
-    }
+    DBG_OUT_I("Access check: Session=0x%02X (mask=0x%08X), Security=0x%02X (mask=0x%08X)", 
+              current_session, current_session_mask, current_security_level, current_security_mask);
     
-    // Validate session and security access
-    if (uds_did_validate_access(did, UDS_SID_WRITE_DATA_BY_IDENTIFIER, current_session_mask, current_security_mask) != E_OK) {
-        DBG_OUT_E("DID 0x%04X access denied (session: 0x%08X, security: 0x%08X)", 
-                  did, current_session_mask, current_security_mask);
-        // Return proper NRC based on which check failed
-        if ((did_entry->write_config.session_mask & current_session_mask) == 0) {
-            *error_code = UDS_NRC_CONDITIONS_NOT_CORRECT;
-        } else {
-            *error_code = UDS_NRC_SECURITY_ACCESS_DENIED;
-        }
+    // Phase 5: Check DID write access (session + security) - BEFORE calling callback
+    if (dcm_did_check_write_access(did_entry, current_session_mask, current_security_mask, error_code) != E_OK) {
+        DBG_OUT_E("DID 0x%04X write access denied", did);
         return E_NOT_OK;
     }
 
-    // Phase 5: Validate data length
-    if (!uds_did_validate_length(did, UDS_SID_WRITE_DATA_BY_IDENTIFIER, data_len)) {
-        DBG_OUT_E("Invalid data length: %d", data_len);
+    // Phase 6: Validate data length
+    if (!dcm_did_validate_length(did_entry, true, data_len)) {
+        DBG_OUT_E("Invalid data length: %d (expected: %d)", data_len, did_entry->expected_length);
         *error_code = UDS_NRC_INCORRECT_MESSAGE_LENGTH;
         return E_NOT_OK;
     }
 
-    // Phase 6: Call DID write callback - all validation done, just write
+    // Phase 7: Call DID write callback - all validation done (session, security, length checked)
     Std_ReturnType result = did_entry->write_config.callback(data, error_code);
 
     if (result == DCM_E_PENDING) {
@@ -98,17 +69,12 @@ Std_ReturnType uds_service_0x2e_handler(const uds_message_t *message, ErrorCode_
         return DCM_E_PENDING;
     }
     else if (result != E_OK) {
-        DBG_OUT_E("DID 0x%04X write failed", did);
-        // // Check if semantic validation is enabled for better error reporting
-        // if (did_entry->write_config.semantic_validation) {
-        //     *error_code = UDS_NRC_REQUEST_OUT_OF_RANGE;  // Invalid data semantics
-        // } else {
-        //     *error_code = UDS_NRC_CONDITIONS_NOT_CORRECT;  // Write operation failed
-        // }
+        DBG_OUT_E("DID 0x%04X write failed (callback returned error)", did);
+        // Callback should set proper error_code
         return E_NOT_OK;
     }
 
-    // Phase 7: Build positive response (echo DID)
+    // Phase 8: Build positive response (echo DID)
     message->response[0] = (did >> 8) & 0xFF;
     message->response[1] = did & 0xFF;
     *(message->response_len) = 2;
