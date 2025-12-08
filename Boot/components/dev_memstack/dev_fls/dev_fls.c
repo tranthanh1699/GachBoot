@@ -1,45 +1,65 @@
 #include "dev_fls.h"
-#include "dev_fls_config.h"
 #include "stm32h7xx_hal.h"
 #include <string.h>
 
 CONFIG_LOG_TAG(DEV_FLS, true)
 
-// FLS Runtime State (minimal - no sector management)
+/**
+ * @brief Fls runtime state
+ * 
+ * Stores injected configuration and runtime statistics.
+ * Configuration is copied at init time - no external dependencies.
+ */
 typedef struct {
-    bool initialized;
+    Fls_ConfigType config;              /**< Copy of injected configuration */
+    bool initialized;                   /**< Initialization flag */
 } dev_fls_state_t;
 
 static dev_fls_state_t fls_state = {0};
 static dev_fls_statistics_t fls_stats = {0};
 
 // Forward declarations
-static dev_err_t fls_hal_erase_sector(uint8_t sector_index);
-#if DEV_FLS_ERASE_BY_PAGE
-static dev_err_t fls_hal_erase_page(uint32_t page_address);
-#endif
-static dev_err_t fls_hal_write(uint32_t address, const uint8_t *data, uint32_t length);
+static dev_err_t fls_hal_write_flash_word(uint32_t address, const uint8_t *data);
+static dev_err_t fls_hal_erase_sector_by_hw_index(uint8_t bank, uint8_t sector);
+
+// Public function forward declarations (defined later)
+bool dev_fls_is_managed_address(uint32_t address);
+const Fls_SectorDescriptor_t* dev_fls_get_sector_by_address(uint32_t address);
 
 /**
- * @brief Initialize FLS module
+ * @brief Initialize Fls module with configuration
  */
-dev_err_t dev_fls_init(void)
+dev_err_t dev_fls_init(const Fls_ConfigType *config)
 {
     if (fls_state.initialized) {
         return DEV_OK;
     }
     
-    DBG_OUT_I("Initializing FLS driver (hardware-only mode)...");
+    // Use default config if NULL passed
+    const Fls_ConfigType *active_config = (config != NULL) ? config : &Fls_Config;
     
-    memset(&fls_state, 0, sizeof(fls_state));
+    // Validate configuration
+    DEV_RETURN_ON_FALSE(active_config->sector_table != NULL, DEV_ERR_INVALID_ARG, "Sector table is NULL");
+    DEV_RETURN_ON_FALSE(active_config->sector_count > 0, DEV_ERR_INVALID_ARG, "Sector count is zero");
+    DEV_RETURN_ON_FALSE(active_config->write_alignment > 0, DEV_ERR_INVALID_ARG, "Invalid write alignment");
+    
+    DBG_OUT_I("Initializing Fls driver (AUTOSAR compliant)");
+    
+    // Copy configuration into internal state
+    memcpy(&fls_state.config, active_config, sizeof(Fls_ConfigType));
     memset(&fls_stats, 0, sizeof(fls_stats));
     
+    // Log managed sectors
+    DBG_OUT_I("Fls manages %u sectors:", fls_state.config.sector_count);
+    for (uint8_t i = 0; i < fls_state.config.sector_count; i++) {
+        const Fls_SectorDescriptor_t *sector = &fls_state.config.sector_table[i];
+        DBG_OUT_I("  [%u] %s: 0x%08X - 0x%08X (%u KB, Bank %u, Sector %u)",
+                  i, sector->name, sector->base_address,
+                  sector->base_address + sector->size - 1,
+                  sector->size / 1024, sector->bank_index, sector->sector_index);
+    }
+    
     fls_state.initialized = true;
-    
-    DBG_OUT_I("FLS initialized - Manages sectors 0x%08X to 0x%08X", 
-              DEV_FLS_SECTOR_A_BASE_ADDRESS, 
-              DEV_FLS_SECTOR_B_BASE_ADDRESS + DEV_FLS_SECTOR_SIZE - 1);
-    
     return DEV_OK;
 }
 
@@ -48,12 +68,12 @@ dev_err_t dev_fls_init(void)
  */
 dev_err_t dev_fls_read(uint32_t address, uint8_t *data, uint32_t length)
 {
-    DEV_RETURN_ON_FALSE(fls_state.initialized, DEV_ERR_MODULE_NOT_INIT, "FLS not initialized");
-    DEV_RETURN_ON_FALSE(data != NULL, DEV_ERR_INVALID_ARG, "Data is NULL");
+    DEV_RETURN_ON_FALSE(fls_state.initialized, DEV_ERR_MODULE_NOT_INIT, "Fls not initialized");
+    DEV_RETURN_ON_FALSE(data != NULL, DEV_ERR_INVALID_ARG, "Data buffer is NULL");
     DEV_RETURN_ON_FALSE(length > 0, DEV_ERR_INVALID_ARG, "Length is zero");
-    DEV_RETURN_ON_FALSE(dev_fls_is_managed_address(address), DEV_ERR_INVALID_ARG, "Address not managed");
+    DEV_RETURN_ON_FALSE(dev_fls_is_managed_address(address), DEV_ERR_INVALID_ARG, "Address 0x%08X not managed", address);
     
-    // Direct memory read from flash
+    // Direct memory-mapped read from flash
     memcpy(data, (const void*)address, length);
     fls_stats.total_reads++;
     
@@ -65,255 +85,214 @@ dev_err_t dev_fls_read(uint32_t address, uint8_t *data, uint32_t length)
  */
 dev_err_t dev_fls_write(uint32_t address, const uint8_t *data, uint32_t length)
 {
-    DEV_RETURN_ON_FALSE(fls_state.initialized, DEV_ERR_MODULE_NOT_INIT, "FLS not initialized");
+    DEV_RETURN_ON_FALSE(fls_state.initialized, DEV_ERR_MODULE_NOT_INIT, "Fls not initialized");
     DEV_RETURN_ON_FALSE(data != NULL, DEV_ERR_INVALID_ARG, "Data is NULL");
     DEV_RETURN_ON_FALSE(length > 0, DEV_ERR_INVALID_ARG, "Length is zero");
-    DEV_RETURN_ON_FALSE(dev_fls_is_managed_address(address), DEV_ERR_INVALID_ARG, "Address not managed");
+    DEV_RETURN_ON_FALSE(dev_fls_is_managed_address(address), DEV_ERR_INVALID_ARG, "Address 0x%08X not managed", address);
     
-    // Check alignment
-    if (address % DEV_FLS_WRITE_ALIGNMENT != 0) {
-        DBG_OUT_E("Address 0x%08X not aligned to %u bytes", address, DEV_FLS_WRITE_ALIGNMENT);
+    // Check write alignment
+    uint32_t write_align = fls_state.config.write_alignment;
+    if (address % write_align != 0) {
+        DBG_OUT_E("Address 0x%08X not aligned to %u bytes", address, write_align);
+        fls_stats.write_errors++;
+        return DEV_ERR_INVALID_ARG;
+    }
+    
+    // Get sector info to check boundaries
+    const Fls_SectorDescriptor_t *sector = dev_fls_get_sector_by_address(address);
+    if (sector == NULL) {
+        DBG_OUT_E("Address 0x%08X does not belong to any managed sector", address);
+        fls_stats.write_errors++;
         return DEV_ERR_INVALID_ARG;
     }
     
     // Align length up to write alignment
-    uint32_t aligned_length = ((length + DEV_FLS_WRITE_ALIGNMENT - 1) / DEV_FLS_WRITE_ALIGNMENT) * DEV_FLS_WRITE_ALIGNMENT;
+    uint32_t aligned_length = ((length + write_align - 1) / write_align) * write_align;
     
-    // Check if write would exceed sector boundary
-    uint32_t sector_base = (address == DEV_FLS_SECTOR_A_BASE_ADDRESS || 
-                             (address >= DEV_FLS_SECTOR_A_BASE_ADDRESS && address < DEV_FLS_SECTOR_A_BASE_ADDRESS + DEV_FLS_SECTOR_SIZE))
-                            ? DEV_FLS_SECTOR_A_BASE_ADDRESS : DEV_FLS_SECTOR_B_BASE_ADDRESS;
-    uint32_t sector_end = sector_base + DEV_FLS_SECTOR_SIZE;
-    
+    // Check sector boundary
+    uint32_t sector_end = sector->base_address + sector->size;
     if (address + aligned_length > sector_end) {
-        DBG_OUT_E("Write would exceed sector boundary: addr=0x%08X, len=%u, end=0x%08X", 
+        DBG_OUT_E("Write would exceed sector boundary: addr=0x%08X, len=%u, sector_end=0x%08X",
                   address, aligned_length, sector_end);
+        fls_stats.write_errors++;
         return DEV_ERR_INVALID_ARG;
     }
     
-    // Create adaptive buffer aligned to 32 bytes
+    // Prepare write buffer with padding
     uint8_t write_buffer[aligned_length];
     memcpy(write_buffer, data, length);
     
-    // Pad with 0xFF (erased flash state)
+    // Pad with erase value (0xFF)
     if (aligned_length > length) {
-        memset(write_buffer + length, 0xFF, aligned_length - length);
+        memset(write_buffer + length, sector->erase_value, aligned_length - length);
     }
     
-    // Write to hardware
-    dev_err_t err = fls_hal_write(address, write_buffer, aligned_length);
-    
-    if (err == DEV_OK) {
-        fls_stats.total_writes++;
-        DBG_OUT_I("FLS write: 0x%08X (%u bytes, %u aligned)", address, length, aligned_length);
-    } else {
-        fls_stats.write_errors++;
-        DBG_OUT_E("FLS write failed at 0x%08X", address);
+    // Write in flash words
+    uint32_t write_addr = address;
+    for (uint32_t offset = 0; offset < aligned_length; offset += write_align) {
+        dev_err_t err = fls_hal_write_flash_word(write_addr, write_buffer + offset);
+        if (err != DEV_OK) {
+            DBG_OUT_E("Flash write failed at 0x%08X", write_addr);
+            fls_stats.write_errors++;
+            return err;
+        }
+        write_addr += write_align;
     }
     
-    return err;
+    fls_stats.total_writes++;
+    return DEV_OK;
 }
 
 /**
  * @brief Erase flash sector
  */
-dev_err_t dev_fls_erase_sector(uint32_t sector_address)
+dev_err_t dev_fls_erase_sector(uint8_t sector_index)
 {
-    DEV_RETURN_ON_FALSE(fls_state.initialized, DEV_ERR_MODULE_NOT_INIT, "FLS not initialized");
-    DEV_RETURN_ON_FALSE(dev_fls_is_managed_address(sector_address), DEV_ERR_INVALID_ARG, "Invalid sector address");
+    DEV_RETURN_ON_FALSE(fls_state.initialized, DEV_ERR_MODULE_NOT_INIT, "Fls not initialized");
+    DEV_RETURN_ON_FALSE(sector_index < fls_state.config.sector_count, DEV_ERR_INVALID_ARG, "Invalid sector index %u", sector_index);
     
-#if DEV_FLS_ERASE_BY_SECTOR
-    // STM32H7: Erase whole sector
-    uint8_t sector_idx = dev_fls_get_sector_index(sector_address);
-    if (sector_idx == 0xFF) {
-        DBG_OUT_E("Invalid sector address 0x%08X", sector_address);
-        return DEV_ERR_INVALID_ARG;
-    }
+    const Fls_SectorDescriptor_t *sector = &fls_state.config.sector_table[sector_index];
     
-    dev_err_t err = fls_hal_erase_sector(sector_idx);
+    DBG_OUT_I("Erasing sector [%u] %s at 0x%08X (%u KB)...", 
+              sector_index, sector->name, sector->base_address, sector->size / 1024);
+    
+    dev_err_t err = fls_hal_erase_sector_by_hw_index(sector->bank_index, sector->sector_index);
     
     if (err == DEV_OK) {
         fls_stats.total_erases++;
-        DBG_OUT_I("Sector 0x%08X erased", sector_address);
+        DBG_OUT_I("Sector erased successfully");
     } else {
         fls_stats.erase_errors++;
+        DBG_OUT_E("Sector erase failed");
     }
     
     return err;
-    
-#elif DEV_FLS_ERASE_BY_PAGE
-    // For MCUs with page erase
-    uint32_t page_addr = sector_address;
-    uint32_t sector_end = sector_address + DEV_FLS_SECTOR_SIZE;
-    
-    while (page_addr < sector_end) {
-        dev_err_t err = fls_hal_erase_page(page_addr);
-        if (err != DEV_OK) {
-            DBG_OUT_E("Page erase failed at 0x%08X", page_addr);
-            fls_stats.erase_errors++;
-            return err;
-        }
-        page_addr += DEV_FLS_PAGE_SIZE;
-        fls_stats.total_erases++;
-    }
-    
-    DBG_OUT_I("Sector 0x%08X erased (page-level)", sector_address);
-    return DEV_OK;
-    
-#else
-    #error "FLS erase mode not configured"
-#endif
 }
 
 /**
- * @brief Erase all FLS-managed sectors
- */
-dev_err_t dev_fls_erase_all(void)
-{
-    DEV_RETURN_ON_FALSE(fls_state.initialized, DEV_ERR_MODULE_NOT_INIT, "FLS not initialized");
-    
-    DBG_OUT_I("Erasing all FLS sectors...");
-    
-    dev_err_t err_a = dev_fls_erase_sector(DEV_FLS_SECTOR_A_BASE_ADDRESS);
-    dev_err_t err_b = dev_fls_erase_sector(DEV_FLS_SECTOR_B_BASE_ADDRESS);
-    
-    if (err_a != DEV_OK || err_b != DEV_OK) {
-        DBG_OUT_E("Erase all failed");
-        return DEV_ERR_HARDWARE;
-    }
-    
-    DBG_OUT_I("All sectors erased");
-    return DEV_OK;
-}
-
-/**
- * @brief Check if address is managed by FLS
- */
-bool dev_fls_is_managed_address(uint32_t address)
-{
-    return (address >= DEV_FLS_SECTOR_A_BASE_ADDRESS && 
-            address < (DEV_FLS_SECTOR_A_BASE_ADDRESS + DEV_FLS_SECTOR_SIZE)) ||
-           (address >= DEV_FLS_SECTOR_B_BASE_ADDRESS && 
-            address < (DEV_FLS_SECTOR_B_BASE_ADDRESS + DEV_FLS_SECTOR_SIZE));
-}
-
-/**
- * @brief Blank check - verify if flash area is erased
+ * @brief Check if flash region is blank
  */
 bool dev_fls_blank_check(uint32_t address, uint32_t length)
 {
-    if (!dev_fls_is_managed_address(address)) {
+    if (!fls_state.initialized || !dev_fls_is_managed_address(address)) {
         return false;
     }
     
-    const uint32_t *ptr = (const uint32_t*)address;
-    uint32_t words = length / 4;
+    const Fls_SectorDescriptor_t *sector = dev_fls_get_sector_by_address(address);
+    if (sector == NULL) {
+        return false;
+    }
     
-    for (uint32_t i = 0; i < words; i++) {
-        if (ptr[i] != 0xFFFFFFFF) {
-            return false;
+    const uint8_t *ptr = (const uint8_t*)address;
+    for (uint32_t i = 0; i < length; i++) {
+        if (ptr[i] != sector->erase_value) {
+            return false;  // Found non-erased byte
         }
     }
     
-    // Check remaining bytes
-    const uint8_t *byte_ptr = (const uint8_t*)(ptr + words);
-    for (uint32_t i = 0; i < (length % 4); i++) {
-        if (byte_ptr[i] != 0xFF) {
-            return false;
-        }
-    }
-    
-    return true;
+    return true;  // All bytes match erase value
 }
 
 /**
- * @brief Get FLS statistics
+ * @brief Get sector by physical address
+ */
+const Fls_SectorDescriptor_t* dev_fls_get_sector_by_address(uint32_t address)
+{
+    if (!fls_state.initialized) return NULL;
+    
+    for (uint8_t i = 0; i < fls_state.config.sector_count; i++) {
+        const Fls_SectorDescriptor_t *sector = &fls_state.config.sector_table[i];
+        if (address >= sector->base_address && 
+            address < (sector->base_address + sector->size)) {
+            return sector;
+        }
+    }
+    return NULL;
+}
+
+/**
+ * @brief Get sector by table index
+ */
+const Fls_SectorDescriptor_t* dev_fls_get_sector_by_index(uint8_t sector_index)
+{
+    if (!fls_state.initialized || sector_index >= fls_state.config.sector_count) {
+        return NULL;
+    }
+    return &fls_state.config.sector_table[sector_index];
+}
+
+/**
+ * @brief Check if address is managed
+ */
+bool dev_fls_is_managed_address(uint32_t address)
+{
+    return (dev_fls_get_sector_by_address(address) != NULL);
+}
+
+/**
+ * @brief Get statistics
  */
 dev_err_t dev_fls_get_statistics(dev_fls_statistics_t *stats)
 {
-    DEV_RETURN_ON_FALSE(fls_state.initialized, DEV_ERR_MODULE_NOT_INIT, "FLS not initialized");
-    DEV_RETURN_ON_FALSE(stats != NULL, DEV_ERR_INVALID_ARG, "Stats is NULL");
-    
+    DEV_RETURN_ON_FALSE(stats != NULL, DEV_ERR_INVALID_ARG, "Stats pointer is NULL");
     memcpy(stats, &fls_stats, sizeof(dev_fls_statistics_t));
     return DEV_OK;
 }
 
-// ============================================================================
-// Hardware Abstraction Layer (HAL)
-// ============================================================================
-
 /**
- * @brief HAL: Erase flash sector (STM32H7)
+ * @brief HAL: Write 32-byte flash word
  */
-static dev_err_t fls_hal_erase_sector(uint8_t sector_index)
+static dev_err_t fls_hal_write_flash_word(uint32_t address, const uint8_t *data)
 {
-    FLASH_EraseInitTypeDef erase_init;
-    uint32_t sector_error = 0;
-    
-    // Unlock flash
     HAL_FLASH_Unlock();
     
-    // Configure erase
-    erase_init.TypeErase = FLASH_TYPEERASE_SECTORS;
-    erase_init.Banks = FLASH_BANK_2;
-    erase_init.Sector = sector_index;
-    erase_init.NbSectors = 1;
-    erase_init.VoltageRange = FLASH_VOLTAGE_RANGE_3;  // 2.7V - 3.6V
+    // STM32H7: Program 256-bit (32 bytes) flash word
+    HAL_StatusTypeDef hal_status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_FLASHWORD, address, (uint32_t)data);
     
-    // Execute erase
-    HAL_StatusTypeDef status = HAL_FLASHEx_Erase(&erase_init, &sector_error);
-    
-    // Lock flash
     HAL_FLASH_Lock();
     
-    if (status != HAL_OK || sector_error != 0xFFFFFFFF) {
-        DBG_OUT_E("HAL flash erase failed: status=%d, error=0x%08X", status, sector_error);
+    if (hal_status != HAL_OK) {
         return DEV_ERR_HARDWARE;
     }
     
     return DEV_OK;
 }
 
-#if DEV_FLS_ERASE_BY_PAGE
 /**
- * @brief HAL: Erase flash page (placeholder for MCUs with page erase)
+ * @brief HAL: Erase sector by bank and hardware sector index
  */
-static dev_err_t fls_hal_erase_page(uint32_t page_address)
+static dev_err_t fls_hal_erase_sector_by_hw_index(uint8_t bank, uint8_t sector)
 {
-    DBG_OUT_E("Page erase not implemented for this MCU");
-    return DEV_ERR_NOT_SUPPORTED;
-}
-#endif
-
-/**
- * @brief HAL: Write to flash (STM32H7)
- */
-static dev_err_t fls_hal_write(uint32_t address, const uint8_t *data, uint32_t length)
-{
-    // Unlock flash
+    FLASH_EraseInitTypeDef erase_init;
+    uint32_t sector_error = 0;
+    
+    erase_init.TypeErase = FLASH_TYPEERASE_SECTORS;
+    erase_init.Banks = (bank == 1) ? FLASH_BANK_1 : FLASH_BANK_2;
+    erase_init.Sector = sector;
+    erase_init.NbSectors = 1;
+    erase_init.VoltageRange = FLASH_VOLTAGE_RANGE_3;  // 2.7-3.6V
+    
     HAL_FLASH_Unlock();
     
-    // STM32H7 writes in 256-bit (32 bytes) flash words
-    uint32_t *src = (uint32_t*)data;
-    uint32_t words = length / 32;
+    HAL_StatusTypeDef hal_status = HAL_FLASHEx_Erase(&erase_init, &sector_error);
     
-    for (uint32_t i = 0; i < words; i++) {
-        uint32_t write_addr = address + (i * 32);
-        
-        // Program 256-bit flash word (8 x 32-bit words)
-        HAL_StatusTypeDef status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_FLASHWORD, 
-                                                       write_addr, 
-                                                       (uint32_t)(src + i * 8));
-        
-        if (status != HAL_OK) {
-            HAL_FLASH_Lock();
-            DBG_OUT_E("HAL flash write failed at 0x%08X: status=%d", write_addr, status);
-            return DEV_ERR_HARDWARE;
-        }
-    }
-    
-    // Lock flash
     HAL_FLASH_Lock();
     
+    if (hal_status != HAL_OK) {
+        DBG_OUT_E("HAL erase failed: Bank %u, Sector %u, Error: 0x%08X", bank, sector, sector_error);
+        return DEV_ERR_HARDWARE;
+    }
+    
     return DEV_OK;
+}
+
+/**
+ * @brief Get current configuration
+ */
+const Fls_ConfigType* dev_fls_get_config(void)
+{
+    if (!fls_state.initialized) {
+        return NULL;
+    }
+    return &fls_state.config;
 }

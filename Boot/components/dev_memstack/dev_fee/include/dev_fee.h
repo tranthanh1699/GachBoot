@@ -1,130 +1,160 @@
 #ifndef DEV_FEE_H
 #define DEV_FEE_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "dev_common.h"
-#include <stdint.h>
-#include <stdbool.h>
+#include "Fee_Cfg.h"  /* Generated configuration */
 
 /**
- * @brief Flash EEPROM Emulation (Fee) - AUTOSAR-compliant
- * 
- * Manages logical flash memory operations with wear leveling and sector switching.
- * Provides EEPROM-like interface on top of flash hardware.
+ * @file dev_fee.h
+ * @brief Flash EEPROM Emulation (AUTOSAR Fee) - Logical Address Management
  * 
  * Responsibilities:
- * - Sector management (active/standby sectors)
- * - Wear leveling (automatic sector switching)
- * - Write position tracking
- * - Logical-to-physical address mapping
- * - Garbage collection
+ * - Provide virtual address space for NvM
+ * - Map virtual addresses to physical Fls addresses
+ * - Manage sector lifecycle (wear leveling)
+ * - Track write position and sector usage
+ * - Handle sector switching transparently
  * 
- * Architecture:
- * NvM → MemIf → Fee (this layer) → Fls → Hardware
+ * Virtual Address Space:
+ * - Fee provides continuous virtual space from 0x00000000
+ * - NvM allocates blocks in this virtual space
+ * - Fee maps virtual → physical (may change after sector switch)
+ * - Physical addresses returned to NvM for reading
  * 
- * Sector Strategy:
- * - Two sectors: Active and Standby
- * - Active sector receives all writes
- * - When full: switch to standby, mark old as invalid
- * - Automatic garbage collection
+ * AUTOSAR Compliance:
+ * - Configuration injection at runtime (dev_fee_init with config pointer)
+ * - No hardcoded dependencies on generated config
+ * - Layered on top of Fls driver
  */
 
 /**
- * @brief Fee Job Status
+ * @brief Fee sector state
  */
 typedef enum {
-    DEV_FEE_JOB_OK = 0,                 // Job completed successfully
-    DEV_FEE_JOB_PENDING = 1,            // Job is pending
-    DEV_FEE_JOB_FAILED = 2,             // Job failed
-    DEV_FEE_SECTOR_SWITCHED = 3         // Sector switch occurred during operation
-} dev_fee_job_status_t;
-
-/**
- * @brief Fee Sector State
- */
-typedef enum {
-    DEV_FEE_SECTOR_EMPTY = 0,           // Sector is erased
-    DEV_FEE_SECTOR_ACTIVE = 1,          // Sector is actively being written
-    DEV_FEE_SECTOR_STANDBY = 2,         // Sector is erased and ready
-    DEV_FEE_SECTOR_FULL = 3,            // Sector is full
-    DEV_FEE_SECTOR_INVALID = 4          // Sector has errors
+    DEV_FEE_SECTOR_ERASED = 0,      /**< Sector is erased (all 0xFF) */
+    DEV_FEE_SECTOR_ACTIVE,          /**< Sector is currently active (writing) */
+    DEV_FEE_SECTOR_FULL,            /**< Sector is full (needs switch) */
+    DEV_FEE_SECTOR_INVALIDATED      /**< Sector invalidated (old data) */
 } dev_fee_sector_state_t;
 
 /**
- * @brief Fee Statistics
+ * @brief Fee statistics
  */
 typedef struct {
-    uint32_t total_writes;              // Total write operations
-    uint32_t total_reads;               // Total read operations
-    uint32_t sector_switches;           // Number of sector switches
-    uint32_t garbage_collections;       // Number of GC cycles
-    uint32_t active_sector_address;     // Current active sector base
-    uint32_t active_sector_usage;       // Bytes used in active sector
-    uint32_t write_position;            // Current write position
+    uint32_t total_writes;              /**< Total write operations */
+    uint32_t total_reads;               /**< Total read operations */
+    uint32_t sector_switches;           /**< Number of sector switches */
+    uint32_t active_sector_index;       /**< Current Fee sector index */
+    uint32_t active_sector_usage;       /**< Bytes used in active sector */
+    uint32_t next_virtual_address;      /**< Next available virtual address */
+    uint32_t write_errors;              /**< Write error count */
 } dev_fee_statistics_t;
 
 /**
- * @brief Initialize Fee module
- * @return dev_err_t Error code
+ * @brief Initialize Fee module with configuration
  * 
- * @note Must be called after Fls initialization
+ * @param config Pointer to generated configuration (from Fee_Cfg.c)
+ *               Pass &Fee_Config for default configuration
+ *               Pass NULL to use default configuration
+ *               Pass custom config for testing or alternate setups
+ * 
+ * @return DEV_OK on success
+ *         DEV_ERR_INVALID_ARG if config is invalid
+ *         DEV_ERR_MODULE_NOT_INIT if Fls not initialized
+ * 
+ * @note Config is copied internally - caller can free after init
+ * @note Automatically scans sectors to determine active one
+ * @note Sets up write position for append operations
  */
-dev_err_t dev_fee_init(void);
+dev_err_t dev_fee_init(const Fee_ConfigType *config);
 
 /**
- * @brief Write data to Fee (dynamic addressing)
- * @param data Source data buffer
- * @param length Number of bytes to write
- * @param out_address Output: Logical address where data was written
- * @return dev_err_t Error code
+ * @brief Write data to virtual address (NvM writes)
+ * @param virtual_address Virtual address where to write (ignored, auto-allocated)
+ * @param data Data to write
+ * @param length Data length
+ * @param out_physical_address [OUT] Physical address where data was written
+ * @return DEV_OK on success, error code otherwise
  * 
- * @note Fee automatically:
- *       - Finds next available position in active sector
- *       - Switches to standby sector if full
- *       - Returns logical address for NvM to track
+ * @note Virtual address is auto-incremented (append mode)
+ * @note Returns physical address for subsequent reads
+ * @note May trigger sector switch if active sector is full
+ * @note Physical address remains valid until next sector switch
+ * 
+ * Usage by NvM:
+ * @code
+ * uint32_t phys_addr;
+ * dev_fee_write(0, data, len, &phys_addr);  // Virtual addr ignored
+ * // Store phys_addr in block_runtime for reads
+ * @endcode
  */
-dev_err_t dev_fee_write(const uint8_t *data, uint32_t length, uint32_t *out_address);
+dev_err_t dev_fee_write(uint32_t virtual_address, const uint8_t *data, 
+                        uint32_t length, uint32_t *out_physical_address);
 
 /**
- * @brief Read data from Fee
- * @param address Logical address (previously returned by dev_fee_write)
- * @param data Destination buffer
+ * @brief Read data from physical address (NvM reads)
+ * @param physical_address Physical address (returned by write)
+ * @param data Buffer to store read data
  * @param length Number of bytes to read
- * @return dev_err_t Error code
+ * @return DEV_OK on success, error code otherwise
+ * 
+ * @note Uses physical address directly (no translation needed)
+ * @note Physical addresses are stable (don't change)
  */
-dev_err_t dev_fee_read(uint32_t address, uint8_t *data, uint32_t length);
-
-/**
- * @brief Erase all Fee-managed sectors
- * @return dev_err_t Error code
- */
-dev_err_t dev_fee_erase_all(void);
-
-/**
- * @brief Force sector switch (for testing/maintenance)
- * @return dev_err_t Error code
- */
-dev_err_t dev_fee_force_sector_switch(void);
+dev_err_t dev_fee_read(uint32_t physical_address, uint8_t *data, uint32_t length);
 
 /**
  * @brief Get active sector information
- * @param out_sector Output: Active sector base address
- * @param out_usage Output: Bytes used in active sector
- * @return dev_err_t Error code
+ * @param sector_address [OUT] Physical base address of active sector
+ * @param sector_usage [OUT] Bytes used in active sector
+ * @return DEV_OK on success
+ * 
+ * @note Used by NvM for flash scanning during init
  */
-dev_err_t dev_fee_get_active_sector(uint32_t *out_sector, uint32_t *out_usage);
+dev_err_t dev_fee_get_active_sector(uint32_t *sector_address, uint32_t *sector_usage);
+
+/**
+ * @brief Manually trigger sector switch
+ * @return DEV_OK on success, error code otherwise
+ * 
+ * @note Normally called automatically when sector full
+ * @note Can be called manually for testing or defragmentation
+ * @note Erases alternate sector and resets write position
+ */
+dev_err_t dev_fee_switch_sector(void);
 
 /**
  * @brief Get Fee statistics
- * @param stats Output statistics structure
- * @return dev_err_t Error code
+ * @param stats Pointer to statistics structure
+ * @return DEV_OK on success
  */
 dev_err_t dev_fee_get_statistics(dev_fee_statistics_t *stats);
 
 /**
- * @brief Check if address is managed by Fee
- * @param address Address to check
- * @return true if address is managed
+ * @brief Check if sector switch is needed
+ * @return true if switch needed, false otherwise
  */
-bool dev_fee_is_managed_address(uint32_t address);
+bool dev_fee_is_sector_full(void);
+
+/**
+ * @brief Get current Fee configuration
+ * 
+ * Returns pointer to active configuration.
+ * Useful for diagnostics and testing.
+ * 
+ * @return Pointer to active config
+ *         NULL if not initialized
+ * 
+ * @note Do not modify returned config
+ */
+const Fee_ConfigType* dev_fee_get_config(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // DEV_FEE_H

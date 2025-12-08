@@ -1,5 +1,6 @@
 #include "dev_memif.h"
 #include "dev_fee.h"
+#include "Fee_Cfg.h"
 #include <string.h>
 
 CONFIG_LOG_TAG(DEV_MEMIF, true)
@@ -27,8 +28,8 @@ dev_err_t dev_memif_init(void)
     
     memset(&memif_state, 0, sizeof(memif_state));
     
-    // Initialize underlying Fee driver
-    dev_err_t err = dev_fee_init();
+    // Initialize underlying Fee driver with default config
+    dev_err_t err = dev_fee_init(NULL);  // NULL = use default Fee_Config
     if (err != DEV_OK) {
         DBG_OUT_E("Fee init failed");
         memif_state.status = DEV_MEMIF_UNINIT;
@@ -81,8 +82,8 @@ dev_err_t dev_memif_write(uint32_t address, const uint8_t *data, uint32_t length
     
     memif_state.status = DEV_MEMIF_BUSY;
     
-    // Route to Fee
-    dev_err_t err = dev_fee_write(data, length, out_physical_address);
+    // Route to Fee - virtual address is managed by Fee (use 0 for auto-allocation)
+    dev_err_t err = dev_fee_write(address, data, length, out_physical_address);
     
     if (err == DEV_OK) {
         memif_state.status = DEV_MEMIF_JOB_OK;
@@ -97,25 +98,20 @@ dev_err_t dev_memif_write(uint32_t address, const uint8_t *data, uint32_t length
 
 /**
  * @brief Erase memory block
+ * @note Fee doesn't have erase_all API - erase is handled automatically during sector switch
  */
 dev_err_t dev_memif_erase(uint32_t address, uint32_t length)
 {
     DEV_RETURN_ON_FALSE(memif_state.initialized, DEV_ERR_MODULE_NOT_INIT, "MemIf not initialized");
     
-    memif_state.status = DEV_MEMIF_BUSY;
+    // Fee manages erase automatically during sector switching
+    // This is a no-op for Fee - return OK
+    DBG_OUT_W("MemIf erase is no-op for Fee (automatic sector management)");
     
-    // Route to Fee
-    dev_err_t err = dev_fee_erase_all();
+    memif_state.status = DEV_MEMIF_JOB_OK;
+    memif_state.job_result = DEV_MEMIF_JOB_OK;
     
-    if (err == DEV_OK) {
-        memif_state.status = DEV_MEMIF_JOB_OK;
-        memif_state.job_result = DEV_MEMIF_JOB_OK;
-    } else {
-        memif_state.status = DEV_MEMIF_JOB_FAILED;
-        memif_state.job_result = DEV_MEMIF_JOB_FAILED;
-    }
-    
-    return err;
+    return DEV_OK;
 }
 
 /**

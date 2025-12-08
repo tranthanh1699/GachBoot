@@ -1,11 +1,10 @@
 # ==============================================================================
-# Memory Stack (AUTOSAR-inspired)
+# Memory Stack (AUTOSAR-compliant)
 # ==============================================================================
-# This module implements a 4-layer non-volatile memory stack:
+# This module implements a 3-layer non-volatile memory stack:
 #   - NvM (NV Manager): Block management, CRC, redundancy
-#   - MemIf (Memory Interface): Device abstraction layer
-#   - Fee (Flash EEPROM Emulation): Sector management, wear leveling
-#   - Fls (Flash Driver): STM32H7 hardware operations
+#   - Fee (Flash EEPROM Emulation): Virtual addressing, wear leveling
+#   - Fls (Flash Driver): STM32H7 hardware operations (sector info only)
 # ==============================================================================
 
 cmake_minimum_required(VERSION 3.22)
