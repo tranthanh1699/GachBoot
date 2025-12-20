@@ -13,3 +13,4 @@ target_include_directories(dev_fee PUBLIC
 target_link_libraries(dev_fee PUBLIC stm32cubemx)
 target_link_libraries(dev_fee PUBLIC dev_app)
 target_link_libraries(dev_fee PUBLIC dev_fls)
+target_link_libraries(dev_fee PUBLIC GenerateCode)

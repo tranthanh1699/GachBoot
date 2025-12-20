@@ -1,6 +1,6 @@
 #include "dev_memif.h"
 #include "dev_fee.h"
-#include "Fee_Cfg.h"
+#include "dev_fls.h"
 #include <string.h>
 
 CONFIG_LOG_TAG(DEV_MEMIF, true)

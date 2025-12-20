@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 #include "dev_common.h"
-#include "Fee_Cfg.h"  /* Generated configuration */
+#include "Fee_PBCfg.h"  /* Generated configuration */
 
 /**
  * @file dev_fee.h

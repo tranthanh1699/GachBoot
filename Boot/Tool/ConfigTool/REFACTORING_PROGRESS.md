@@ -3,6 +3,113 @@
 ## Overview
 Refactoring `config_editor.py` by extracting UI rendering code into separate Module_UI classes for better maintainability.
 
+## ⚠️ CRITICAL: Module Integration Checklist
+
+**When adding a new UI module, ALWAYS follow these steps:**
+
+### 1. Create Module Files
+- [ ] `Module/xxx_module.py` - Validator and code generator
+- [ ] `Module_UI/xxx_ui.py` - UI components (TreeView, forms, toolbar)
+
+### 2. Update config_editor.py
+- [ ] **Import statements** (top of file):
+  ```python
+  from Module.xxx_module import validate_xxx_config, generate_xxx_code
+  from Module_UI.xxx_ui import XxxUI
+  ```
+
+- [ ] **Initialize in `__init__`** (around line 40):
+  ```python
+  self.xxx_ui = None
+  ```
+
+- [ ] **⚠️ CRITICAL: Call setup in `__init__`** (around line 110):
+  ```python
+  self.setup_xxx_tab()  # ← MUST ADD THIS OR JSON LOAD WILL FAIL!
+  ```
+
+- [ ] **Create setup method**:
+  ```python
+  def setup_xxx_tab(self):
+      xxx_frame = ttk.Frame(self.config_panel_frame)
+      self.xxx_ui = XxxUI(xxx_frame)
+      self.xxx_tree = self.xxx_ui.setup_tab()
+      self.xxx_count_var = self.xxx_ui.setup_toolbar(
+          add_cmd=self.add_xxx,
+          edit_cmd=self.edit_xxx,
+          delete_cmd=self.delete_xxx
+      )
+  ```
+
+- [ ] **Add to `refresh_ui()`** (around line 340):
+  ```python
+  if self.xxx_ui:
+      self.xxx_ui.refresh_tree(xxx_config)
+  ```
+
+- [ ] **Add to `refresh_nav_tree()`** (around line 400):
+  ```python
+  xxx_root = self.nav_tree.insert(root, tk.END, text=f"📦 Xxx Config ({count})", tags=('xxx_root',))
+  ```
+
+- [ ] **Add to `on_tree_select()`** (around line 550):
+  ```python
+  elif tags and tags[0] == 'xxx':
+      self.xxx_ui.show_info_panel(self.info_text, item)
+      self.show_xxx_edit_form(idx)
+  ```
+
+- [ ] **Add to `show_context_menu()`** (around line 630):
+  ```python
+  elif tags and tags[0] == 'xxx_root':
+      menu.add_command(label="➕ Add New", command=self.add_xxx)
+  ```
+
+- [ ] **Add CRUD operations**:
+  ```python
+  def add_xxx(self): ...
+  def edit_xxx(self): ...
+  def delete_xxx(self): ...
+  ```
+
+- [ ] **Add to `validate_config()`** (around line 1390):
+  ```python
+  xxx_valid, xxx_errors, xxx_warnings = validate_xxx_config(self.config)
+  all_errors += xxx_errors
+  all_warnings += xxx_warnings
+  ```
+
+- [ ] **Add to `generate_code()`** (around line 1330):
+  ```python
+  xxx_files = []
+  if self.config.get('xxx_config'):
+      xxx_files = generate_xxx_code(self.config, output_path)
+  all_files += xxx_files
+  ```
+
+### 3. Update Other Files
+- [ ] Add `xxx_config` section to `gachboot_config.json`
+- [ ] Update `Module/cmake_module.py` to include Xxx_Gen sources
+- [ ] Update `GenerateCode/CMakeLists.txt` to add Xxx_Gen subdirectory
+
+### 4. Test Checklist
+- [ ] JSON loads without errors
+- [ ] Navigation tree shows new branch
+- [ ] Add/Edit/Delete operations work
+- [ ] Forms display correctly with auto-save
+- [ ] Validation catches errors
+- [ ] Code generation creates files
+- [ ] Generated code compiles
+
+### 5. Common Pitfalls
+- ❌ **Forgetting `self.setup_xxx_tab()` in `__init__`** → JSON load fails with AttributeError
+- ❌ Missing imports → Module not found errors
+- ❌ Not adding to validation → Silent validation skip
+- ❌ Not adding to generation → Files not created
+- ❌ Wrong tags in navigation tree → Selection handler doesn't work
+
+---
+
 ## Goals
 - Reduce `config_editor.py` complexity (from 2404 lines)
 - Separate UI rendering (view) from controller logic

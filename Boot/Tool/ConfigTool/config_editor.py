@@ -14,6 +14,7 @@ from Module.session_module import validate_sessions, generate_session_code
 from Module.security_module import validate_security_levels, generate_security_code
 from Module.service_module import validate_services, generate_service_code
 from Module.fls_module import validate_fls_config, generate_fls_code
+from Module.fee_module import validate_fee_config, generate_fee_code
 from Module.cmake_module import generate_cmake_file
 from Module_UI.service_ui import ServiceUI
 from Module_UI.session_ui import SessionUI
@@ -21,6 +22,7 @@ from Module_UI.security_ui import SecurityUI
 from Module_UI.nvm_ui import NvmUI
 from Module_UI.did_ui import DidUI
 from Module_UI.fls_ui import FlsUI
+from Module_UI.fee_ui import FeeUI
 
 class ConfigEditor:
     def __init__(self, root):
@@ -39,6 +41,7 @@ class ConfigEditor:
         self.nvm_ui = None
         self.did_ui = None
         self.fls_ui = None
+        self.fee_ui = None
         
         # Apply theme
         style = ttk.Style()
@@ -112,6 +115,7 @@ class ConfigEditor:
         self.setup_security_tab()
         self.setup_service_tab()
         self.setup_fls_tab()
+        self.setup_fee_tab()
         
         # Status bar
         self.status_var = tk.StringVar(value="Ready")
@@ -272,6 +276,21 @@ class ConfigEditor:
             delete_cmd=self.delete_fls_sector
         )
     
+    def setup_fee_tab(self):
+        """Setup Fee (Flash EEPROM Emulation) tab using FeeUI module"""
+        fee_frame = ttk.Frame(self.config_panel_frame)
+        
+        # Initialize FeeUI
+        self.fee_ui = FeeUI(fee_frame)
+        
+        # Setup tree and toolbar using UI module
+        self.fee_tree = self.fee_ui.setup_tab()
+        self.fee_count_var = self.fee_ui.setup_toolbar(
+            add_cmd=self.add_fee_mapping,
+            edit_cmd=self.edit_fee_mapping,
+            delete_cmd=self.delete_fee_mapping
+        )
+    
     def load_config(self):
         """Load configuration from file"""
         try:
@@ -347,6 +366,13 @@ class ConfigEditor:
             self.fls_ui.refresh_tree(fls_config)
         sectors = fls_config.get('sectors', [])
         self.fls_count_var.set(str(len(sectors)))
+        
+        # Fee Configuration
+        fee_config = self.config.get('fee_config', {})
+        if self.fee_ui:
+            self.fee_ui.refresh_tree(fee_config)
+        mappings = fee_config.get('sector_mapping', [])
+        self.fee_count_var.set(str(len(mappings)))
     
     def refresh_nav_tree(self):
         """Refresh navigation tree"""
@@ -415,6 +441,22 @@ class ConfigEditor:
             self.nav_tree.insert(fls_root, tk.END,
                 text=f"  [{sector.get('bank_index', 1)}.{sector.get('sector_index', i)}] {sector.get('name', f'Sector {i}')}",
                 tags=('fls_sector', str(i)))
+        
+        # Fee Configuration branch
+        fee_config = self.config.get('fee_config', {})
+        mappings = fee_config.get('sector_mapping', [])
+        fee_count = len(mappings)
+        fee_root = self.nav_tree.insert(root, tk.END, text=f"🔄 Fee Configuration ({fee_count})", open=True, tags=('fee_root',))
+        # Add virtual space config node
+        self.nav_tree.insert(fee_root, tk.END, text="  ⚙️ Virtual Space Settings", tags=('fee_settings',))
+        # Add sector mappings
+        for i, mapping in enumerate(mappings):
+            fls_idx = mapping.get('fls_sector_index', 0)
+            name = mapping.get('name', f'Fee_Sector_{i}')
+            primary = " [Primary]" if mapping.get('is_primary', False) else ""
+            self.nav_tree.insert(fee_root, tk.END,
+                text=f"  {name} → Fls[{fls_idx}]{primary}",
+                tags=('fee_mapping', str(i)))
     
     def browse_config_file(self):
         """Browse for config file"""
@@ -586,6 +628,37 @@ class ConfigEditor:
                 
                 self.fls_ui.show_sector_edit_form(self.config_panel_frame, idx, self.config, self.set_modified)
         
+        elif tags and tags[0] == 'fee_settings':
+            # Show Fee virtual space settings
+            fee_config = self.config.get('fee_config', {})
+            if self.fee_ui:
+                self.info_text.insert(tk.END, f"Fee Virtual Space\n")
+                self.info_text.insert(tk.END, f"{'='*30}\n")
+                self.info_text.insert(tk.END, f"Virtual Start: {fee_config.get('virtual_start', '0x00000000')}\n")
+                virt_size = fee_config.get('virtual_size', 128 * 1024)
+                self.info_text.insert(tk.END, f"Virtual Size: {virt_size // 1024}KB\n")
+                threshold = fee_config.get('sector_full_threshold', 127 * 1024)
+                self.info_text.insert(tk.END, f"Switch Threshold: {threshold // 1024}KB\n")
+                self.info_text.insert(tk.END, f"Write Alignment: {fee_config.get('write_alignment', 32)} bytes\n")
+                
+                self.fee_ui.show_edit_form(self.config_panel_frame, self.config, self.set_modified)
+        
+        elif tags and tags[0] == 'fee_mapping':
+            # Show Fee sector mapping
+            idx = int(tags[1])
+            fee_config = self.config.get('fee_config', {})
+            mappings = fee_config.get('sector_mapping', [])
+            if idx < len(mappings) and self.fee_ui:
+                mapping = mappings[idx]
+                self.info_text.insert(tk.END, f"Fee Sector Mapping {idx}\n")
+                self.info_text.insert(tk.END, f"{'='*30}\n")
+                self.info_text.insert(tk.END, f"Name: {mapping.get('name', '')}\n")
+                self.info_text.insert(tk.END, f"Fls Sector: {mapping.get('fls_sector_index', 0)}\n")
+                self.info_text.insert(tk.END, f"Primary: {'Yes' if mapping.get('is_primary', False) else 'No'}\n")
+                self.info_text.insert(tk.END, f"Description: {mapping.get('description', '')}\n")
+                
+                self.fee_ui.show_mapping_edit_form(self.config_panel_frame, idx, self.config, self.set_modified)
+        
         self.info_text.config(state=tk.DISABLED)
     
     def show_context_menu(self, event):
@@ -614,6 +687,8 @@ class ConfigEditor:
             menu.add_command(label="➕ Add New Service", command=self.add_service)
         elif tags and tags[0] == 'fls_root':
             menu.add_command(label="➕ Add New Sector", command=self.add_fls_sector)
+        elif tags and tags[0] == 'fee_root':
+            menu.add_command(label="➕ Add New Mapping", command=self.add_fee_mapping)
         elif tags and tags[0] == 'nvm':
             menu.add_command(label="✏️ Edit Block", command=self.edit_nvm_block)
             menu.add_command(label="🗑️ Delete Block", command=self.delete_nvm_block)
@@ -1104,6 +1179,104 @@ class ConfigEditor:
             self.refresh_ui()
             self.set_modified()
     
+    # ========================================================================
+    # Fee Configuration CRUD Operations
+    # ========================================================================
+    
+    def add_fee_mapping(self):
+        """Add new Fee sector mapping"""
+        if 'fee_config' not in self.config:
+            self.config['fee_config'] = {
+                'description': 'Flash EEPROM Emulation',
+                'virtual_start': '0x00000000',
+                'virtual_size': 128 * 1024,
+                'sector_full_threshold': 127 * 1024,
+                'write_alignment': 32,
+                'erase_value': 0xFF,
+                'sector_mapping': []
+            }
+        
+        mappings = self.config['fee_config'].get('sector_mapping', [])
+        if not isinstance(mappings, list):
+            self.config['fee_config']['sector_mapping'] = []
+            mappings = self.config['fee_config']['sector_mapping']
+        
+        # Auto-assign next Fls sector
+        fls_config = self.config.get('fls_config', {})
+        fls_sectors = fls_config.get('sectors', [])
+        
+        # Find used Fls indices
+        used_indices = {m.get('fls_sector_index', 0) for m in mappings}
+        
+        # Find first available Fls sector
+        next_fls_idx = 0
+        for i in range(len(fls_sectors)):
+            if i not in used_indices:
+                next_fls_idx = i
+                break
+        
+        # Check if this is the first mapping (make it primary)
+        is_primary = len(mappings) == 0
+        
+        new_mapping = {
+            'name': f'Fee_Sector_{len(mappings)}',
+            'fls_sector_index': next_fls_idx,
+            'is_primary': is_primary,
+            'description': 'Primary Fee sector' if is_primary else 'Standby Fee sector'
+        }
+        
+        mappings.append(new_mapping)
+        self.refresh_ui()
+        self.set_modified()
+        
+        # Show edit form for new mapping
+        index = len(mappings) - 1
+        if self.fee_ui:
+            self.fee_ui.show_mapping_edit_form(self.config_panel_frame, index, self.config, self.set_modified)
+    
+    def edit_fee_mapping(self):
+        """Edit selected Fee sector mapping"""
+        selection = self.nav_tree.selection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a Fee mapping to edit")
+            return
+        
+        item = self.nav_tree.item(selection[0])
+        tags = item['tags']
+        
+        if not tags or tags[0] != 'fee_mapping':
+            messagebox.showwarning("Invalid Selection", "Please select a Fee mapping")
+            return
+        
+        index = int(tags[1])
+        if self.fee_ui:
+            self.fee_ui.show_mapping_edit_form(self.config_panel_frame, index, self.config, self.set_modified)
+    
+    def delete_fee_mapping(self):
+        """Delete selected Fee sector mapping"""
+        selection = self.nav_tree.selection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a Fee mapping to delete")
+            return
+        
+        item = self.nav_tree.item(selection[0])
+        tags = item['tags']
+        
+        if not tags or tags[0] != 'fee_mapping':
+            messagebox.showwarning("Invalid Selection", "Please select a Fee mapping")
+            return
+        
+        index = int(tags[1])
+        fee_config = self.config.get('fee_config', {})
+        mappings = fee_config.get('sector_mapping', [])
+        
+        mapping = mappings[index]
+        
+        if messagebox.askyesno("Confirm Delete", f"Delete mapping {mapping.get('name', f'Mapping {index}')}?"):
+            del mappings[index]
+            self.refresh_ui()
+            self.set_modified()
+    
     def generate_code(self):
         """Generate code from configuration"""
         try:
@@ -1121,8 +1294,9 @@ class ConfigEditor:
                 self.config.get('security_levels', [])
             )
             fls_valid, fls_errors, fls_warnings = validate_fls_config(self.config)
+            fee_valid, fee_errors, fee_warnings = validate_fee_config(self.config)
             
-            if not nvm_valid or not did_valid or not session_valid or not security_valid or not service_valid or not fls_valid:
+            if not nvm_valid or not did_valid or not session_valid or not security_valid or not service_valid or not fls_valid or not fee_valid:
                 error_msg = "Validation failed:\n"
                 if nvm_errors:
                     error_msg += "\nNVM Errors:\n" + "\n".join(nvm_errors)
@@ -1136,6 +1310,8 @@ class ConfigEditor:
                     error_msg += "\nService Errors:\n" + "\n".join(service_errors)
                 if fls_errors:
                     error_msg += "\nFlash Config Errors:\n" + "\n".join(fls_errors)
+                if fee_errors:
+                    error_msg += "\nFee Config Errors:\n" + "\n".join(fee_errors)
                 messagebox.showerror("Validation Error", error_msg)
                 return
             
@@ -1182,9 +1358,12 @@ class ConfigEditor:
             fls_files = []
             if self.config.get('fls_config'):
                 fls_files = generate_fls_code(self.config, output_path)
+            fee_files = []
+            if self.config.get('fee_config'):
+                fee_files = generate_fee_code(self.config, output_path)
             cmake_file = generate_cmake_file(output_path, project_name, version)
             
-            all_files = nvm_files + did_files + session_files + security_files + service_files + fls_files + [cmake_file]
+            all_files = nvm_files + did_files + session_files + security_files + service_files + fls_files + fee_files + [cmake_file]
             messagebox.showinfo("Success", f"Generated {len(all_files)} files:\n" + "\n".join([os.path.basename(f) for f in all_files]))
             self.status_var.set("Code generation complete")
         except Exception as e:
@@ -1199,10 +1378,11 @@ class ConfigEditor:
             session_valid, session_errors, session_warnings = validate_sessions(self.config.get('sessions', []))
             security_valid, security_errors, security_warnings = validate_security_levels(self.config.get('security_levels', []))
             fls_valid, fls_errors, fls_warnings = validate_fls_config(self.config)
+            fee_valid, fee_errors, fee_warnings = validate_fee_config(self.config)
             
             # Collect all messages
-            all_errors = nvm_errors + did_errors + session_errors + security_errors + fls_errors
-            all_warnings = nvm_warnings + did_warnings + session_warnings + security_warnings + fls_warnings
+            all_errors = nvm_errors + did_errors + session_errors + security_errors + fls_errors + fee_errors
+            all_warnings = nvm_warnings + did_warnings + session_warnings + security_warnings + fls_warnings + fee_warnings
             
             # Basic project validation
             if not self.config['project']['name']:

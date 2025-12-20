@@ -76,6 +76,15 @@ if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Fls_Gen)
     message(STATUS "Added Fls_Gen sources: ${{FLS_GEN_SOURCES}}")
 endif()
 
+# Add Fee Generated Code
+if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Fee_Gen)
+    file(GLOB FEE_GEN_SOURCES 
+        "${{CMAKE_CURRENT_SOURCE_DIR}}/Fee_Gen/*.c"
+    )
+    list(APPEND GENERATED_SOURCES ${{FEE_GEN_SOURCES}})
+    message(STATUS "Added Fee_Gen sources: ${{FEE_GEN_SOURCES}}")
+endif()
+
 # Create library from generated code
 add_library(GenerateCode STATIC ${{GENERATED_SOURCES}})
 
@@ -113,6 +122,12 @@ endif()
 if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Fls_Gen)
     target_include_directories(GenerateCode PUBLIC
         ${{CMAKE_CURRENT_SOURCE_DIR}}/Fls_Gen
+    )
+endif()
+
+if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Fee_Gen)
+    target_include_directories(GenerateCode PUBLIC
+        ${{CMAKE_CURRENT_SOURCE_DIR}}/Fee_Gen
     )
 endif()
 

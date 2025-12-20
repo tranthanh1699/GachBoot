@@ -43,7 +43,10 @@ dev_err_t dev_fee_init(const Fee_ConfigType *config)
     // Validate configuration
     DEV_RETURN_ON_FALSE(active_config->sector_table != NULL, DEV_ERR_INVALID_ARG, "Fee sector table is NULL");
     DEV_RETURN_ON_FALSE(active_config->sector_count > 0, DEV_ERR_INVALID_ARG, "Fee sector count is zero");
-    DEV_RETURN_ON_FALSE(active_config->fls_config != NULL, DEV_ERR_INVALID_ARG, "Fls config reference is NULL");
+    
+    // Verify Fls is already initialized (Fee depends on Fls)
+    const Fls_ConfigType *fls_config = dev_fls_get_config();
+    DEV_RETURN_ON_FALSE(fls_config != NULL, DEV_ERR_MODULE_NOT_INIT, "Fls must be initialized before Fee");
     
     DBG_OUT_I("Initializing Fee driver (AUTOSAR compliant)");
     
@@ -51,15 +54,8 @@ dev_err_t dev_fee_init(const Fee_ConfigType *config)
     memcpy(&fee_state.config, active_config, sizeof(Fee_ConfigType));
     memset(&fee_stats, 0, sizeof(fee_stats));
     
-    // Initialize Fls with its config
-    dev_err_t err = dev_fls_init(fee_state.config.fls_config);
-    if (err != DEV_OK) {
-        DBG_OUT_E("Fls init failed");
-        return err;
-    }
-    
     // Scan sectors to determine active one and write position
-    err = fee_scan_and_init_sectors();
+    dev_err_t err = fee_scan_and_init_sectors();
     if (err != DEV_OK) {
         DBG_OUT_E("Fee sector scan failed");
         return err;

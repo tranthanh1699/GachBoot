@@ -188,5 +188,27 @@
         "erase_value": 255
       }
     ]
+  },
+  "fee_config": {
+    "description": "Flash EEPROM Emulation Configuration",
+    "virtual_start": "0x00000000",
+    "virtual_size": 131072,
+    "sector_full_threshold": 130048,
+    "write_alignment": 32,
+    "erase_value": 255,
+    "sector_mapping": [
+      {
+        "name": "Fee_Primary",
+        "fls_sector_index": 0,
+        "is_primary": true,
+        "description": "Primary Fee sector (maps to NVM_Sector_A)"
+      },
+      {
+        "name": "Fee_Secondary",
+        "fls_sector_index": 1,
+        "is_primary": false,
+        "description": "Secondary Fee sector (maps to NVM_Sector_B)"
+      }
+    ]
   }
 }
