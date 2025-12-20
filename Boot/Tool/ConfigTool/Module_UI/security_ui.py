@@ -71,8 +71,7 @@ class SecurityUI:
         if self.security_count_var:
             self.security_count_var.set(str(len(security_levels)))
     
-    def show_edit_form(self, config_panel_frame, index, config, 
-                       update_sessions_callback, set_modified_callback):
+    def show_edit_form(self, config_panel_frame, index, config, set_modified_callback):
         """Render edit form for security level with auto-save"""
         # Clear config panel
         for widget in config_panel_frame.winfo_children():

@@ -886,10 +886,7 @@ class ConfigEditor:
                 self.config_panel_frame,
                 index,
                 self.config,
-                {
-                    'set_modified': self.set_modified,
-                    'refresh_ui': self.refresh_ui
-                }
+                self.set_modified
             )
     
     # ===== DCM Service Management =====
