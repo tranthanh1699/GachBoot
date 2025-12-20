@@ -157,5 +157,36 @@
       ],
       "required_security_levels": []
     }
-  ]
+  ],
+  "fls_config": {
+    "mcu_name": "STM32H743VIT6",
+    "description": "Flash Driver Configuration for NVM Storage",
+    "base_address": "0x08000000",
+    "total_size": 2097152,
+    "write_alignment": 32,
+    "read_alignment": 1,
+    "erase_value": 255,
+    "write_timeout_ms": 100,
+    "erase_timeout_ms": 2000,
+    "sectors": [
+      {
+        "name": "NVM_Sector_A",
+        "description": "Primary NVM storage sector",
+        "bank_index": 2,
+        "sector_index": 6,
+        "start_address": "0x081C0000",
+        "size": 131072,
+        "erase_value": 255
+      },
+      {
+        "name": "NVM_Sector_B",
+        "description": "Secondary NVM storage sector",
+        "bank_index": 2,
+        "sector_index": 7,
+        "start_address": "0x081E0000",
+        "size": 131072,
+        "erase_value": 255
+      }
+    ]
+  }
 }

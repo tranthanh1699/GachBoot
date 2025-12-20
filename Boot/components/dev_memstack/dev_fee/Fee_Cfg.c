@@ -10,7 +10,7 @@
  */
 
 #include "Fee_Cfg.h"
-#include "Fls_Cfg.h"  /* For Fls_Config reference */
+#include "dev_fls.h"
 
 /* ============================================================================
  * Generated Fee Sector Table

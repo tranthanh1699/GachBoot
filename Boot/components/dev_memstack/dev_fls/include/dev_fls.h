@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 #include "dev_common.h"
-#include "Fls_Cfg.h"  /* Generated configuration */
+#include "Fls_PBCfg.h"  /* Generated configuration */
 
 /**
  * @file dev_fls.h

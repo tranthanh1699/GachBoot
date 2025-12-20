@@ -67,6 +67,15 @@ if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Service_Gen)
     message(STATUS "Added Service_Gen sources: ${{SERVICE_GEN_SOURCES}}")
 endif()
 
+# Add Flash Driver Generated Code
+if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Fls_Gen)
+    file(GLOB FLS_GEN_SOURCES 
+        "${{CMAKE_CURRENT_SOURCE_DIR}}/Fls_Gen/*.c"
+    )
+    list(APPEND GENERATED_SOURCES ${{FLS_GEN_SOURCES}})
+    message(STATUS "Added Fls_Gen sources: ${{FLS_GEN_SOURCES}}")
+endif()
+
 # Create library from generated code
 add_library(GenerateCode STATIC ${{GENERATED_SOURCES}})
 
@@ -98,6 +107,12 @@ endif()
 if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Service_Gen)
     target_include_directories(GenerateCode PUBLIC
         ${{CMAKE_CURRENT_SOURCE_DIR}}/Service_Gen
+    )
+endif()
+
+if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Fls_Gen)
+    target_include_directories(GenerateCode PUBLIC
+        ${{CMAKE_CURRENT_SOURCE_DIR}}/Fls_Gen
     )
 endif()
 

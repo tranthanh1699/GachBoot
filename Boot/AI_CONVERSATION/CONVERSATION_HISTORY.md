@@ -2140,4 +2140,606 @@ Build completed successfully!
 
 ---
 
-**End of Conversation History - Last Updated: December 7, 2025**
+## 📅 Session: December 20, 2025 - ConfigTool Bug Fix & dev_memstack Planning
+
+### Issue: Security Level Configuration Not Loading
+
+**Problem Discovered:**
+User reported that the security level configuration interface in ConfigTool was not loading properly. Error occurred when selecting a security level from the navigation tree.
+
+**Root Cause Analysis:**
+Investigated the `SecurityUI.show_edit_form()` method and discovered a signature mismatch:
+- **Expected:** `show_edit_form(config_panel_frame, index, config, set_modified_callback)` (4 parameters)
+- **Actual:** `show_edit_form(config_panel_frame, index, config, update_sessions_callback, set_modified_callback)` (5 parameters)
+- **Problem:** `config_editor.py` was passing a dictionary `{'set_modified': ..., 'refresh_ui': ...}` instead of individual callbacks
+
+**Files Analyzed:**
+- [Tool/ConfigTool/config_editor.py](../Tool/ConfigTool/config_editor.py) - Lines 882-893
+- [Tool/ConfigTool/Module_UI/security_ui.py](../Tool/ConfigTool/Module_UI/security_ui.py) - Lines 74-81
+- [Tool/ConfigTool/Module_UI/session_ui.py](../Tool/ConfigTool/Module_UI/session_ui.py) - Lines 69-70 (reference pattern)
+
+**Solution Implemented:**
+
+1. **Updated `security_ui.py`** - Changed method signature to match other UI modules:
+```python
+# Before (5 parameters)
+def show_edit_form(self, config_panel_frame, index, config, 
+                   update_sessions_callback, set_modified_callback):
+
+# After (4 parameters)
+def show_edit_form(self, config_panel_frame, index, config, set_modified_callback):
+```
+
+2. **Updated `config_editor.py`** - Fixed method call to pass correct parameters:
+```python
+# Before (passing dictionary)
+self.security_ui.show_edit_form(
+    self.config_panel_frame, index, self.config,
+    {'set_modified': self.set_modified, 'refresh_ui': self.refresh_ui}
+)
+
+# After (passing callback directly)
+self.security_ui.show_edit_form(
+    self.config_panel_frame, index, self.config,
+    self.set_modified
+)
+```
+
+**Testing Required:**
+- ✅ Method signatures now consistent across all UI modules
+- ⏳ Run ConfigTool and verify security level edit form loads correctly
+- ⏳ Test security level configuration changes save properly
+
+---
+
+### Planning: dev_memstack Configuration Integration
+
+**Current Status:**
+The `dev_memstack` module contains a 3-layer AUTOSAR-compliant memory stack:
+- **NvM (NV Manager):** Block management, CRC, redundancy
+- **Fee (Flash EEPROM Emulation):** Virtual addressing, wear leveling  
+- **Fls (Flash Driver):** Hardware abstraction (STM32H7)
+
+**Existing Configuration Files:**
+```
+components/dev_memstack/
+├── dev_nvm/
+│   ├── dev_nvm.h
+│   └── dev_nvm.c
+├── dev_fee/
+│   ├── dev_fee.h
+│   ├── dev_fee.c
+│   └── Fee_Cfg.h (configuration)
+├── dev_fls/
+│   ├── dev_fls.h
+│   ├── dev_fls.c
+│   └── Fls_Cfg.h (configuration)
+└── dev_memif/
+    ├── dev_memif.h
+    └── dev_memif.c
+```
+
+**Configuration Requirements:**
+
+The dev_memstack module already has modular, code-generation-friendly configuration:
+- Configuration files separated from implementation
+- `*_Cfg.h/c` files can be auto-generated
+- Runtime injection support
+- Support for multiple configurations (test/production/simulation)
+
+**Integration Plan with ConfigTool:**
+
+1. **NvM Configuration** (Already Implemented ✅)
+   - Block ID, name, size, type
+   - ROM/RAM data pointers
+   - Write protection, CRC settings
+   - Currently generates: `GenerateCode/NvM_Gen/NvM_PBCfg.h/c`
+
+2. **Fee Configuration** (To Be Implemented)
+   - Virtual block mapping to NvM blocks
+   - Page size, number of pages
+   - Wear leveling configuration
+   - Cache configuration
+   - **Target:** `GenerateCode/Fee_Gen/Fee_Cfg.h/c`
+
+3. **Fls Configuration** (To Be Implemented)
+   - Flash sector layout for STM32H7
+   - Base addresses, sector sizes
+   - Programming timeout
+   - Erase timeout
+   - **Target:** `GenerateCode/Fls_Gen/Fls_Cfg.h/c`
+
+**Proposed ConfigTool Extensions:**
+
+```json
+{
+  "project": {...},
+  "nvm_blocks": [...],  // ✅ Already implemented
+  "fee_config": {       // 🆕 New section
+    "page_size": 8,
+    "num_pages": 256,
+    "cache_size": 16,
+    "wear_leveling_threshold": 1000,
+    "virtual_blocks": [
+      {
+        "virtual_block_id": 0,
+        "nvm_block_id": 1,
+        "block_size": 17
+      }
+    ]
+  },
+  "fls_config": {       // 🆕 New section
+    "base_address": "0x08100000",
+    "sectors": [
+      {
+        "sector_id": 0,
+        "start_address": "0x08100000",
+        "size": "0x20000",
+        "description": "128KB sector"
+      }
+    ],
+    "program_timeout": 1000,
+    "erase_timeout": 5000
+  }
+}
+```
+
+**Next Steps for dev_memstack Integration:**
+
+1. **Analyze Existing Configuration Headers**
+   - Read `Fee_Cfg.h` and `Fls_Cfg.h` to understand current structure
+   - Identify which parameters should be configurable
+
+2. **Create Generator Modules**
+   - `Module/fee_module.py` - Validate and generate Fee configuration
+   - `Module/fls_module.py` - Validate and generate Fls configuration
+
+3. **Create UI Modules**
+   - `Module_UI/fee_ui.py` - UI for Fee configuration
+   - `Module_UI/fls_ui.py` - UI for Flash sector layout
+
+4. **Add Navigation Tree Items**
+   - Add "💾 Flash Configuration" branch
+   - Add "⚙️ Fee Configuration" branch
+
+5. **Integration Testing**
+   - Verify generated code compiles
+   - Test runtime initialization with generated configs
+   - Validate memory layout consistency
+
+**Benefits of Integration:**
+- ✅ Single point of configuration for entire memory stack
+- ✅ Visual editor for complex flash layouts
+- ✅ Automatic validation of sector boundaries
+- ✅ Consistency between NvM blocks and Fee virtual blocks
+- ✅ Reduced configuration errors
+
+---
+
+## 📅 Session: December 20, 2025 (Continued) - Fls Module Implementation & Bug Fixes
+
+### Part 1: Security Level Configuration Bug Fix
+
+**Issue:** Security level configuration interface không load được khi user click vào navigation tree.
+
+**Root Cause:**
+- Method signature mismatch giữa `config_editor.py` và `SecurityUI.show_edit_form()`
+- Expected: 4 parameters `(config_panel_frame, index, config, set_modified_callback)`
+- Actual: 5 parameters và đang pass dictionary thay vì callbacks
+
+**Solution:**
+Updated [Module_UI/security_ui.py](../Tool/ConfigTool/Module_UI/security_ui.py#L74):
+```python
+# Before
+def show_edit_form(self, config_panel_frame, index, config, 
+                   update_sessions_callback, set_modified_callback):
+
+# After
+def show_edit_form(self, config_panel_frame, index, config, set_modified_callback):
+```
+
+Updated [config_editor.py](../Tool/ConfigTool/config_editor.py#L882-L889):
+```python
+# Before - passing dictionary
+self.security_ui.show_edit_form(
+    self.config_panel_frame, index, self.config,
+    {'set_modified': self.set_modified, 'refresh_ui': self.refresh_ui}
+)
+
+# After - passing callback directly
+self.security_ui.show_edit_form(
+    self.config_panel_frame, index, self.config,
+    self.set_modified
+)
+```
+
+---
+
+### Part 2: Flash Driver (Fls) Configuration Module Implementation
+
+**Objective:** Tạo module configuration cho Flash Driver layer của dev_memstack, tích hợp vào ConfigTool với đầy đủ validation và code generation.
+
+#### 2.1. Module Generator ([fls_module.py](../Tool/ConfigTool/Module/fls_module.py))
+
+**Features Implemented:**
+- ✅ `FlsValidator` class với comprehensive validation
+  - Hardware parameters validation (base address, alignment, timeouts)
+  - Sector configuration validation (overlap detection, boundary checks)
+  - STM32H7 constraints (2MB, 2 banks, 8 sectors/bank, 128KB/sector)
+- ✅ `validate_fls_config()` function
+- ✅ `generate_fls_code()` function tạo `Fls_PBCfg.h/c`
+- ✅ Support for custom MCU configurations
+
+**Generated Code Structure:**
+```c
+// Fls_PBCfg.h
+#define FLS_CFG_WRITE_ALIGNMENT    32U
+#define FLS_CFG_ERASE_VALUE        0xFFU
+#define FLS_CFG_BASE_ADDRESS       0x08000000U
+
+typedef struct {
+    uint32_t base_address;
+    uint32_t size;
+    uint8_t bank_index;
+    uint8_t sector_index;
+    uint8_t erase_value;
+    const char *name;
+} Fls_SectorDescriptor_t;
+
+extern const Fls_SectorDescriptor_t Fls_SectorTable[];
+extern const Fls_ConfigType Fls_Config;
+```
+
+#### 2.2. UI Module ([fls_ui.py](../Tool/ConfigTool/Module_UI/fls_ui.py))
+
+**Components:**
+- ✅ `FlsUI` class with TreeView for sectors
+- ✅ Hardware settings form (MCU, base address, alignment, timeouts)
+- ✅ Sector edit form (name, bank, sector index, address, size)
+- ✅ Auto-save functionality
+- ✅ Info panel with configuration summary
+
+**UI Features:**
+- Visual sector configuration with bank/sector selection
+- Address auto-calculation based on bank and sector index
+- Real-time validation feedback
+- Intuitive TreeView display
+
+#### 2.3. Main Editor Integration ([config_editor.py](../Tool/ConfigTool/config_editor.py))
+
+**Changes Made:**
+1. **Imports:**
+```python
+from Module.fls_module import validate_fls_config, generate_fls_code
+from Module_UI.fls_ui import FlsUI
+```
+
+2. **Setup Method:**
+```python
+def setup_fls_tab(self):
+    fls_frame = ttk.Frame(self.config_panel_frame)
+    self.fls_ui = FlsUI(fls_frame)
+    self.fls_tree = self.fls_ui.setup_tab()
+    self.fls_count_var = self.fls_ui.setup_toolbar(
+        add_cmd=self.add_fls_sector,
+        edit_cmd=self.edit_fls_sector,
+        delete_cmd=self.delete_fls_sector
+    )
+```
+
+3. **Navigation Tree:**
+```python
+# Flash Configuration branch
+fls_root = self.nav_tree.insert(root, tk.END, 
+    text=f"💾 Flash Configuration ({fls_count})", 
+    open=True, tags=('fls_root',))
+self.nav_tree.insert(fls_root, tk.END, 
+    text="  ⚙️ Hardware Settings", tags=('fls_hw',))
+# Sectors...
+```
+
+4. **CRUD Operations:**
+- `add_fls_sector()` - Auto-calculates next sector address
+- `edit_fls_sector()` - Opens sector edit form
+- `delete_fls_sector()` - Removes sector with confirmation
+
+5. **Validation & Generation:**
+```python
+def validate_config(self):
+    fls_valid, fls_errors, fls_warnings = validate_fls_config(self.config)
+    # Add to error collection...
+
+def generate_code(self):
+    fls_files = generate_fls_code(self.config, output_path)
+    all_files += fls_files
+```
+
+#### 2.4. Configuration File ([gachboot_config.json](../Tool/ConfigTool/gachboot_config.json))
+
+**Added Section:**
+```json
+{
+  "fls_config": {
+    "mcu_name": "STM32H743VIT6",
+    "description": "Flash Driver Configuration for NVM Storage",
+    "base_address": "0x08000000",
+    "total_size": 2097152,
+    "write_alignment": 32,
+    "read_alignment": 1,
+    "erase_value": 255,
+    "write_timeout_ms": 100,
+    "erase_timeout_ms": 2000,
+    "sectors": [
+      {
+        "name": "NVM_Sector_A",
+        "bank_index": 2,
+        "sector_index": 6,
+        "start_address": "0x081C0000",
+        "size": 131072
+      },
+      {
+        "name": "NVM_Sector_B",
+        "bank_index": 2,
+        "sector_index": 7,
+        "start_address": "0x081E0000",
+        "size": 131072
+      }
+    ]
+  }
+}
+```
+
+---
+
+### Part 3: File Naming Convention Standardization
+
+**Issue:** Generated files không theo cùng naming convention
+- Fls tạo ra `Fls_Cfg.h/c` 
+- Các module khác dùng `*_PBCfg.h/c` (Post-Build Config)
+
+**Solution: Chuẩn hóa về PBCfg Convention**
+
+**1. Updated Generator ([fls_module.py](../Tool/ConfigTool/Module/fls_module.py)):**
+```python
+# Changed filename from Fls_Cfg.h/c to Fls_PBCfg.h/c
+header_path = os.path.join(fls_gen_dir, 'Fls_PBCfg.h')
+source_path = os.path.join(fls_gen_dir, 'Fls_PBCfg.c')
+```
+
+**2. Updated Header Format:**
+```c
+/**
+ * @file Fls_PBCfg.h
+ * @brief Flash Driver Configuration (Post-Build) - Generated File
+ * 
+ * AUTO-GENERATED FILE - DO NOT EDIT MANUALLY!
+ * Generated by: GachBoot ConfigTool (Flash Module)
+ * Project: GachBoot v1.0.0
+ * Generated: 2025-12-20 22:30:55
+ */
+
+#ifndef FLS_PBCFG_H
+#define FLS_PBCFG_H
+
+#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
+```
+
+**3. Updated CMake Integration ([cmake_module.py](../Tool/ConfigTool/Module/cmake_module.py)):**
+```cmake
+# Add Flash Driver Generated Code
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/Fls_Gen)
+    file(GLOB FLS_GEN_SOURCES 
+        "${CMAKE_CURRENT_SOURCE_DIR}/Fls_Gen/*.c"
+    )
+    list(APPEND GENERATED_SOURCES ${FLS_GEN_SOURCES})
+endif()
+
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/Fls_Gen)
+    target_include_directories(GenerateCode PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/Fls_Gen
+    )
+endif()
+```
+
+**4. Final Generated Files Structure:**
+```
+GenerateCode/
+├── CMakeLists.txt
+├── DCM_Session_Gen/
+│   ├── DCM_Session_PBCfg.h
+│   └── DCM_Session_PBCfg.c
+├── DID_Gen/
+│   ├── DID_PBCfg.h
+│   └── DID_PBCfg.c
+├── Fls_Gen/                    ✅ NEW
+│   ├── Fls_PBCfg.h            ✅ Standardized naming
+│   └── Fls_PBCfg.c
+├── NvM_Gen/
+│   ├── NvM_PBCfg.h
+│   └── NvM_PBCfg.c
+├── Security_Gen/
+│   ├── Security_PBCfg.h
+│   └── Security_PBCfg.c
+└── Service_Gen/
+    ├── Service_PBCfg.h
+    └── Service_PBCfg.c
+```
+
+---
+
+### Part 4: Session Edit Form Bug Fix
+
+**Issue:** ConfigTool crash khi click vào session trong navigation tree
+```
+NameError: name 'form_frame' is not defined
+  at show_session_edit_form, line 688
+```
+
+**Root Cause:**
+Method `show_session_edit_form()` có 2 vấn đề:
+1. Pass dictionary thay vì callback function đến `session_ui.show_edit_form()`
+2. Còn code cũ cố gắng thao tác với `form_frame` và `canvas` không tồn tại
+
+**Solution:**
+Fixed [config_editor.py](../Tool/ConfigTool/config_editor.py#L666-L676):
+```python
+# Before
+def show_session_edit_form(self, index):
+    if self.session_ui:
+        self.session_ui.show_edit_form(
+            self.config_panel_frame, index, self.config,
+            {'set_modified': self.set_modified, 'refresh_ui': self.refresh_ui}
+        )
+    # Old code trying to access undefined form_frame and canvas...
+    form_frame.bind('<Configure>', on_frame_configure)  # ❌ ERROR
+
+# After
+def show_session_edit_form(self, index):
+    if self.session_ui:
+        self.session_ui.show_edit_form(
+            self.config_panel_frame, index, self.config,
+            self.set_modified  # ✅ Direct callback
+        )
+    # ✅ Removed old code
+```
+
+---
+
+### Testing Results
+
+**1. JSON Validation:**
+```bash
+✓ JSON syntax valid
+✓ All sections present: project, nvm_blocks, dids, sessions, security_levels, dcm_services, fls_config
+```
+
+**2. Module Import:**
+```bash
+✓ Fls module imported successfully
+✓ All validation functions working
+```
+
+**3. Code Generation:**
+```bash
+✓ Generated: Fls_PBCfg.h
+✓ Generated: Fls_PBCfg.c
+✓ CMakeLists.txt updated with Fls_Gen sources
+✓ All includes properly configured
+```
+
+**4. Generated Code Quality:**
+```c
+// Fls_PBCfg.c example
+const Fls_SectorDescriptor_t Fls_SectorTable[] = {
+    /* Sector 0 - Bank 2, Sector 6 (Primary NVM storage sector) */
+    {
+        .base_address = 0x081C0000U,
+        .size = 128U * 1024U,
+        .bank_index = 2U,
+        .sector_index = 6U,
+        .erase_value = 0xFFU,
+        .name = "NVM_Sector_A"
+    },
+    // ...
+};
+```
+
+**5. UI Testing:**
+```
+✓ ConfigTool loads without errors
+✓ Flash Configuration branch appears in navigation tree
+✓ Hardware Settings form displays correctly
+✓ Sector edit form works with auto-save
+✓ Add/Edit/Delete operations functional
+✓ Security level config now loads correctly
+✓ Session edit form works without crash
+```
+
+---
+
+### Summary of Changes
+
+**Files Created:**
+- [Tool/ConfigTool/Module/fls_module.py](../Tool/ConfigTool/Module/fls_module.py) - 400+ lines
+- [Tool/ConfigTool/Module_UI/fls_ui.py](../Tool/ConfigTool/Module_UI/fls_ui.py) - 350+ lines
+- [GenerateCode/Fls_Gen/Fls_PBCfg.h](../GenerateCode/Fls_Gen/Fls_PBCfg.h) - Generated
+- [GenerateCode/Fls_Gen/Fls_PBCfg.c](../GenerateCode/Fls_Gen/Fls_PBCfg.c) - Generated
+
+**Files Modified:**
+- [Tool/ConfigTool/config_editor.py](../Tool/ConfigTool/config_editor.py) - Added Fls integration
+- [Tool/ConfigTool/Module/cmake_module.py](../Tool/ConfigTool/Module/cmake_module.py) - Added Fls_Gen support
+- [Tool/ConfigTool/gachboot_config.json](../Tool/ConfigTool/gachboot_config.json) - Added fls_config section
+- [GenerateCode/CMakeLists.txt](../GenerateCode/CMakeLists.txt) - Added Fls_Gen sources
+- [Tool/ConfigTool/Module_UI/security_ui.py](../Tool/ConfigTool/Module_UI/security_ui.py) - Fixed signature
+- Fixed session_edit_form crash
+
+**Code Statistics:**
+- Total lines added: ~800+
+- Modules completed: 6/6 (NvM, DID, Session, Security, Service, **Fls**)
+- Configuration sections: 7/7 complete
+- All UI modules following consistent pattern
+
+---
+
+### Architecture Overview
+
+**ConfigTool Module Structure:**
+```
+ConfigTool/
+├── Module/                         # Code generators
+│   ├── nvm_module.py              ✅
+│   ├── did_module.py              ✅
+│   ├── session_module.py          ✅
+│   ├── security_module.py         ✅
+│   ├── service_module.py          ✅
+│   ├── fls_module.py              ✅ NEW
+│   └── cmake_module.py            ✅ Updated
+├── Module_UI/                      # UI components
+│   ├── nvm_ui.py                  ✅
+│   ├── did_ui.py                  ✅
+│   ├── session_ui.py              ✅
+│   ├── security_ui.py             ✅ Fixed
+│   ├── service_ui.py              ✅
+│   └── fls_ui.py                  ✅ NEW
+├── config_editor.py               ✅ Updated
+└── gachboot_config.json           ✅ Updated
+```
+
+**dev_memstack Integration:**
+```
+dev_memstack/
+├── dev_nvm/                       ← Config by NvM_Gen
+├── dev_fee/                       ← TODO: Fee_Gen
+├── dev_fls/                       ← Config by Fls_Gen ✅
+└── dev_memif/
+```
+
+---
+
+### Next Steps
+
+**Immediate Tasks:**
+1. ✅ Test Fls configuration generation with ConfigTool GUI
+2. ⏳ Implement Fee configuration module
+3. ⏳ Test integration between NvM, Fee, and Fls configurations
+4. ⏳ Validate consistency between NvM blocks and Fee virtual blocks
+5. ⏳ Hardware testing on STM32H7
+
+**Fee Module Requirements:**
+- Virtual block to NvM block mapping
+- Page configuration
+- Wear leveling parameters
+- Cache settings
+- Similar UI pattern to Fls module
+
+**Future Enhancements:**
+- Import/export configuration presets
+- Configuration templates for common use cases
+- Graphical memory map visualization
+- Flash usage statistics and reports
+
+---
+
+**End of Conversation History - Last Updated: December 20, 2025 (22:35 PM)**

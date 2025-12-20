@@ -21,7 +21,7 @@ extern "C" {
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "Fls_Cfg.h"  /* For Fls_ConfigType definition */
+#include "dev_fls.h"
 
 /* ============================================================================
  * Virtual Address Space Configuration (Generated)

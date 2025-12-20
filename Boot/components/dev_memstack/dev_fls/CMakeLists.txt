@@ -12,3 +12,4 @@ target_include_directories(dev_fls PUBLIC
 # Link to stm32cubemx to get HAL includes and definitions
 target_link_libraries(dev_fls PUBLIC stm32cubemx)
 target_link_libraries(dev_fls PUBLIC dev_app)
+target_link_libraries(dev_fls PUBLIC GenerateCode)

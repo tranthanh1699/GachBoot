@@ -13,12 +13,14 @@ from Module.did_module import validate_dids, generate_did_code
 from Module.session_module import validate_sessions, generate_session_code
 from Module.security_module import validate_security_levels, generate_security_code
 from Module.service_module import validate_services, generate_service_code
+from Module.fls_module import validate_fls_config, generate_fls_code
 from Module.cmake_module import generate_cmake_file
 from Module_UI.service_ui import ServiceUI
 from Module_UI.session_ui import SessionUI
 from Module_UI.security_ui import SecurityUI
 from Module_UI.nvm_ui import NvmUI
 from Module_UI.did_ui import DidUI
+from Module_UI.fls_ui import FlsUI
 
 class ConfigEditor:
     def __init__(self, root):
@@ -36,6 +38,7 @@ class ConfigEditor:
         self.security_ui = None
         self.nvm_ui = None
         self.did_ui = None
+        self.fls_ui = None
         
         # Apply theme
         style = ttk.Style()
@@ -108,6 +111,7 @@ class ConfigEditor:
         self.setup_session_tab()
         self.setup_security_tab()
         self.setup_service_tab()
+        self.setup_fls_tab()
         
         # Status bar
         self.status_var = tk.StringVar(value="Ready")
@@ -253,6 +257,21 @@ class ConfigEditor:
             delete_cmd=self.delete_service
         )
     
+    def setup_fls_tab(self):
+        """Setup Flash Driver tab using FlsUI module"""
+        fls_frame = ttk.Frame(self.config_panel_frame)
+        
+        # Initialize FlsUI
+        self.fls_ui = FlsUI(fls_frame)
+        
+        # Setup tree and toolbar using UI module
+        self.fls_tree = self.fls_ui.setup_tab()
+        self.fls_count_var = self.fls_ui.setup_toolbar(
+            add_cmd=self.add_fls_sector,
+            edit_cmd=self.edit_fls_sector,
+            delete_cmd=self.delete_fls_sector
+        )
+    
     def load_config(self):
         """Load configuration from file"""
         try:
@@ -321,6 +340,13 @@ class ConfigEditor:
         if self.service_ui:
             self.service_ui.refresh_tree(services)
         self.service_count_var.set(str(len(services)))
+        
+        # Flash Configuration
+        fls_config = self.config.get('fls_config', {})
+        if self.fls_ui:
+            self.fls_ui.refresh_tree(fls_config)
+        sectors = fls_config.get('sectors', [])
+        self.fls_count_var.set(str(len(sectors)))
     
     def refresh_nav_tree(self):
         """Refresh navigation tree"""
@@ -376,6 +402,19 @@ class ConfigEditor:
             self.nav_tree.insert(service_root, tk.END,
                 text=f"  {service['service_id']} - {service['handler_name']}",
                 tags=('service', str(i)))
+        
+        # Flash Configuration branch
+        fls_config = self.config.get('fls_config', {})
+        sectors = fls_config.get('sectors', [])
+        fls_count = len(sectors)
+        fls_root = self.nav_tree.insert(root, tk.END, text=f"💾 Flash Configuration ({fls_count})", open=True, tags=('fls_root',))
+        # Add hardware config node
+        self.nav_tree.insert(fls_root, tk.END, text="  ⚙️ Hardware Settings", tags=('fls_hw',))
+        # Add sectors
+        for i, sector in enumerate(sectors):
+            self.nav_tree.insert(fls_root, tk.END,
+                text=f"  [{sector.get('bank_index', 1)}.{sector.get('sector_index', i)}] {sector.get('name', f'Sector {i}')}",
+                tags=('fls_sector', str(i)))
     
     def browse_config_file(self):
         """Browse for config file"""
@@ -522,6 +561,31 @@ class ConfigEditor:
             # Show edit form in config panel
             self.show_service_edit_form(idx)
         
+        elif tags and tags[0] == 'fls_hw':
+            # Show Fls hardware configuration
+            fls_config = self.config.get('fls_config', {})
+            if self.fls_ui:
+                self.fls_ui.show_info_panel(self.info_text, fls_config)
+                self.fls_ui.show_edit_form(self.config_panel_frame, self.config, self.set_modified)
+        
+        elif tags and tags[0] == 'fls_sector':
+            # Show Fls sector configuration
+            idx = int(tags[1])
+            fls_config = self.config.get('fls_config', {})
+            sectors = fls_config.get('sectors', [])
+            if idx < len(sectors) and self.fls_ui:
+                sector = sectors[idx]
+                self.info_text.insert(tk.END, f"Flash Sector {idx}\n")
+                self.info_text.insert(tk.END, f"{'='*30}\n")
+                self.info_text.insert(tk.END, f"Name: {sector.get('name', '')}\n")
+                self.info_text.insert(tk.END, f"Bank: {sector.get('bank_index', 1)}\n")
+                self.info_text.insert(tk.END, f"Sector: {sector.get('sector_index', 0)}\n")
+                self.info_text.insert(tk.END, f"Address: {sector.get('start_address', '0x00000000')}\n")
+                size_kb = sector.get('size', 0) // 1024
+                self.info_text.insert(tk.END, f"Size: {size_kb}KB\n")
+                
+                self.fls_ui.show_sector_edit_form(self.config_panel_frame, idx, self.config, self.set_modified)
+        
         self.info_text.config(state=tk.DISABLED)
     
     def show_context_menu(self, event):
@@ -548,6 +612,8 @@ class ConfigEditor:
             menu.add_command(label="➕ Add New Security Level", command=self.add_security_level)
         elif tags and tags[0] == 'service_root':
             menu.add_command(label="➕ Add New Service", command=self.add_service)
+        elif tags and tags[0] == 'fls_root':
+            menu.add_command(label="➕ Add New Sector", command=self.add_fls_sector)
         elif tags and tags[0] == 'nvm':
             menu.add_command(label="✏️ Edit Block", command=self.edit_nvm_block)
             menu.add_command(label="🗑️ Delete Block", command=self.delete_nvm_block)
@@ -563,6 +629,9 @@ class ConfigEditor:
         elif tags and tags[0] == 'service':
             menu.add_command(label="✏️ Edit Service", command=self.edit_service)
             menu.add_command(label="🗑️ Delete Service", command=self.delete_service)
+        elif tags and tags[0] == 'fls_sector':
+            menu.add_command(label="✏️ Edit Sector", command=self.edit_fls_sector)
+            menu.add_command(label="🗑️ Delete Sector", command=self.delete_fls_sector)
         else:
             return
         
@@ -601,27 +670,8 @@ class ConfigEditor:
                 self.config_panel_frame, 
                 index, 
                 self.config,
-                {
-                    'set_modified': self.set_modified,
-                    'refresh_ui': self.refresh_ui
-                }
+                self.set_modified
             )
-        
-        # Update scroll region
-        def on_frame_configure(event=None):
-            canvas.configure(scrollregion=canvas.bbox("all"))
-        
-        def on_canvas_configure(event):
-            canvas_frame = canvas.find_withtag("canvas_frame")
-            if canvas_frame:
-                canvas.itemconfig(canvas_frame[0], width=event.width)
-        
-        form_frame.bind('<Configure>', on_frame_configure)
-        canvas.bind('<Configure>', on_canvas_configure)
-        
-        # Initial update
-        form_frame.update_idletasks()
-        canvas.configure(scrollregion=canvas.bbox("all"))
     
     def new_config(self):
         """Create new configuration"""
@@ -966,6 +1016,94 @@ class ConfigEditor:
                 set_modified_callback=self.set_modified
             )
     
+    # ===== Flash Configuration Management =====
+    def add_fls_sector(self):
+        """Add new flash sector"""
+        if 'fls_config' not in self.config:
+            self.config['fls_config'] = {
+                'mcu_name': 'STM32H743VIT6',
+                'base_address': '0x08000000',
+                'total_size': 2097152,
+                'write_alignment': 32,
+                'read_alignment': 1,
+                'erase_value': 0xFF,
+                'write_timeout_ms': 100,
+                'erase_timeout_ms': 2000,
+                'sectors': []
+            }
+        
+        if 'sectors' not in self.config['fls_config']:
+            self.config['fls_config']['sectors'] = []
+        
+        # Calculate next sector index
+        sectors = self.config['fls_config']['sectors']
+        next_idx = len(sectors)
+        
+        # Default to Bank 2, Sector 0 if empty, otherwise increment
+        bank = 2
+        sector_idx = next_idx % 8
+        start_addr = 0x08100000 + (sector_idx * 128 * 1024)  # Bank 2 start + offset
+        
+        new_sector = {
+            'name': f'Sector_{next_idx}',
+            'description': '',
+            'bank_index': bank,
+            'sector_index': sector_idx,
+            'start_address': f'0x{start_addr:08X}',
+            'size': 131072,  # 128KB
+            'erase_value': 0xFF
+        }
+        
+        sectors.append(new_sector)
+        self.refresh_ui()
+        self.set_modified()
+    
+    def edit_fls_sector(self):
+        """Edit selected flash sector"""
+        selection = self.nav_tree.selection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a flash sector to edit")
+            return
+        
+        item = self.nav_tree.item(selection[0])
+        tags = item['tags']
+        
+        if not tags or tags[0] != 'fls_sector':
+            messagebox.showwarning("Invalid Selection", "Please select a flash sector")
+            return
+        
+        index = int(tags[1])
+        if self.fls_ui:
+            self.fls_ui.show_sector_edit_form(self.config_panel_frame, index, self.config, self.set_modified)
+    
+    def delete_fls_sector(self):
+        """Delete selected flash sector"""
+        selection = self.nav_tree.selection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a flash sector to delete")
+            return
+        
+        item = self.nav_tree.item(selection[0])
+        tags = item['tags']
+        
+        if not tags or tags[0] != 'fls_sector':
+            messagebox.showwarning("Invalid Selection", "Please select a flash sector")
+            return
+        
+        index = int(tags[1])
+        fls_config = self.config.get('fls_config', {})
+        sectors = fls_config.get('sectors', [])
+        
+        if index >= len(sectors):
+            return
+        
+        sector = sectors[index]
+        
+        if messagebox.askyesno("Confirm Delete", f"Delete sector {sector.get('name', f'Sector {index}')}?"):
+            del sectors[index]
+            self.refresh_ui()
+            self.set_modified()
+    
     def generate_code(self):
         """Generate code from configuration"""
         try:
@@ -982,8 +1120,9 @@ class ConfigEditor:
                 self.config.get('sessions', []),
                 self.config.get('security_levels', [])
             )
+            fls_valid, fls_errors, fls_warnings = validate_fls_config(self.config)
             
-            if not nvm_valid or not did_valid or not session_valid or not security_valid or not service_valid:
+            if not nvm_valid or not did_valid or not session_valid or not security_valid or not service_valid or not fls_valid:
                 error_msg = "Validation failed:\n"
                 if nvm_errors:
                     error_msg += "\nNVM Errors:\n" + "\n".join(nvm_errors)
@@ -995,6 +1134,8 @@ class ConfigEditor:
                     error_msg += "\nSecurity Errors:\n" + "\n".join(security_errors)
                 if service_errors:
                     error_msg += "\nService Errors:\n" + "\n".join(service_errors)
+                if fls_errors:
+                    error_msg += "\nFlash Config Errors:\n" + "\n".join(fls_errors)
                 messagebox.showerror("Validation Error", error_msg)
                 return
             
@@ -1038,9 +1179,12 @@ class ConfigEditor:
             if self.config.get('dcm_services'):
                 service_files = generate_service_code(self.config['dcm_services'], self.config.get('sessions', []),
                                                      self.config.get('security_levels', []), output_path)
+            fls_files = []
+            if self.config.get('fls_config'):
+                fls_files = generate_fls_code(self.config, output_path)
             cmake_file = generate_cmake_file(output_path, project_name, version)
             
-            all_files = nvm_files + did_files + session_files + security_files + service_files + [cmake_file]
+            all_files = nvm_files + did_files + session_files + security_files + service_files + fls_files + [cmake_file]
             messagebox.showinfo("Success", f"Generated {len(all_files)} files:\n" + "\n".join([os.path.basename(f) for f in all_files]))
             self.status_var.set("Code generation complete")
         except Exception as e:
@@ -1054,10 +1198,11 @@ class ConfigEditor:
             did_valid, did_errors, did_warnings = validate_dids(self.config['dids'])
             session_valid, session_errors, session_warnings = validate_sessions(self.config.get('sessions', []))
             security_valid, security_errors, security_warnings = validate_security_levels(self.config.get('security_levels', []))
+            fls_valid, fls_errors, fls_warnings = validate_fls_config(self.config)
             
             # Collect all messages
-            all_errors = nvm_errors + did_errors + session_errors + security_errors
-            all_warnings = nvm_warnings + did_warnings + session_warnings + security_warnings
+            all_errors = nvm_errors + did_errors + session_errors + security_errors + fls_errors
+            all_warnings = nvm_warnings + did_warnings + session_warnings + security_warnings + fls_warnings
             
             # Basic project validation
             if not self.config['project']['name']:
