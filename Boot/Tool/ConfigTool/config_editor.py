@@ -36,6 +36,9 @@ class ConfigEditor:
         self.config = None
         self.set_modified(False)
         
+        # Track current active form for saving
+        self.current_form_widget = None
+        
         # Initialize UI modules
         self.service_ui = None
         self.session_ui = None
@@ -401,11 +404,48 @@ class ConfigEditor:
     
     def save_current_form(self):
         """Save current form data before validate/generate"""
-        # Try to find and call save_changes on active form frame
+        # First try the cached reference
+        if self.current_form_widget and hasattr(self.current_form_widget, 'save_changes'):
+            print(f"[DEBUG] Using cached form widget: {self.current_form_widget}")
+            try:
+                result = self.current_form_widget.save_changes()
+                print(f"[DEBUG] save_changes() returned: {result}")
+                return
+            except Exception as e:
+                print(f"[DEBUG] Error calling save_changes(): {e}")
+                import traceback
+                traceback.print_exc()
+        
+        # Fallback: Try to find and call save_changes on active form frame
+        # First check direct children
         for widget in self.config_panel_frame.winfo_children():
             if hasattr(widget, 'save_changes'):
+                print(f"[DEBUG] Found save_changes on direct child: {widget}")
                 widget.save_changes()
-                break
+                print("[DEBUG] save_changes() called successfully")
+                return
+            
+            # If widget is a Canvas, check its children (form_frame is inside canvas)
+            if isinstance(widget, tk.Canvas):
+                # Get all items in canvas
+                for item in widget.find_all():
+                    # Get the window widget
+                    try:
+                        window_widget = widget.itemcget(item, 'window')
+                        if window_widget:
+                            # Get the actual widget object
+                            actual_widget = widget.nametowidget(window_widget)
+                            if hasattr(actual_widget, 'save_changes'):
+                                print(f"[DEBUG] Found save_changes on canvas child: {actual_widget}")
+                                actual_widget.save_changes()
+                                print("[DEBUG] save_changes() called successfully")
+                                self.current_form_widget = actual_widget  # Cache for next time
+                                return
+                    except Exception as e:
+                        print(f"[DEBUG] Error checking canvas item: {e}")
+                        continue
+        
+        print("[DEBUG] No save_changes() method found on any widget")
     
     def refresh_nav_tree(self):
         """Refresh navigation tree"""
@@ -769,6 +809,25 @@ class ConfigEditor:
         
         menu.post(event.x_root, event.y_root)
     
+    def _cache_current_form_widget(self):
+        """Helper to cache the current form widget for saving later"""
+        # The form_frame is inside a canvas, which is a child of config_panel_frame
+        for widget in self.config_panel_frame.winfo_children():
+            if isinstance(widget, tk.Canvas):
+                # Get the form_frame from canvas
+                for item in widget.find_all():
+                    try:
+                        window_widget = widget.itemcget(item, 'window')
+                        if window_widget:
+                            form_widget = widget.nametowidget(window_widget)
+                            if hasattr(form_widget, 'save_changes'):
+                                self.current_form_widget = form_widget
+                                print(f"[DEBUG] Cached form widget: {form_widget}")
+                                return
+                    except:
+                        continue
+                break
+    
     def show_nvm_edit_form(self, index):
         """Show NVM block edit form in config panel using NvmUI"""
         if self.nvm_ui:
@@ -781,6 +840,7 @@ class ConfigEditor:
                     'refresh_ui': self.refresh_ui
                 }
             )
+            self._cache_current_form_widget()
     
     def show_did_edit_form(self, index):
         """Show DID edit form in config panel using DidUI"""
@@ -794,6 +854,7 @@ class ConfigEditor:
                     'refresh_ui': self.refresh_ui
                 }
             )
+            self._cache_current_form_widget()
     
     def show_session_edit_form(self, index):
         """Show Session edit form in config panel using SessionUI"""
@@ -804,6 +865,7 @@ class ConfigEditor:
                 self.config,
                 self.set_modified
             )
+            self._cache_current_form_widget()
     
     def new_config(self):
         """Create new configuration"""
@@ -835,6 +897,9 @@ class ConfigEditor:
     def save_config(self):
         """Save configuration to file"""
         try:
+            # Save current form data first
+            self.save_current_form()
+            
             # Update config from UI
             self.config['project']['name'] = self.project_name_var.get()
             self.config['project']['version'] = self.version_var.get()
@@ -846,8 +911,11 @@ class ConfigEditor:
             self.set_modified(False)
             self.update_title()
             self.status_var.set(f"Saved: {self.config_file}")
+            print(f"[DEBUG] Config saved to {self.config_file}")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save config: {e}")
+            import traceback
+            traceback.print_exc()
     
     def save_as_config(self):
         """Save configuration as new file"""
@@ -1070,6 +1138,7 @@ class ConfigEditor:
                 self.config,
                 self.set_modified
             )
+            self._cache_current_form_widget()
     
     # ===== DCM Service Management =====
     def add_service(self):
@@ -1147,12 +1216,13 @@ class ConfigEditor:
                 on_change_callback=self.refresh_ui,
                 set_modified_callback=self.set_modified
             )
+            self._cache_current_form_widget()
     
     def show_routine_edit_form(self, index):
         """Show routine edit form using RoutineUI module"""
         if self.routine_ui:
             callbacks = {
-                'save_callback': lambda: (self.set_modified(), self.refresh_ui())
+                'save_callback': lambda: self.set_modified()  # Only mark as modified, don't rebuild UI
             }
             self.routine_ui.show_edit_form(
                 config_panel_frame=self.config_panel_frame,
@@ -1160,6 +1230,7 @@ class ConfigEditor:
                 config=self.config,
                 callbacks=callbacks
             )
+            self._cache_current_form_widget()
     
     # ===== Routine Management =====
     def add_routine(self):

@@ -169,7 +169,8 @@
         "REQUEST_RESULTS"
       ],
       "supported_sessions": [
-        "DCM_PROGRAMMING_SESSION"
+        "DCM_PROGRAMMING_SESSION",
+        "DCM_EXTENDED_SESSION"
       ],
       "required_security_levels": [
         1,
@@ -177,8 +178,8 @@
       ],
       "subfunction_parameters": {
         "START": {
-          "option_record_length": 8,
-          "option_record_description": "Memory address (4 bytes) + Memory size (4 bytes)",
+          "option_record_length": 0,
+          "option_record_description": "Optional: Memory address (4 bytes) + Memory size (4 bytes). If omitted, erases default region (Bank 2).",
           "status_record_length": 1,
           "status_record_description": "Status byte (0x00=Success)"
         },

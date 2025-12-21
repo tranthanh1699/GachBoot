@@ -26,21 +26,26 @@ Std_ReturnType routine_erase_memory_start(
 {
     DBG_OUT_I("Erase Memory START");
     
-    // TODO: Validate option_record parameters
-    // Expected: address (4 bytes) + length (4 bytes)
+    uint32_t address = 0x08100000;  // Default: Bank 2 start
+    uint32_t length = 0x00100000;   // Default: 1MB (entire Bank 2)
     
-    if (option_record_len != 8) {
-        DBG_OUT_E("Invalid option length: %d (expected 8)", option_record_len);
+    // Parse parameters if provided (flexible: 0 or 8 bytes)
+    if (option_record_len == 8) {
+        // Parse address and length from option_record
+        address = ((uint32_t)option_record[0] << 24) | ((uint32_t)option_record[1] << 16) | 
+                  ((uint32_t)option_record[2] << 8) | option_record[3];
+        length = ((uint32_t)option_record[4] << 24) | ((uint32_t)option_record[5] << 16) | 
+                 ((uint32_t)option_record[6] << 8) | option_record[7];
+        DBG_OUT_I("Erase parameters: addr=0x%08X, len=0x%08X", address, length);
+    } else if (option_record_len == 0) {
+        DBG_OUT_I("Using default erase parameters: addr=0x%08X, len=0x%08X", address, length);
+    } else {
+        DBG_OUT_E("Invalid option length: %d (expected 0 or 8)", option_record_len);
         return E_NOT_OK;
     }
     
-    // TODO: Parse address and length from option_record
-    // uint32_t address = (option_record[0] << 24) | (option_record[1] << 16) | 
-    //                    (option_record[2] << 8) | option_record[3];
-    // uint32_t length = (option_record[4] << 24) | (option_record[5] << 16) | 
-    //                   (option_record[6] << 8) | option_record[7];
-    
     // TODO: Perform flash erase operation
+    // For now, just return success
     
     // Return success status
     status_record[0] = 0x00;  // Status: Success

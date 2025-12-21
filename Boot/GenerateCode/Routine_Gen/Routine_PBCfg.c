@@ -1,7 +1,7 @@
 /**
  * @file Routine_PBCfg.c
  * @brief UDS Routine Control Configuration Implementation
- * @date Generated on 2025-12-21 16:20:08
+ * @date Generated on 2025-12-21 21:05:14
  * 
  * Auto-generated from gachboot_config.json
  * DO NOT EDIT MANUALLY
@@ -124,7 +124,7 @@ static const uds_routine_entry_t routine_registry[] = {
     {
         .rid = 0xFF00,
         .callback = routine_erase_memory,
-        .session_mask = DCM_PROGRAMMING_SESSION_MASK,
+        .session_mask = DCM_PROGRAMMING_SESSION_MASK | DCM_EXTENDED_SESSION_MASK,
         .security_mask = (1U << 1U) | (1U << 2U)  // Erase flash memory region
     },
     {

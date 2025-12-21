@@ -54,6 +54,9 @@ Std_ReturnType uds_service_0x31_handler(const uds_message_t *message, ErrorCode_
     uint32_t current_security_mask = dcm_service_get_security_mask(current_security_level);
 
     // Phase 6: Check session support
+    DBG_OUT_I("Session check: routine_mask=0x%08X, current_mask=0x%08X, AND=0x%08X", 
+              routine_entry->session_mask, current_session_mask, 
+              (routine_entry->session_mask & current_session_mask));
     if ((routine_entry->session_mask & current_session_mask) == 0) {
         DBG_OUT_E("RID 0x%04X not supported in session 0x%02X (mask=0x%08X)", rid, current_session, current_session_mask);
         *error_code = UDS_NRC_CONDITIONS_NOT_CORRECT;

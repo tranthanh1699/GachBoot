@@ -317,27 +317,75 @@ class RoutineUI:
         for subfunc in ['START', 'STOP', 'REQUEST_RESULTS']:
             subfunction_vars[subfunc].trace_add('write', lambda *args, sf=subfunc: toggle_subfunction_ui(sf))
         
+        # Auto-save function (mark as modified on any change and update config)
+        def on_change(*args):
+            """Mark config as modified and update config when any field changes"""
+            try:
+                # Update config immediately
+                config['routines'][index]['rid'] = rid_var.get()
+                config['routines'][index]['routine_name'] = routine_name_var.get()
+                config['routines'][index]['callback_function'] = callback_var.get()
+                config['routines'][index]['description'] = desc_var.get()
+                
+                # Update sessions
+                selected_sessions = [s for s, var in session_vars.items() if var.get()]
+                config['routines'][index]['supported_sessions'] = selected_sessions
+                
+                # Mark as modified
+                if 'save_callback' in callbacks:
+                    callbacks['save_callback']()
+            except Exception as e:
+                print(f"[DEBUG] Error in on_change: {e}")
+        
+        # Bind all variables to auto-update
+        rid_var.trace_add('write', on_change)
+        routine_name_var.trace_add('write', on_change)
+        callback_var.trace_add('write', on_change)
+        desc_var.trace_add('write', on_change)
+        
+        # Bind subfunction checkboxes
+        for var in subfunction_vars.values():
+            var.trace_add('write', on_change)
+        
+        # Bind session checkboxes
+        for var in session_vars.values():
+            var.trace_add('write', on_change)
+        
+        # Bind security checkboxes
+        for var in security_vars.values():
+            var.trace_add('write', on_change)
+        
+        # Bind subfunction parameter variables
+        for subfunc_vars in subfunction_param_vars.values():
+            for var in subfunc_vars.values():
+                var.trace_add('write', on_change)
+        
         # Manual save function (called when closing form or generating code)
         def save_changes():
             """Save all form data to config"""
+            print("[DEBUG] routine_ui.save_changes() called")
             try:
                 # Update routine data
                 config['routines'][index]['rid'] = rid_var.get()
                 config['routines'][index]['routine_name'] = routine_name_var.get()
                 config['routines'][index]['callback_function'] = callback_var.get()
                 config['routines'][index]['description'] = desc_var.get()
+                print(f"[DEBUG] Updated routine basic info: rid={rid_var.get()}")
                 
                 # Update subfunctions
                 selected_subfunctions = [sf for sf, var in subfunction_vars.items() if var.get()]
                 config['routines'][index]['supported_subfunctions'] = selected_subfunctions
+                print(f"[DEBUG] Updated subfunctions: {selected_subfunctions}")
                 
                 # Update sessions
                 selected_sessions = [s for s, var in session_vars.items() if var.get()]
                 config['routines'][index]['supported_sessions'] = selected_sessions
+                print(f"[DEBUG] Updated sessions: {selected_sessions}")
                 
                 # Update security levels
                 selected_security = [sec for sec, var in security_vars.items() if var.get()]
                 config['routines'][index]['required_security_levels'] = selected_security
+                print(f"[DEBUG] Updated security: {selected_security}")
                 
                 # Update subfunction parameters - only save for selected subfunctions
                 subfunction_parameters = {}
@@ -362,11 +410,16 @@ class RoutineUI:
                         }
                 
                 config['routines'][index]['subfunction_parameters'] = subfunction_parameters
+                print(f"[DEBUG] Updated subfunction_parameters: {list(subfunction_parameters.keys())}")
                 
                 # Call save callback to save config to file
                 if 'save_callback' in callbacks:
+                    print("[DEBUG] Calling save_callback from save_changes()")
                     callbacks['save_callback']()
+                else:
+                    print("[DEBUG] No save_callback found in callbacks")
                 
+                print("[DEBUG] save_changes() completed successfully")
                 return True
                 
             except Exception as e:
