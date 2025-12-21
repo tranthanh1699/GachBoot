@@ -63,6 +63,8 @@ if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Service_Gen)
     file(GLOB SERVICE_GEN_SOURCES 
         "${{CMAKE_CURRENT_SOURCE_DIR}}/Service_Gen/*.c"
     )
+    # Exclude Service_PBCfg.c (compiled with svc_dcm to resolve circular dependency)
+    list(FILTER SERVICE_GEN_SOURCES EXCLUDE REGEX "Service_PBCfg\\.c$")
     list(APPEND GENERATED_SOURCES ${{SERVICE_GEN_SOURCES}})
     message(STATUS "Added Service_Gen sources: ${{SERVICE_GEN_SOURCES}}")
 endif()
@@ -72,6 +74,8 @@ if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Routine_Gen)
     file(GLOB ROUTINE_GEN_SOURCES 
         "${{CMAKE_CURRENT_SOURCE_DIR}}/Routine_Gen/*.c"
     )
+    # Exclude Routine_PBCfg.c (compiled with svc_dcm to resolve circular dependency)
+    list(FILTER ROUTINE_GEN_SOURCES EXCLUDE REGEX "Routine_PBCfg\\.c$")
     list(APPEND GENERATED_SOURCES ${{ROUTINE_GEN_SOURCES}})
     message(STATUS "Added Routine_Gen sources: ${{ROUTINE_GEN_SOURCES}}")
 endif()

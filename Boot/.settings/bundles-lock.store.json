@@ -208,6 +208,39 @@
           "version": "7.10.0+st.3"
         }
       ]
+    },
+    {
+      "name": "stlink-server",
+      "version": "2.1.1+st.7",
+      "platform": "darwin",
+      "selected_by": [
+        {
+          "name": "stlink-server",
+          "version": "2.1.1+st.7"
+        }
+      ]
+    },
+    {
+      "name": "stlink-server",
+      "version": "2.1.1+st.7",
+      "platform": "x86_64-linux",
+      "selected_by": [
+        {
+          "name": "stlink-server",
+          "version": "2.1.1+st.7"
+        }
+      ]
+    },
+    {
+      "name": "stlink-server",
+      "version": "2.1.1+st.7",
+      "platform": "x86_64-windows",
+      "selected_by": [
+        {
+          "name": "stlink-server",
+          "version": "2.1.1+st.7"
+        }
+      ]
     }
   ]
 }

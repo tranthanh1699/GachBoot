@@ -90,7 +90,10 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
     dev_com_tp
     dev_memstack  # Memory Stack (includes Fls, Fee, MemIf, NvM)
 
+    # Add generated code library (headers and non-circular sources)
+    GenerateCode
+
     # Add service libraries
     svc_app
-    svc_dcm
+    svc_dcm  # Includes Service_PBCfg.c and Routine_PBCfg.c from GenerateCode
 )

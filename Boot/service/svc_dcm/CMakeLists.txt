@@ -14,6 +14,13 @@ if(EXISTS ${SERVICE_PBCFG_SOURCE})
     message(STATUS "Added Service_PBCfg.c to svc_dcm")
 endif()
 
+# Add Routine_PBCfg.c from GenerateCode (compile with svc_dcm to access routine_callbacks)
+set(ROUTINE_PBCFG_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/../../GenerateCode/Routine_Gen/Routine_PBCfg.c")
+if(EXISTS ${ROUTINE_PBCFG_SOURCE})
+    list(APPEND UDS_SERVICES_SOURCES ${ROUTINE_PBCFG_SOURCE})
+    message(STATUS "Added Routine_PBCfg.c to svc_dcm")
+endif()
+
 # Create the svc_dcm library
 add_library(svc_dcm STATIC 
     ${SVC_DCM_SOURCES}

@@ -12,6 +12,10 @@
  */
 void dev_log(const char* str, ...)
 {
+    if (!CDC_IsReady()) {
+        return;
+    }
+
     char log_buffer[512];
     va_list args;
     va_start(args, str);
@@ -32,6 +36,10 @@ void dev_log(const char* str, ...)
 
 void dev_log_hex(const uint8_t* data, uint32_t length)
 {
+    if (!CDC_IsReady()) {
+        return;
+    }
+
     char hex_buf[1024];
     int hex_idx = 0;
     dev_log("Hex Dump - Length: %d\r\n", length);

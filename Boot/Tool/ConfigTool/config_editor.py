@@ -1491,8 +1491,7 @@ class ConfigEditor:
                 if routine_success:
                     routine_files = [
                         os.path.join(output_path, "Routine_Gen", "Routine_PBCfg.h"),
-                        os.path.join(output_path, "Routine_Gen", "Routine_PBCfg.c"),
-                        os.path.join(output_path, "Routine_Gen", "Routine_Callbacks_Skeleton.c")
+                        os.path.join(output_path, "Routine_Gen", "Routine_PBCfg.c")
                     ]
             fls_files = []
             if self.config.get('fls_config'):
