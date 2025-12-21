@@ -1,5 +1,5 @@
 #include "uds_service_0x31.h"
-#include "uds_routine_control_registry.h"
+#include "Routine_PBCfg.h"
 #include "svc_dcm.h"
 #include "dcmdsl/dcmdsl.h"
 #include "../service_0x27/uds_service_0x27.h"

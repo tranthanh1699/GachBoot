@@ -67,6 +67,15 @@ if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Service_Gen)
     message(STATUS "Added Service_Gen sources: ${{SERVICE_GEN_SOURCES}}")
 endif()
 
+# Add Routine Generated Code
+if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Routine_Gen)
+    file(GLOB ROUTINE_GEN_SOURCES 
+        "${{CMAKE_CURRENT_SOURCE_DIR}}/Routine_Gen/*.c"
+    )
+    list(APPEND GENERATED_SOURCES ${{ROUTINE_GEN_SOURCES}})
+    message(STATUS "Added Routine_Gen sources: ${{ROUTINE_GEN_SOURCES}}")
+endif()
+
 # Add Flash Driver Generated Code
 if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Fls_Gen)
     file(GLOB FLS_GEN_SOURCES 
@@ -98,6 +107,12 @@ endif()
 if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/DID_Gen)
     target_include_directories(GenerateCode PUBLIC
         ${{CMAKE_CURRENT_SOURCE_DIR}}/DID_Gen
+    )
+endif()
+
+if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Routine_Gen)
+    target_include_directories(GenerateCode PUBLIC
+        ${{CMAKE_CURRENT_SOURCE_DIR}}/Routine_Gen
     )
 endif()
 

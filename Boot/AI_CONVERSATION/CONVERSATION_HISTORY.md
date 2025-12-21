@@ -2694,7 +2694,7 @@ ConfigTool/
 │   ├── session_module.py          ✅
 │   ├── security_module.py         ✅
 │   ├── service_module.py          ✅
-│   ├── fls_module.py              ✅ NEW
+│   ├── fls_module.py              ✅
 │   └── cmake_module.py            ✅ Updated
 ├── Module_UI/                      # UI components
 │   ├── nvm_ui.py                  ✅
@@ -2742,4 +2742,1077 @@ dev_memstack/
 
 ---
 
-**End of Conversation History - Last Updated: December 20, 2025 (22:35 PM)**
+## Session 3: UDS Routine Control (Service 0x31) Configuration
+
+**Date:** December 21, 2025  
+**Focus:** Implement UDS Routine Control configuration system with JSON config, Python code generator, GUI tool, and service layer callback architecture
+
+### Problem Statement
+
+User requested configuration system for UDS Service 0x31 (Routine Control):
+- **Requirements:**
+  - JSON configuration for Routine Identifiers (RID)
+  - Support for subfunctions: START (0x01), STOP (0x02), REQUEST_RESULTS (0x03)
+  - Security level and session support per routine
+  - Callback functions for each routine
+  - Per-subfunction parameter lengths and descriptions
+  - GUI tool for configuration management
+  - Code generation for C header/source files
+  - Integration with service layer
+
+### Initial Implementation
+
+**1. JSON Configuration Structure**
+
+Created `gachboot_config.json` with routines section:
+
+```json
+{
+  "routines": [
+    {
+      "rid": "0xFF00",
+      "rid_name": "ERASE_MEMORY",
+      "callback_function": "routine_erase_memory",
+      "subfunction_support": {
+        "START": true,
+        "STOP": false,
+        "REQUEST_RESULTS": true
+      },
+      "subfunction_parameters": {
+        "START": {
+          "option_record_length": 8,
+          "option_record_description": "Start address (4 bytes) + Length (4 bytes)",
+          "status_record_length": 1,
+          "status_record_description": "Status byte: 0x00=OK, 0x01=Failed"
+        },
+        "REQUEST_RESULTS": {
+          "option_record_length": 0,
+          "option_record_description": "No parameters",
+          "status_record_length": 4,
+          "status_record_description": "Erased bytes count (4 bytes)"
+        }
+      },
+      "security_level": ["LEVEL_1"],
+      "session_support": ["DEFAULT_SESSION", "PROGRAMMING_SESSION"]
+    },
+    {
+      "rid": "0x0200",
+      "rid_name": "CHECK_PROGRAMMING_DEPENDENCIES",
+      "callback_function": "routine_check_programming_dependencies",
+      "subfunction_support": {
+        "START": true,
+        "STOP": false,
+        "REQUEST_RESULTS": false
+      },
+      "subfunction_parameters": {
+        "START": {
+          "option_record_length": 0,
+          "option_record_description": "No parameters",
+          "status_record_length": 1,
+          "status_record_description": "Dependency check result"
+        }
+      },
+      "security_level": ["UNLOCKED"],
+      "session_support": ["PROGRAMMING_SESSION"]
+    },
+    {
+      "rid": "0x0201",
+      "rid_name": "ERASE_MIRROR_MEMORY_DTCs",
+      "callback_function": "routine_erase_mirror_dtcs",
+      "subfunction_support": {
+        "START": true,
+        "STOP": false,
+        "REQUEST_RESULTS": false
+      },
+      "subfunction_parameters": {
+        "START": {
+          "option_record_length": 0,
+          "option_record_description": "No parameters",
+          "status_record_length": 0,
+          "status_record_description": "No status data"
+        }
+      },
+      "security_level": ["LEVEL_1"],
+      "session_support": ["EXTENDED_SESSION"]
+    },
+    {
+      "rid": "0x0202",
+      "rid_name": "CHECK_PROGRAMMING_PRECONDITIONS",
+      "callback_function": "routine_check_programming_preconditions",
+      "subfunction_support": {
+        "START": true,
+        "STOP": false,
+        "REQUEST_RESULTS": false
+      },
+      "subfunction_parameters": {
+        "START": {
+          "option_record_length": 0,
+          "option_record_description": "No parameters",
+          "status_record_length": 1,
+          "status_record_description": "Precondition check result"
+        }
+      },
+      "security_level": ["UNLOCKED"],
+      "session_support": ["DEFAULT_SESSION", "PROGRAMMING_SESSION"]
+    },
+    {
+      "rid": "0x0204",
+      "rid_name": "VERIFY_APPLICATION_INTEGRITY",
+      "callback_function": "routine_verify_app_integrity",
+      "subfunction_support": {
+        "START": true,
+        "STOP": false,
+        "REQUEST_RESULTS": true
+      },
+      "subfunction_parameters": {
+        "START": {
+          "option_record_length": 0,
+          "option_record_description": "No parameters",
+          "status_record_length": 0,
+          "status_record_description": "No status data"
+        },
+        "REQUEST_RESULTS": {
+          "option_record_length": 0,
+          "option_record_description": "No parameters",
+          "status_record_length": 5,
+          "status_record_description": "Result (1 byte) + CRC32 (4 bytes)"
+        }
+      },
+      "security_level": ["UNLOCKED"],
+      "session_support": ["DEFAULT_SESSION", "EXTENDED_SESSION", "PROGRAMMING_SESSION"]
+    }
+  ]
+}
+```
+
+**2. Python Generator Module: `routine_module.py`**
+
+Created validation and code generation module:
+
+```python
+# Tool/ConfigTool/Module/routine_module.py
+
+VALID_SUBFUNCTIONS = ["START", "STOP", "REQUEST_RESULTS"]
+SUBFUNCTION_IDS = {
+    "START": "0x01",
+    "STOP": "0x02", 
+    "REQUEST_RESULTS": "0x03"
+}
+
+def validate_routine_config(routines):
+    """Validate routine configuration"""
+    errors = []
+    warnings = []
+    
+    if not routines:
+        warnings.append("No routines configured")
+        return True, [], warnings
+    
+    seen_rids = set()
+    
+    for i, routine in enumerate(routines):
+        # Check required fields
+        required = ['rid', 'rid_name', 'callback_function', 
+                   'subfunction_support', 'security_level', 'session_support']
+        for field in required:
+            if field not in routine:
+                errors.append(f"Routine [{i}]: Missing '{field}'")
+        
+        # Validate RID format
+        rid = routine.get('rid', '')
+        if not rid.startswith('0x'):
+            errors.append(f"Routine [{i}]: RID must start with '0x'")
+        
+        # Check duplicate RIDs
+        if rid in seen_rids:
+            errors.append(f"Routine [{i}]: Duplicate RID {rid}")
+        seen_rids.add(rid)
+        
+        # Validate subfunction support
+        subfunc_support = routine.get('subfunction_support', {})
+        if not any(subfunc_support.values()):
+            errors.append(f"Routine [{i}]: At least one subfunction must be supported")
+        
+        # Validate subfunction parameters
+        subfunc_params = routine.get('subfunction_parameters', {})
+        for subfunc, supported in subfunc_support.items():
+            if supported and subfunc not in subfunc_params:
+                errors.append(f"Routine [{i}]: Missing parameters for {subfunc}")
+    
+    return len(errors) == 0, errors, warnings
+
+
+def generate_routine_header(routines, security_levels, sessions):
+    """Generate Routine_PBCfg.h with per-subfunction callback declarations"""
+    
+    header = """/* Generated by ConfigTool */
+#ifndef ROUTINE_PBCFG_H
+#define ROUTINE_PBCFG_H
+
+#include "Std_Types.h"
+#include <stdint.h>
+
+/* Routine Control Subfunctions */
+#define UDS_ROUTINE_START           0x01
+#define UDS_ROUTINE_STOP            0x02
+#define UDS_ROUTINE_REQUEST_RESULTS 0x03
+
+/* Routine IDs */
+"""
+    
+    # Generate RID defines
+    for routine in routines:
+        rid_name = routine['rid_name']
+        rid = routine['rid']
+        header += f"#define RID_{rid_name.upper()}    {rid}\n"
+    
+    header += "\n/* Routine callback type (for wrapper functions) */\n"
+    header += """typedef Std_ReturnType (*uds_routine_callback_t)(
+    uint8_t subfunction,
+    const uint8_t *option_record,
+    uint16_t option_record_len,
+    uint8_t *status_record,
+    uint16_t *status_record_len
+);
+
+"""
+    
+    # Generate per-subfunction callback declarations
+    header += "/* Per-subfunction callback declarations */\n"
+    for routine in routines:
+        callback_base = routine['callback_function']
+        subfunc_support = routine['subfunction_support']
+        
+        for subfunc, supported in subfunc_support.items():
+            if supported:
+                subfunc_lower = subfunc.lower()
+                header += f"""extern Std_ReturnType {callback_base}_{subfunc_lower}(
+    const uint8_t *option_record,
+    uint16_t option_record_len,
+    uint8_t *status_record,
+    uint16_t *status_record_len
+);
+"""
+    
+    header += """
+/* Routine registry entry */
+typedef struct {
+    uint16_t rid;
+    uds_routine_callback_t callback;
+    uint32_t session_mask;
+    uint32_t security_mask;
+} uds_routine_entry_t;
+
+/* Routine registry */
+extern const uds_routine_entry_t g_routine_registry[];
+extern const uint16_t g_routine_registry_size;
+
+#endif /* ROUTINE_PBCFG_H */
+"""
+    
+    return header
+
+
+def generate_routine_source(routines, security_levels, sessions):
+    """Generate Routine_PBCfg.c with wrapper dispatch functions"""
+    
+    source = """/* Generated by ConfigTool */
+#include "Routine_PBCfg.h"
+
+"""
+    
+    # Generate wrapper functions (static dispatch based on subfunction)
+    for routine in routines:
+        callback_base = routine['callback_function']
+        subfunc_support = routine['subfunction_support']
+        
+        source += f"""/* Wrapper for {routine['rid_name']} */
+static Std_ReturnType {callback_base}(
+    uint8_t subfunction,
+    const uint8_t *option_record,
+    uint16_t option_record_len,
+    uint8_t *status_record,
+    uint16_t *status_record_len
+) {{
+    switch (subfunction) {{
+"""
+        
+        for subfunc, supported in subfunc_support.items():
+            if supported:
+                subfunc_id = SUBFUNCTION_IDS[subfunc]
+                subfunc_lower = subfunc.lower()
+                source += f"""        case {subfunc_id}:  /* {subfunc} */
+            return {callback_base}_{subfunc_lower}(
+                option_record, option_record_len,
+                status_record, status_record_len
+            );
+"""
+        
+        source += """        default:
+            return E_NOT_OK;
+    }
+}
+
+"""
+    
+    # Generate registry table
+    source += """/* Routine Registry */
+const uds_routine_entry_t g_routine_registry[] = {
+"""
+    
+    for routine in routines:
+        rid = routine['rid']
+        callback = routine['callback_function']
+        
+        # Build session mask
+        session_mask = 0
+        for session in routine['session_support']:
+            if session in sessions:
+                session_mask |= (1 << sessions[session]['id'])
+        
+        # Build security mask
+        security_mask = 0
+        for level in routine['security_level']:
+            if level in security_levels:
+                security_mask |= (1 << security_levels[level]['level'])
+        
+        source += f"""    {{
+        .rid = {rid},
+        .callback = {callback},  /* Wrapper function */
+        .session_mask = 0x{session_mask:08X},
+        .security_mask = 0x{security_mask:08X}
+    }},
+"""
+    
+    source += f"""
+}};
+
+const uint16_t g_routine_registry_size = sizeof(g_routine_registry) / sizeof(g_routine_registry[0]);
+"""
+    
+    return source
+
+
+def generate_routine_code(config_data, output_dir):
+    """Main entry point for routine code generation"""
+    
+    routines = config_data.get('routines', [])
+    security_levels = {s['name']: s for s in config_data.get('security_levels', [])}
+    sessions = {s['name']: s for s in config_data.get('sessions', [])}
+    
+    # Validate
+    valid, errors, warnings = validate_routine_config(routines)
+    if not valid:
+        return False, errors
+    
+    # Create output directory
+    routine_dir = os.path.join(output_dir, 'Routine_Gen')
+    os.makedirs(routine_dir, exist_ok=True)
+    
+    # Generate files
+    header = generate_routine_header(routines, security_levels, sessions)
+    source = generate_routine_source(routines, security_levels, sessions)
+    
+    header_path = os.path.join(routine_dir, 'Routine_PBCfg.h')
+    source_path = os.path.join(routine_dir, 'Routine_PBCfg.c')
+    
+    with open(header_path, 'w', encoding='utf-8') as f:
+        f.write(header)
+    
+    with open(source_path, 'w', encoding='utf-8') as f:
+        f.write(source)
+    
+    messages = [
+        f"Generated: {header_path}",
+        f"Generated: {source_path}",
+        f"Total routines: {len(routines)}"
+    ]
+    
+    if warnings:
+        messages.extend(warnings)
+    
+    return True, messages
+```
+
+**Key Architecture Decisions:**
+
+1. **Per-Subfunction Callbacks:** Instead of single callback with switch-case, generate separate callback declarations for each supported subfunction (e.g., `routine_erase_memory_start()`, `routine_erase_memory_request_results()`)
+
+2. **Wrapper Dispatch Pattern:** Generated code creates static wrapper functions that dispatch to per-subfunction callbacks based on subfunction parameter
+
+3. **Service Layer Implementation:** User implements actual callback logic in service layer (`service/svc_dcm/uds_services/service_0x31/routine_callbacks.c`)
+
+4. **Registry Structure:** Simplified to `{rid, callback (wrapper), session_mask, security_mask}` - no `subfunction_support` field needed
+
+**3. GUI Module: `routine_ui.py`**
+
+Created comprehensive UI with TreeView, edit forms, and dynamic parameter sections:
+
+```python
+# Tool/ConfigTool/Module_UI/routine_ui.py
+
+class RoutineUI:
+    def setup_tab(self, parent, data, security_levels, sessions):
+        """Setup routine configuration tab with TreeView"""
+        
+        # Toolbar
+        toolbar = ttk.Frame(parent)
+        toolbar.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
+        
+        ttk.Button(toolbar, text="Add Routine", 
+                  command=self.add_routine).pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="Edit", 
+                  command=self.edit_routine).pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="Delete", 
+                  command=self.delete_routine).pack(side=tk.LEFT, padx=2)
+        
+        # TreeView
+        tree_frame = ttk.Frame(parent)
+        tree_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        columns = ('rid', 'name', 'subfunctions', 'security', 'sessions')
+        self.tree = ttk.Treeview(tree_frame, columns=columns, show='headings')
+        
+        self.tree.heading('rid', text='RID')
+        self.tree.heading('name', text='Name')
+        self.tree.heading('subfunctions', text='Subfunctions')
+        self.tree.heading('security', text='Security')
+        self.tree.heading('sessions', text='Sessions')
+        
+        # Populate tree
+        for routine in data.get('routines', []):
+            subfuncs = [k for k, v in routine['subfunction_support'].items() if v]
+            self.tree.insert('', 'end', values=(
+                routine['rid'],
+                routine['rid_name'],
+                ', '.join(subfuncs),
+                ', '.join(routine['security_level']),
+                ', '.join(routine['session_support'])
+            ))
+    
+    def show_edit_form(self, config_panel_frame, routine_data, 
+                       security_levels, sessions, save_callback):
+        """Show edit form with dynamic subfunction parameter sections"""
+        
+        # Create canvas for scrolling
+        canvas = tk.Canvas(config_panel_frame)
+        scrollbar = ttk.Scrollbar(config_panel_frame, orient=tk.VERTICAL,
+                                  command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        form_frame = ttk.Frame(canvas)
+        canvas_window = canvas.create_window((0, 0), window=form_frame, anchor=tk.NW)
+        
+        # Basic fields
+        ttk.Label(form_frame, text="RID:").grid(row=0, column=0, sticky=tk.W)
+        rid_var = tk.StringVar(value=routine_data.get('rid', '0x'))
+        ttk.Entry(form_frame, textvariable=rid_var).grid(row=0, column=1, sticky=(tk.W, tk.E))
+        
+        ttk.Label(form_frame, text="Name:").grid(row=1, column=0, sticky=tk.W)
+        name_var = tk.StringVar(value=routine_data.get('rid_name', ''))
+        ttk.Entry(form_frame, textvariable=name_var).grid(row=1, column=1, sticky=(tk.W, tk.E))
+        
+        ttk.Label(form_frame, text="Callback:").grid(row=2, column=0, sticky=tk.W)
+        callback_var = tk.StringVar(value=routine_data.get('callback_function', ''))
+        ttk.Entry(form_frame, textvariable=callback_var).grid(row=2, column=1, sticky=(tk.W, tk.E))
+        
+        # Subfunction support checkboxes
+        ttk.Label(form_frame, text="Subfunction Support:").grid(row=3, column=0, 
+                                                                 sticky=tk.W, pady=(10,0))
+        subfunc_frame = ttk.Frame(form_frame)
+        subfunc_frame.grid(row=3, column=1, sticky=(tk.W, tk.E), pady=(10,0))
+        
+        subfunc_support = routine_data.get('subfunction_support', {})
+        subfunc_vars = {}
+        
+        for i, subfunc in enumerate(['START', 'STOP', 'REQUEST_RESULTS']):
+            var = tk.BooleanVar(value=subfunc_support.get(subfunc, False))
+            subfunc_vars[subfunc] = var
+            ttk.Checkbutton(subfunc_frame, text=subfunc, variable=var,
+                           command=lambda s=subfunc: self.toggle_subfunction_params(s)
+                           ).grid(row=0, column=i, padx=5)
+        
+        # Per-subfunction parameter sections (CREATE ALL UPFRONT)
+        subfunc_params = routine_data.get('subfunction_parameters', {})
+        param_frames = {}
+        param_vars = {}
+        
+        row = 4
+        for subfunc in ['START', 'STOP', 'REQUEST_RESULTS']:
+            # Create frame for this subfunction
+            frame = ttk.LabelFrame(form_frame, text=f"{subfunc} Parameters")
+            frame.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), 
+                      padx=5, pady=5)
+            param_frames[subfunc] = frame
+            
+            # Get existing parameters
+            params = subfunc_params.get(subfunc, {})
+            
+            # Create Entry widgets
+            param_vars[subfunc] = {}
+            
+            ttk.Label(frame, text="Option Length:").grid(row=0, column=0, sticky=tk.W)
+            param_vars[subfunc]['option_len'] = tk.IntVar(
+                value=params.get('option_record_length', 0))
+            ttk.Entry(frame, textvariable=param_vars[subfunc]['option_len']
+                     ).grid(row=0, column=1, sticky=(tk.W, tk.E))
+            
+            ttk.Label(frame, text="Option Description:").grid(row=1, column=0, sticky=tk.W)
+            param_vars[subfunc]['option_desc'] = tk.StringVar(
+                value=params.get('option_record_description', ''))
+            ttk.Entry(frame, textvariable=param_vars[subfunc]['option_desc']
+                     ).grid(row=1, column=1, sticky=(tk.W, tk.E))
+            
+            ttk.Label(frame, text="Status Length:").grid(row=2, column=0, sticky=tk.W)
+            param_vars[subfunc]['status_len'] = tk.IntVar(
+                value=params.get('status_record_length', 0))
+            ttk.Entry(frame, textvariable=param_vars[subfunc]['status_len']
+                     ).grid(row=2, column=1, sticky=(tk.W, tk.E))
+            
+            ttk.Label(frame, text="Status Description:").grid(row=3, column=0, sticky=tk.W)
+            param_vars[subfunc]['status_desc'] = tk.StringVar(
+                value=params.get('status_record_description', ''))
+            ttk.Entry(frame, textvariable=param_vars[subfunc]['status_desc']
+                     ).grid(row=3, column=1, sticky=(tk.W, tk.E))
+            
+            # Hide if not supported (grid_remove preserves grid config)
+            if not subfunc_vars[subfunc].get():
+                frame.grid_remove()
+            
+            row += 1
+        
+        # Security and session selection
+        # ... (similar to other modules)
+        
+        # Save function (MANUAL, not auto)
+        def save_changes():
+            try:
+                # Collect basic data
+                routine_data['rid'] = rid_var.get()
+                routine_data['rid_name'] = name_var.get()
+                routine_data['callback_function'] = callback_var.get()
+                
+                # Collect subfunction support
+                routine_data['subfunction_support'] = {
+                    s: v.get() for s, v in subfunc_vars.items()
+                }
+                
+                # Collect parameters for supported subfunctions
+                routine_data['subfunction_parameters'] = {}
+                for subfunc, supported in routine_data['subfunction_support'].items():
+                    if supported:
+                        routine_data['subfunction_parameters'][subfunc] = {
+                            'option_record_length': param_vars[subfunc]['option_len'].get(),
+                            'option_record_description': param_vars[subfunc]['option_desc'].get(),
+                            'status_record_length': param_vars[subfunc]['status_len'].get(),
+                            'status_record_description': param_vars[subfunc]['status_desc'].get()
+                        }
+                
+                # Collect security and sessions
+                # ...
+                
+                save_callback(routine_data)
+                return True
+            except Exception as e:
+                messagebox.showerror("Error", f"Save failed: {e}")
+                return False
+        
+        # Store save function for external access
+        form_frame.save_changes = save_changes
+        
+        # Toggle visibility function
+        def toggle_subfunction_params(subfunc):
+            if subfunc_vars[subfunc].get():
+                param_frames[subfunc].grid()  # Show
+            else:
+                param_frames[subfunc].grid_remove()  # Hide
+        
+        self.toggle_subfunction_params = toggle_subfunction_params
+        
+        # Canvas scroll configuration
+        def on_frame_configure(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        
+        def on_canvas_configure(event):
+            canvas.itemconfig(canvas_window, width=event.width)
+        
+        form_frame.bind('<Configure>', on_frame_configure)
+        canvas.bind('<Configure>', on_canvas_configure)
+        
+        form_frame.update_idletasks()
+        canvas.configure(scrollregion=canvas.bbox("all"))
+        
+        # Mouse wheel scrolling
+        def on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        
+        canvas.bind_all("<MouseWheel>", on_mousewheel)
+```
+
+**Key UI Design Decisions:**
+
+1. **Create All UI Elements Upfront:** All subfunction parameter frames created during init, hidden with `grid_remove()` if not supported
+
+2. **Toggle Visibility, Don't Destroy/Recreate:** Checkbox toggles visibility with `grid()` / `grid_remove()` to avoid KeyError when accessing vars
+
+3. **Manual Save Pattern:** No trace callbacks for autosave. Explicit `save_changes()` function called when:
+   - Form closed
+   - Generate/Validate clicked
+   - User explicitly saves
+
+4. **Canvas Layout for Scrolling:** Canvas without fixed width, `on_canvas_configure` updates form width to match canvas
+
+### Bug Fixes and Evolution
+
+**Bug 1: Dynamic Subfunction UI Creation**
+
+**Problem:** When user ticked additional subfunction checkbox, KeyError occurred because UI only created Entry widgets for initially supported subfunctions.
+
+**Root Cause:** Conditional widget creation:
+```python
+# ❌ WRONG - Only creates widgets for initially supported subfunctions
+for subfunc, supported in subfunc_support.items():
+    if supported:  # Only creates if initially true
+        create_param_widgets(subfunc)
+```
+
+**Solution:** Create ALL subfunction parameter widgets upfront, hide unsupported:
+```python
+# ✅ CORRECT - Create widgets for all subfunctions
+for subfunc in ['START', 'STOP', 'REQUEST_RESULTS']:
+    frame = create_param_frame(subfunc)
+    param_frames[subfunc] = frame
+    
+    # Create all Entry widgets
+    param_vars[subfunc] = {
+        'option_len': tk.IntVar(...),
+        'option_desc': tk.StringVar(...),
+        'status_len': tk.IntVar(...),
+        'status_desc': tk.StringVar(...)
+    }
+    
+    # Hide if not currently supported
+    if not subfunc_vars[subfunc].get():
+        frame.grid_remove()  # Preserve grid config
+```
+
+**Bug 2: Autosave Race Conditions**
+
+**Problem:** Trace callbacks on checkbox changes fired during UI initialization, causing attempts to save before UI fully created.
+
+**Root Cause:** Autosave pattern with trace callbacks:
+```python
+# ❌ WRONG - Trace fires immediately during init
+for var in all_vars.values():
+    var.trace_add('write', save_callback)  # Fires even during set()
+```
+
+**Solution:** Manual save at defined points:
+```python
+# ✅ CORRECT - No trace callbacks
+def save_changes():
+    """Called explicitly when needed"""
+    # All widgets guaranteed to exist
+    collect_and_save_data()
+
+# Call save before critical operations
+def generate_code():
+    save_current_form()  # Find active form's save_changes()
+    validate_config()
+    generate()
+```
+
+**Bug 3: Canvas Layout Width**
+
+**Problem:** Canvas had fixed width, created whitespace when window resized.
+
+**Solution:** Dynamic canvas width:
+```python
+# Create canvas WITHOUT fixed width
+canvas = tk.Canvas(config_panel_frame)  # No width= parameter
+
+# Update form width when canvas resizes
+def on_canvas_configure(event):
+    canvas.itemconfig(canvas_frame, width=event.width)
+
+canvas.bind('<Configure>', on_canvas_configure)
+```
+
+### Architecture Changes
+
+**Change 1: Remove Skeleton Generation**
+
+**Original:** Generator created `Routine_Callbacks_Skeleton.c` with stub implementations.
+
+**Problem:** 
+- Skeleton file conflicts with real implementation in service layer
+- User needs to manually merge skeleton into service layer
+- Maintenance overhead keeping skeleton in sync
+
+**Solution:** Remove skeleton generation, implement callbacks in service layer directly.
+
+**Change 2: Per-Subfunction Callbacks**
+
+**Original:** Single callback with subfunction parameter, user implements switch-case:
+
+```c
+// User implements this
+Std_ReturnType routine_erase_memory(
+    uint8_t subfunction,
+    const uint8_t *option_record,
+    uint16_t option_record_len,
+    uint8_t *status_record,
+    uint16_t *status_record_len
+) {
+    switch (subfunction) {
+        case UDS_ROUTINE_START:
+            // User code
+            break;
+        case UDS_ROUTINE_REQUEST_RESULTS:
+            // User code
+            break;
+        default:
+            return E_NOT_OK;
+    }
+}
+```
+
+**Problem:**
+- Repetitive switch-case in every routine
+- Hard to maintain for routines with complex logic
+- Can't easily see which subfunctions are supported
+
+**New Architecture:** Per-subfunction callbacks with generated wrapper:
+
+```c
+// User implements focused functions (in routine_callbacks.c)
+Std_ReturnType routine_erase_memory_start(
+    const uint8_t *option_record,
+    uint16_t option_record_len,
+    uint8_t *status_record,
+    uint16_t *status_record_len
+);
+
+Std_ReturnType routine_erase_memory_request_results(
+    const uint8_t *option_record,
+    uint16_t option_record_len,
+    uint8_t *status_record,
+    uint16_t *status_record_len
+);
+
+// Generated wrapper (in Routine_PBCfg.c)
+static Std_ReturnType routine_erase_memory(
+    uint8_t subfunction,
+    const uint8_t *option_record,
+    uint16_t option_record_len,
+    uint8_t *status_record,
+    uint16_t *status_record_len
+) {
+    switch (subfunction) {
+        case 0x01:  /* START */
+            return routine_erase_memory_start(
+                option_record, option_record_len,
+                status_record, status_record_len
+            );
+        case 0x03:  /* REQUEST_RESULTS */
+            return routine_erase_memory_request_results(
+                option_record, option_record_len,
+                status_record, status_record_len
+            );
+        default:
+            return E_NOT_OK;
+    }
+}
+```
+
+**Benefits:**
+- User code focuses on business logic
+- Clear separation: generated wrapper vs user implementation
+- Library interface preserved (still expects single callback)
+- Zero runtime overhead (wrapper is static inline candidate)
+
+### Service Layer Implementation
+
+Created callback implementations in service layer:
+
+```c
+// service/svc_dcm/uds_services/service_0x31/routine_callbacks.c
+
+#include "Routine_PBCfg.h"
+#include "dev_log.h"
+#include "dev_fls.h"
+
+/* Erase Memory - START */
+Std_ReturnType routine_erase_memory_start(
+    const uint8_t *option_record,
+    uint16_t option_record_len,
+    uint8_t *status_record,
+    uint16_t *status_record_len
+) {
+    if (option_record_len != 8) {
+        return E_NOT_OK;
+    }
+    
+    uint32_t address = (option_record[0] << 24) | (option_record[1] << 16) |
+                       (option_record[2] << 8) | option_record[3];
+    uint32_t length = (option_record[4] << 24) | (option_record[5] << 16) |
+                      (option_record[6] << 8) | option_record[7];
+    
+    dev_err_t result = dev_fls_erase(address, length);
+    
+    status_record[0] = (result == DEV_E_OK) ? 0x00 : 0x01;
+    *status_record_len = 1;
+    
+    return (result == DEV_E_OK) ? E_OK : E_NOT_OK;
+}
+
+/* Erase Memory - REQUEST_RESULTS */
+Std_ReturnType routine_erase_memory_request_results(
+    const uint8_t *option_record,
+    uint16_t option_record_len,
+    uint8_t *status_record,
+    uint16_t *status_record_len
+) {
+    // Get erase status
+    uint32_t erased_bytes = get_erased_byte_count();
+    
+    status_record[0] = (erased_bytes >> 24) & 0xFF;
+    status_record[1] = (erased_bytes >> 16) & 0xFF;
+    status_record[2] = (erased_bytes >> 8) & 0xFF;
+    status_record[3] = erased_bytes & 0xFF;
+    *status_record_len = 4;
+    
+    return E_OK;
+}
+
+/* Check Programming Dependencies - START */
+Std_ReturnType routine_check_programming_dependencies_start(
+    const uint8_t *option_record,
+    uint16_t option_record_len,
+    uint8_t *status_record,
+    uint16_t *status_record_len
+) {
+    // Check battery voltage, communication status, etc.
+    bool dependencies_ok = check_all_dependencies();
+    
+    status_record[0] = dependencies_ok ? 0x00 : 0x01;
+    *status_record_len = 1;
+    
+    return E_OK;
+}
+
+/* Verify Application Integrity - START */
+Std_ReturnType routine_verify_app_integrity_start(
+    const uint8_t *option_record,
+    uint16_t option_record_len,
+    uint8_t *status_record,
+    uint16_t *status_record_len
+) {
+    // Start CRC calculation (async)
+    start_crc_calculation();
+    *status_record_len = 0;
+    return E_OK;
+}
+
+/* Verify Application Integrity - REQUEST_RESULTS */
+Std_ReturnType routine_verify_app_integrity_request_results(
+    const uint8_t *option_record,
+    uint16_t option_record_len,
+    uint8_t *status_record,
+    uint16_t *status_record_len
+) {
+    // Get CRC result
+    uint32_t crc = get_calculated_crc();
+    bool valid = (crc == EXPECTED_CRC);
+    
+    status_record[0] = valid ? 0x00 : 0x01;
+    status_record[1] = (crc >> 24) & 0xFF;
+    status_record[2] = (crc >> 16) & 0xFF;
+    status_record[3] = (crc >> 8) & 0xFF;
+    status_record[4] = crc & 0xFF;
+    *status_record_len = 5;
+    
+    return E_OK;
+}
+
+/* Other routine callbacks... */
+```
+
+### CMake Integration
+
+Updated `cmake_module.py` to include Routine_Gen in generated CMakeLists.txt:
+
+```python
+# Tool/ConfigTool/Module/cmake_module.py
+
+def generate_cmake_lists(output_dir):
+    cmake_content = """
+# Generated CMakeLists.txt for GenerateCode
+
+set(GENERATE_CODE_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/DCM_Session_Gen/DCM_Session_PBCfg.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/DID_Gen/DID_PBCfg.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/NvM_Gen/NvM_PBCfg.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Fee_Gen/Fee_PBCfg.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Fls_Gen/Fls_PBCfg.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Security_Gen/Security_PBCfg.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Service_Gen/Service_PBCfg.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Routine_Gen/Routine_PBCfg.c
+)
+
+set(GENERATE_CODE_INCLUDES
+    ${CMAKE_CURRENT_SOURCE_DIR}/DCM_Session_Gen
+    ${CMAKE_CURRENT_SOURCE_DIR}/DID_Gen
+    ${CMAKE_CURRENT_SOURCE_DIR}/NvM_Gen
+    ${CMAKE_CURRENT_SOURCE_DIR}/Fee_Gen
+    ${CMAKE_CURRENT_SOURCE_DIR}/Fls_Gen
+    ${CMAKE_CURRENT_SOURCE_DIR}/Security_Gen
+    ${CMAKE_CURRENT_SOURCE_DIR}/Service_Gen
+    ${CMAKE_CURRENT_SOURCE_DIR}/Routine_Gen
+)
+
+# Export to parent
+set(GENERATE_CODE_SOURCES ${GENERATE_CODE_SOURCES} PARENT_SCOPE)
+set(GENERATE_CODE_INCLUDES ${GENERATE_CODE_INCLUDES} PARENT_SCOPE)
+"""
+    
+    cmake_path = os.path.join(output_dir, 'CMakeLists.txt')
+    with open(cmake_path, 'w', encoding='utf-8') as f:
+        f.write(cmake_content)
+```
+
+### Current State (December 21, 2025)
+
+**Working Components:**
+✅ JSON configuration with 5 routines (ERASE_MEMORY, CHECK_PROGRAMMING_DEPENDENCIES, ERASE_MIRROR_MEMORY_DTCs, CHECK_PROGRAMMING_PRECONDITIONS, VERIFY_APPLICATION_INTEGRITY)
+✅ routine_module.py with validation and per-subfunction callback generation
+✅ routine_ui.py with dynamic form, create-all-upfront pattern, manual save
+✅ config_editor.py integration (navigation, CRUD, context menus)
+✅ Generated Routine_PBCfg.h declares per-subfunction callbacks
+✅ Generated Routine_PBCfg.c creates wrapper dispatch functions
+✅ service/svc_dcm/uds_services/service_0x31/routine_callbacks.c implements actual callbacks
+✅ CMakeLists.txt includes Routine_Gen sources and headers
+✅ UI layout fixed (canvas width, scrolling, grid_remove pattern)
+
+**Code Organization:**
+```
+Tool/ConfigTool/
+├── Module/
+│   ├── routine_module.py          ✅ Validation + Code gen
+│   └── cmake_module.py            ✅ Updated for Routine_Gen
+├── Module_UI/
+│   └── routine_ui.py              ✅ GUI with TreeView + dynamic form
+├── config_editor.py               ✅ Main app integration
+└── gachboot_config.json           ✅ Config with routines array
+
+GenerateCode/
+└── Routine_Gen/
+    ├── Routine_PBCfg.h            ✅ Generated (per-subfunc callbacks)
+    └── Routine_PBCfg.c            ✅ Generated (wrapper dispatch)
+
+service/svc_dcm/uds_services/service_0x31/
+├── routine_callbacks.c            ✅ User implementations
+├── uds_routine_control_registry.h ✅ Registry type definition
+└── uds_service_0x31.c             ✅ Service handler (uses registry)
+```
+
+**Generated Code Structure:**
+
+Routine_PBCfg.h:
+```c
+/* Per-subfunction callback declarations */
+extern Std_ReturnType routine_erase_memory_start(...);
+extern Std_ReturnType routine_erase_memory_request_results(...);
+
+/* Registry type */
+typedef struct {
+    uint16_t rid;
+    uds_routine_callback_t callback;  // Points to wrapper
+    uint32_t session_mask;
+    uint32_t security_mask;
+} uds_routine_entry_t;
+```
+
+Routine_PBCfg.c:
+```c
+/* Wrapper dispatch functions */
+static Std_ReturnType routine_erase_memory(uint8_t subfunction, ...) {
+    switch (subfunction) {
+        case 0x01: return routine_erase_memory_start(...);
+        case 0x03: return routine_erase_memory_request_results(...);
+        default: return E_NOT_OK;
+    }
+}
+
+/* Registry table */
+const uds_routine_entry_t g_routine_registry[] = {
+    {
+        .rid = 0xFF00,
+        .callback = routine_erase_memory,  // Wrapper
+        .session_mask = 0x00000005,
+        .security_mask = 0x00000002
+    },
+    // ...
+};
+```
+
+### Lessons Learned
+
+**1. UI Widget Management**
+- ✅ Create all UI elements upfront, hide with `grid_remove()`
+- ✅ Toggle visibility with `grid()` / `grid_remove()`, don't destroy/recreate
+- ❌ Avoid conditional widget creation based on current state
+- ❌ Don't recreate widgets dynamically when state changes
+
+**2. Form Save Pattern**
+- ✅ Manual save at defined points (form close, generate, validate)
+- ✅ Store save function on form frame: `form_frame.save_changes = save_changes`
+- ✅ Call save before critical operations: `save_current_form()`
+- ❌ Avoid autosave with trace callbacks (race conditions)
+- ❌ Don't trigger save during UI initialization
+
+**3. Code Generator Design**
+- ✅ Match library interface exactly before designing generator
+- ✅ Copy struct definitions from library headers
+- ✅ Test compilation after every generator change
+- ✅ Use wrapper pattern to preserve interface while improving usability
+- ❌ Don't add fields to structs without updating library
+- ❌ Don't generate skeleton files that conflict with real implementation
+
+**4. Callback Architecture**
+- ✅ Per-function callbacks for focused user code
+- ✅ Generated wrapper handles routing/validation
+- ✅ Service layer implements business logic
+- ✅ Zero runtime overhead (static dispatch)
+- ❌ Don't force user to write repetitive switch-case
+- ❌ Don't mix generated code with user implementation in same file
+
+**5. Canvas Layout**
+- ✅ Create canvas without fixed width for responsive layout
+- ✅ Bind `<Configure>` to update form width and scroll region
+- ✅ Use `pack(fill=tk.BOTH, expand=True)` for canvas
+- ❌ Don't set fixed canvas width (causes whitespace on resize)
+- ❌ Don't forget initial `update_idletasks()` and `configure(scrollregion=...)`
+
+### Next Steps
+
+**Immediate Tasks:**
+1. ⏳ Test Routine configuration generation end-to-end
+2. ⏳ Integrate routine control into UDS service handler
+3. ⏳ Test routine execution with diagnostic tester
+4. ⏳ Add routine status tracking (pending/complete)
+5. ⏳ Implement async routine support with NRC 0x78
+
+**Future Enhancements:**
+- Import/export routine configuration presets
+- Routine execution logging and diagnostics
+- Support for manufacturer-specific subfunctions
+- Routine parameter validation in generator
+- Runtime routine registration/deregistration
+
+---
+
+**End of Conversation History - Last Updated: December 21, 2025 (23:45 PM)**

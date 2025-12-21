@@ -13,12 +13,14 @@ from Module.did_module import validate_dids, generate_did_code
 from Module.session_module import validate_sessions, generate_session_code
 from Module.security_module import validate_security_levels, generate_security_code
 from Module.service_module import validate_services, generate_service_code
+from Module.routine_module import validate_routines, generate_routine_config
 from Module.fls_module import validate_fls_config, generate_fls_code
 from Module.fee_module import validate_fee_config, generate_fee_code
 from Module.cmake_module import generate_cmake_file
 from Module_UI.service_ui import ServiceUI
 from Module_UI.session_ui import SessionUI
 from Module_UI.security_ui import SecurityUI
+from Module_UI.routine_ui import RoutineUI
 from Module_UI.nvm_ui import NvmUI
 from Module_UI.did_ui import DidUI
 from Module_UI.fls_ui import FlsUI
@@ -38,6 +40,7 @@ class ConfigEditor:
         self.service_ui = None
         self.session_ui = None
         self.security_ui = None
+        self.routine_ui = None
         self.nvm_ui = None
         self.did_ui = None
         self.fls_ui = None
@@ -114,6 +117,7 @@ class ConfigEditor:
         self.setup_session_tab()
         self.setup_security_tab()
         self.setup_service_tab()
+        self.setup_routine_tab()
         self.setup_fls_tab()
         self.setup_fee_tab()
         
@@ -261,6 +265,21 @@ class ConfigEditor:
             delete_cmd=self.delete_service
         )
     
+    def setup_routine_tab(self):
+        """Setup Routine tab using RoutineUI module"""
+        self.routine_tab_frame = ttk.Frame(self.config_panel_frame)
+        
+        # Initialize RoutineUI
+        self.routine_ui = RoutineUI(self.routine_tab_frame)
+        
+        # Setup tree and toolbar using UI module
+        self.routine_tree = self.routine_ui.setup_tab()
+        self.routine_count_var = self.routine_ui.setup_toolbar(
+            add_cmd=self.add_routine,
+            edit_cmd=self.edit_routine,
+            delete_cmd=self.delete_routine
+        )
+    
     def setup_fls_tab(self):
         """Setup Flash Driver tab using FlsUI module"""
         fls_frame = ttk.Frame(self.config_panel_frame)
@@ -360,6 +379,12 @@ class ConfigEditor:
             self.service_ui.refresh_tree(services)
         self.service_count_var.set(str(len(services)))
         
+        # Routines
+        routines = self.config.get('routines', [])
+        if self.routine_ui:
+            self.routine_ui.refresh_tree(routines)
+        self.routine_count_var.set(str(len(routines)))
+        
         # Flash Configuration
         fls_config = self.config.get('fls_config', {})
         if self.fls_ui:
@@ -373,6 +398,14 @@ class ConfigEditor:
             self.fee_ui.refresh_tree(fee_config)
         mappings = fee_config.get('sector_mapping', [])
         self.fee_count_var.set(str(len(mappings)))
+    
+    def save_current_form(self):
+        """Save current form data before validate/generate"""
+        # Try to find and call save_changes on active form frame
+        for widget in self.config_panel_frame.winfo_children():
+            if hasattr(widget, 'save_changes'):
+                widget.save_changes()
+                break
     
     def refresh_nav_tree(self):
         """Refresh navigation tree"""
@@ -428,6 +461,15 @@ class ConfigEditor:
             self.nav_tree.insert(service_root, tk.END,
                 text=f"  {service['service_id']} - {service['handler_name']}",
                 tags=('service', str(i)))
+        
+        # Routines branch with count (Service 0x31)
+        routines = self.config.get('routines', [])
+        routine_count = len(routines)
+        routine_root = self.nav_tree.insert(root, tk.END, text=f"🔄 Routines (0x31) ({routine_count})", open=True, tags=('routine_root',))
+        for i, routine in enumerate(routines):
+            self.nav_tree.insert(routine_root, tk.END,
+                text=f"  {routine['rid']} - {routine['routine_name']}",
+                tags=('routine', str(i)))
         
         # Flash Configuration branch
         fls_config = self.config.get('fls_config', {})
@@ -603,6 +645,16 @@ class ConfigEditor:
             # Show edit form in config panel
             self.show_service_edit_form(idx)
         
+        elif tags and tags[0] == 'routine':
+            # Show Routine details in info panel using RoutineUI
+            idx = int(tags[1])
+            routine = self.config['routines'][idx]
+            if self.routine_ui:
+                self.routine_ui.show_info_panel(self.info_text, routine)
+            
+            # Show edit form in config panel
+            self.show_routine_edit_form(idx)
+        
         elif tags and tags[0] == 'fls_hw':
             # Show Fls hardware configuration
             fls_config = self.config.get('fls_config', {})
@@ -685,6 +737,8 @@ class ConfigEditor:
             menu.add_command(label="➕ Add New Security Level", command=self.add_security_level)
         elif tags and tags[0] == 'service_root':
             menu.add_command(label="➕ Add New Service", command=self.add_service)
+        elif tags and tags[0] == 'routine_root':
+            menu.add_command(label="➕ Add New Routine", command=self.add_routine)
         elif tags and tags[0] == 'fls_root':
             menu.add_command(label="➕ Add New Sector", command=self.add_fls_sector)
         elif tags and tags[0] == 'fee_root':
@@ -704,6 +758,9 @@ class ConfigEditor:
         elif tags and tags[0] == 'service':
             menu.add_command(label="✏️ Edit Service", command=self.edit_service)
             menu.add_command(label="🗑️ Delete Service", command=self.delete_service)
+        elif tags and tags[0] == 'routine':
+            menu.add_command(label="✏️ Edit Routine", command=self.edit_routine)
+            menu.add_command(label="🗑️ Delete Routine", command=self.delete_routine)
         elif tags and tags[0] == 'fls_sector':
             menu.add_command(label="✏️ Edit Sector", command=self.edit_fls_sector)
             menu.add_command(label="🗑️ Delete Sector", command=self.delete_fls_sector)
@@ -1091,6 +1148,72 @@ class ConfigEditor:
                 set_modified_callback=self.set_modified
             )
     
+    def show_routine_edit_form(self, index):
+        """Show routine edit form using RoutineUI module"""
+        if self.routine_ui:
+            callbacks = {
+                'save_callback': lambda: (self.set_modified(), self.refresh_ui())
+            }
+            self.routine_ui.show_edit_form(
+                config_panel_frame=self.config_panel_frame,
+                index=index,
+                config=self.config,
+                callbacks=callbacks
+            )
+    
+    # ===== Routine Management =====
+    def add_routine(self):
+        """Add new routine"""
+        if 'routines' not in self.config:
+            self.config['routines'] = []
+        
+        def on_add_callback(new_routine):
+            self.config['routines'].append(new_routine)
+            self.refresh_ui()
+            self.set_modified()
+        
+        if self.routine_ui:
+            self.routine_ui.show_add_form(self.root, self.config, on_add_callback)
+    
+    def edit_routine(self):
+        """Edit selected routine"""
+        selection = self.nav_tree.selection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a routine to edit")
+            return
+        
+        item = self.nav_tree.item(selection[0])
+        tags = item['tags']
+        
+        if not tags or tags[0] != 'routine':
+            messagebox.showwarning("Invalid Selection", "Please select a routine")
+            return
+        
+        index = int(tags[1])
+        self.show_routine_edit_form(index)
+    
+    def delete_routine(self):
+        """Delete selected routine"""
+        selection = self.nav_tree.selection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a routine to delete")
+            return
+        
+        item = self.nav_tree.item(selection[0])
+        tags = item['tags']
+        
+        if not tags or tags[0] != 'routine':
+            messagebox.showwarning("Invalid Selection", "Please select a routine")
+            return
+        
+        index = int(tags[1])
+        routine = self.config['routines'][index]
+        
+        if messagebox.askyesno("Confirm Delete", f"Delete routine {routine['rid']} ({routine['routine_name']})?"):
+            del self.config['routines'][index]
+            self.refresh_ui()
+            self.set_modified()
+    
     # ===== Flash Configuration Management =====
     def add_fls_sector(self):
         """Add new flash sector"""
@@ -1280,7 +1403,10 @@ class ConfigEditor:
     def generate_code(self):
         """Generate code from configuration"""
         try:
-            # Save first
+            # Save current form first
+            self.save_current_form()
+            
+            # Save to file
             self.save_config()
             
             # Validate first
@@ -1293,10 +1419,12 @@ class ConfigEditor:
                 self.config.get('sessions', []),
                 self.config.get('security_levels', [])
             )
+            routine_valid, routine_errors = validate_routines(self.config.get('routines', []))
+            routine_warnings = []
             fls_valid, fls_errors, fls_warnings = validate_fls_config(self.config)
             fee_valid, fee_errors, fee_warnings = validate_fee_config(self.config)
             
-            if not nvm_valid or not did_valid or not session_valid or not security_valid or not service_valid or not fls_valid or not fee_valid:
+            if not nvm_valid or not did_valid or not session_valid or not security_valid or not service_valid or not routine_valid or not fls_valid or not fee_valid:
                 error_msg = "Validation failed:\n"
                 if nvm_errors:
                     error_msg += "\nNVM Errors:\n" + "\n".join(nvm_errors)
@@ -1308,6 +1436,8 @@ class ConfigEditor:
                     error_msg += "\nSecurity Errors:\n" + "\n".join(security_errors)
                 if service_errors:
                     error_msg += "\nService Errors:\n" + "\n".join(service_errors)
+                if routine_errors:
+                    error_msg += "\nRoutine Errors:\n" + "\n".join(routine_errors)
                 if fls_errors:
                     error_msg += "\nFlash Config Errors:\n" + "\n".join(fls_errors)
                 if fee_errors:
@@ -1355,6 +1485,15 @@ class ConfigEditor:
             if self.config.get('dcm_services'):
                 service_files = generate_service_code(self.config['dcm_services'], self.config.get('sessions', []),
                                                      self.config.get('security_levels', []), output_path)
+            routine_files = []
+            if self.config.get('routines'):
+                routine_success, routine_messages = generate_routine_config(self.config, output_path)
+                if routine_success:
+                    routine_files = [
+                        os.path.join(output_path, "Routine_Gen", "Routine_PBCfg.h"),
+                        os.path.join(output_path, "Routine_Gen", "Routine_PBCfg.c"),
+                        os.path.join(output_path, "Routine_Gen", "Routine_Callbacks_Skeleton.c")
+                    ]
             fls_files = []
             if self.config.get('fls_config'):
                 fls_files = generate_fls_code(self.config, output_path)
@@ -1363,7 +1502,7 @@ class ConfigEditor:
                 fee_files = generate_fee_code(self.config, output_path)
             cmake_file = generate_cmake_file(output_path, project_name, version)
             
-            all_files = nvm_files + did_files + session_files + security_files + service_files + fls_files + fee_files + [cmake_file]
+            all_files = nvm_files + did_files + session_files + security_files + service_files + routine_files + fls_files + fee_files + [cmake_file]
             messagebox.showinfo("Success", f"Generated {len(all_files)} files:\n" + "\n".join([os.path.basename(f) for f in all_files]))
             self.status_var.set("Code generation complete")
         except Exception as e:
@@ -1372,6 +1511,9 @@ class ConfigEditor:
     def validate_config(self):
         """Validate configuration"""
         try:
+            # Save current form first
+            self.save_current_form()
+            
             # Validate using modules
             nvm_valid, nvm_errors, nvm_warnings = validate_nvm_blocks(self.config['nvm_blocks'])
             did_valid, did_errors, did_warnings = validate_dids(self.config['dids'])
