@@ -22,6 +22,7 @@ class AutomationRunner:
         self.log_error = log_callback.get('log_error')
         self.config_manager = config_manager
         self.pending_seed_level = None
+        self.security_unlock_complete = False
         
         # Register callback for seed responses
         if min_handler:
@@ -86,10 +87,29 @@ class AutomationRunner:
                             continue
                         
                         level = int(parts[1], 16) if parts[1].startswith('0x') else int(parts[1])
+                        
+                        # Reset completion flag
+                        self.security_unlock_complete = False
+                        
+                        # Start security unlock
                         self._security_unlock(level, min_id)
                         
-                        # Wait for unlock to complete (seed request + key send)
-                        time.sleep(0.5)
+                        # Wait for unlock to complete (seed request + key response)
+                        timeout = 5.0  # 5 second timeout
+                        elapsed = 0.0
+                        poll_interval = 0.05  # 50ms polling
+                        
+                        while not self.security_unlock_complete and elapsed < timeout:
+                            time.sleep(poll_interval)
+                            elapsed += poll_interval
+                        
+                        if not self.security_unlock_complete:
+                            self.log_error(f"Script line {line_num}: Security unlock timeout")
+                        else:
+                            self.log_info(f"Script line {line_num}: Security unlock completed")
+                        
+                        # Small delay after unlock
+                        time.sleep(0.1)
                     except Exception as e:
                         self.log_error(f"Script line {line_num}: SA/SECURITY_UNLOCK error - {str(e)}")
                 
@@ -177,6 +197,7 @@ class AutomationRunner:
                 if not exe_path or not os.path.exists(exe_path):
                     self.log_error("Security Access EXE not configured")
                     self.pending_seed_level = None
+                    self.security_unlock_complete = True  # Mark as complete (failed)
                     return
                 
                 try:
@@ -206,10 +227,22 @@ class AutomationRunner:
                         self.min_handler.min_id = old_min_id
                     else:
                         self.log_error(f"Key calculation failed: {result.stderr}")
+                        self.security_unlock_complete = True  # Mark as complete (failed)
                 
                 except Exception as e:
                     self.log_error(f"Security unlock error: {str(e)}")
+                    self.security_unlock_complete = True  # Mark as complete (failed)
                 
                 finally:
                     self.pending_seed_level = None
+            
+            # Check if even subfunction (key response - positive response to send key)
+            elif subfunction % 2 == 0:
+                # Key accepted - security unlock complete
+                self.security_unlock_complete = True
+        
+        # Check for negative response (0x7F)
+        elif len(payload) >= 3 and payload[0] == 0x7F and payload[1] == 0x27:
+            # Security access failed
+            self.security_unlock_complete = True  # Mark as complete (failed)
 
