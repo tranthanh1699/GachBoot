@@ -16,6 +16,7 @@ from Module.service_module import validate_services, generate_service_code
 from Module.routine_module import validate_routines, generate_routine_config
 from Module.fls_module import validate_fls_config, generate_fls_code
 from Module.fee_module import validate_fee_config, generate_fee_code
+from Module.memory_layout_module import validate_memory_layout, generate_memory_layout_code
 from Module.cmake_module import generate_cmake_file
 from Module_UI.service_ui import ServiceUI
 from Module_UI.session_ui import SessionUI
@@ -25,6 +26,7 @@ from Module_UI.nvm_ui import NvmUI
 from Module_UI.did_ui import DidUI
 from Module_UI.fls_ui import FlsUI
 from Module_UI.fee_ui import FeeUI
+from Module_UI.memory_layout_ui import MemoryLayoutUI
 
 class ConfigEditor:
     def __init__(self, root):
@@ -48,6 +50,7 @@ class ConfigEditor:
         self.did_ui = None
         self.fls_ui = None
         self.fee_ui = None
+        self.memory_layout_ui = None
         
         # Apply theme
         style = ttk.Style()
@@ -123,6 +126,7 @@ class ConfigEditor:
         self.setup_routine_tab()
         self.setup_fls_tab()
         self.setup_fee_tab()
+        self.setup_memory_layout_tab()
         
         # Status bar
         self.status_var = tk.StringVar(value="Ready")
@@ -313,6 +317,12 @@ class ConfigEditor:
             delete_cmd=self.delete_fee_mapping
         )
     
+    def setup_memory_layout_tab(self):
+        """Setup Memory Layout tab using MemoryLayoutUI module"""
+        # MemoryLayoutUI will create its own frame inside config_panel_frame when show_edit_form is called
+        # Just initialize it with None for now
+        self.memory_layout_ui = MemoryLayoutUI(None)
+    
     def load_config(self):
         """Load configuration from file"""
         try:
@@ -406,13 +416,10 @@ class ConfigEditor:
         """Save current form data before validate/generate"""
         # First try the cached reference
         if self.current_form_widget and hasattr(self.current_form_widget, 'save_changes'):
-            print(f"[DEBUG] Using cached form widget: {self.current_form_widget}")
             try:
-                result = self.current_form_widget.save_changes()
-                print(f"[DEBUG] save_changes() returned: {result}")
+                self.current_form_widget.save_changes()
                 return
             except Exception as e:
-                print(f"[DEBUG] Error calling save_changes(): {e}")
                 import traceback
                 traceback.print_exc()
         
@@ -420,9 +427,7 @@ class ConfigEditor:
         # First check direct children
         for widget in self.config_panel_frame.winfo_children():
             if hasattr(widget, 'save_changes'):
-                print(f"[DEBUG] Found save_changes on direct child: {widget}")
                 widget.save_changes()
-                print("[DEBUG] save_changes() called successfully")
                 return
             
             # If widget is a Canvas, check its children (form_frame is inside canvas)
@@ -436,16 +441,11 @@ class ConfigEditor:
                             # Get the actual widget object
                             actual_widget = widget.nametowidget(window_widget)
                             if hasattr(actual_widget, 'save_changes'):
-                                print(f"[DEBUG] Found save_changes on canvas child: {actual_widget}")
                                 actual_widget.save_changes()
-                                print("[DEBUG] save_changes() called successfully")
                                 self.current_form_widget = actual_widget  # Cache for next time
                                 return
                     except Exception as e:
-                        print(f"[DEBUG] Error checking canvas item: {e}")
                         continue
-        
-        print("[DEBUG] No save_changes() method found on any widget")
     
     def refresh_nav_tree(self):
         """Refresh navigation tree"""
@@ -539,6 +539,10 @@ class ConfigEditor:
             self.nav_tree.insert(fee_root, tk.END,
                 text=f"  {name} → Fls[{fls_idx}]{primary}",
                 tags=('fee_mapping', str(i)))
+        
+        # Memory Layout branch
+        memory_layout = self.config.get('memory_layout', {})
+        self.nav_tree.insert(root, tk.END, text="🗺️ Memory Layout", open=True, tags=('memory_layout',))
     
     def browse_config_file(self):
         """Browse for config file"""
@@ -751,6 +755,23 @@ class ConfigEditor:
                 
                 self.fee_ui.show_mapping_edit_form(self.config_panel_frame, idx, self.config, self.set_modified)
         
+        elif tags and tags[0] == 'memory_layout':
+            # Show Memory Layout
+            memory_layout = self.config.get('memory_layout', {})
+            bootloader = memory_layout.get('bootloader_region', {})
+            application = memory_layout.get('application_region', {})
+            self.info_text.insert(tk.END, f"Memory Layout Configuration\n")
+            self.info_text.insert(tk.END, f"{'='*30}\n")
+            self.info_text.insert(tk.END, f"Bootloader:\n")
+            self.info_text.insert(tk.END, f"  Start: {bootloader.get('start_address', 'N/A')}\n")
+            self.info_text.insert(tk.END, f"  Size: {bootloader.get('size', 'N/A')}\n")
+            self.info_text.insert(tk.END, f"Application:\n")
+            self.info_text.insert(tk.END, f"  Start: {application.get('start_address', 'N/A')}\n")
+            self.info_text.insert(tk.END, f"  Size: {application.get('size', 'N/A')}\n")
+            
+            # Show edit form
+            self.show_memory_layout_edit_form()
+        
         self.info_text.config(state=tk.DISABLED)
     
     def show_context_menu(self, event):
@@ -911,7 +932,6 @@ class ConfigEditor:
             self.set_modified(False)
             self.update_title()
             self.status_var.set(f"Saved: {self.config_file}")
-            print(f"[DEBUG] Config saved to {self.config_file}")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save config: {e}")
             import traceback
@@ -1570,9 +1590,18 @@ class ConfigEditor:
             fee_files = []
             if self.config.get('fee_config'):
                 fee_files = generate_fee_code(self.config, output_path)
+            
+            # Generate Memory Layout code
+            memory_files = []
+            if self.config.get('memory_layout'):
+                memory_output = generate_memory_layout_code(self.config['memory_layout'], output_path, project_name)
+                memory_files = [memory_output]
+                self.status_var.set(f"Generated: {os.path.basename(memory_output)}")
+                self.root.update()
+            
             cmake_file = generate_cmake_file(output_path, project_name, version)
             
-            all_files = nvm_files + did_files + session_files + security_files + service_files + routine_files + fls_files + fee_files + [cmake_file]
+            all_files = nvm_files + did_files + session_files + security_files + service_files + routine_files + fls_files + fee_files + memory_files + [cmake_file]
             messagebox.showinfo("Success", f"Generated {len(all_files)} files:\n" + "\n".join([os.path.basename(f) for f in all_files]))
             self.status_var.set("Code generation complete")
         except Exception as e:
@@ -1592,8 +1621,11 @@ class ConfigEditor:
             fls_valid, fls_errors, fls_warnings = validate_fls_config(self.config)
             fee_valid, fee_errors, fee_warnings = validate_fee_config(self.config)
             
+            # Validate Memory Layout
+            memory_errors = validate_memory_layout(self.config.get('memory_layout', {}))
+            
             # Collect all messages
-            all_errors = nvm_errors + did_errors + session_errors + security_errors + fls_errors + fee_errors
+            all_errors = nvm_errors + did_errors + session_errors + security_errors + fls_errors + fee_errors + memory_errors
             all_warnings = nvm_warnings + did_warnings + session_warnings + security_warnings + fls_warnings + fee_warnings
             
             # Basic project validation
@@ -1613,6 +1645,44 @@ class ConfigEditor:
                 messagebox.showinfo("Validation", "✓ Configuration is valid!")
         except Exception as e:
             messagebox.showerror("Error", f"Validation failed: {e}")
+    
+    def show_memory_layout_edit_form(self):
+        """Show Memory Layout edit form in config panel using MemoryLayoutUI"""
+        if self.memory_layout_ui:
+            # Set the parent frame to config_panel_frame
+            self.memory_layout_ui.parent_frame = self.config_panel_frame
+            
+            memory_layout = self.config.get('memory_layout', {
+                'bootloader_region': {
+                    'name': 'Bootloader',
+                    'start_address': '0x08000000',
+                    'size': '0x00040000',
+                    'description': 'Bootloader firmware region'
+                },
+                'application_region': {
+                    'name': 'Application',
+                    'start_address': '0x08100000',
+                    'size': '0x00100000',
+                    'description': 'Application firmware region'
+                }
+            })
+            
+            def on_save(updated_layout, show_message=True):
+                self.config['memory_layout'] = updated_layout
+                self.set_modified()
+                self.refresh_nav_tree()
+                if show_message:
+                    messagebox.showinfo("Success", "Memory layout saved successfully!")
+            
+            # Pass on_change callback to mark as modified when fields change
+            self.memory_layout_ui.show_edit_form(
+                memory_layout, 
+                on_save,
+                on_change_callback=self.set_modified
+            )
+            
+            # Cache the UI object (not the frame) for save_current_form
+            self.current_form_widget = self.memory_layout_ui
     
     def show_about(self):
         """Show about dialog"""

@@ -156,6 +156,39 @@
         "DCM_EXTENDED_SESSION"
       ],
       "required_security_levels": []
+    },
+    {
+      "service_id": "0x36",
+      "handler_name": "uds_service_0x36_handler",
+      "supported_sessions": [
+        "DCM_PROGRAMMING_SESSION"
+      ],
+      "required_security_levels": [
+        1,
+        2
+      ]
+    },
+    {
+      "service_id": "0x34",
+      "handler_name": "uds_service_0x31_handler",
+      "supported_sessions": [
+        "DCM_PROGRAMMING_SESSION"
+      ],
+      "required_security_levels": [
+        1,
+        2
+      ]
+    },
+    {
+      "service_id": "0x37",
+      "handler_name": "uds_service_0x37_handler",
+      "supported_sessions": [
+        "DCM_PROGRAMMING_SESSION"
+      ],
+      "required_security_levels": [
+        1,
+        2
+      ]
     }
   ],
   "routines": [
@@ -188,105 +221,6 @@
           "option_record_description": "No parameters",
           "status_record_length": 1,
           "status_record_description": "Status byte (0x00=Complete)"
-        }
-      }
-    },
-    {
-      "rid": "0xFF01",
-      "routine_name": "ROUTINE_CHECK_PROGRAMMING_DEPENDENCIES",
-      "description": "Check programming preconditions (voltage, temperature, etc.)",
-      "callback_function": "routine_check_programming_dependencies",
-      "supported_subfunctions": [
-        "START"
-      ],
-      "supported_sessions": [
-        "DCM_PROGRAMMING_SESSION"
-      ],
-      "required_security_levels": [
-        1,
-        2
-      ],
-      "subfunction_parameters": {
-        "START": {
-          "option_record_length": 0,
-          "option_record_description": "No parameters",
-          "status_record_length": 1,
-          "status_record_description": "Status byte (0x00=OK, 0x01=NOT OK)"
-        }
-      }
-    },
-    {
-      "rid": "0x0202",
-      "routine_name": "ROUTINE_CHECK_MEMORY",
-      "description": "Verify memory integrity using CRC/Checksum",
-      "callback_function": "routine_check_memory",
-      "supported_subfunctions": [
-        "START",
-        "REQUEST_RESULTS"
-      ],
-      "supported_sessions": [
-        "DCM_EXTENDED_SESSION",
-        "DCM_PROGRAMMING_SESSION"
-      ],
-      "required_security_levels": [],
-      "subfunction_parameters": {
-        "START": {
-          "option_record_length": 8,
-          "option_record_description": "Memory address (4 bytes) + Memory size (4 bytes)",
-          "status_record_length": 1,
-          "status_record_description": "Status byte (0x00=Started)"
-        },
-        "REQUEST_RESULTS": {
-          "option_record_length": 0,
-          "option_record_description": "No parameters",
-          "status_record_length": 5,
-          "status_record_description": "Status byte + CRC32 (4 bytes)"
-        }
-      }
-    },
-    {
-      "rid": "0x0203",
-      "routine_name": "ROUTINE_VERIFY_APPLICATION_INTEGRITY",
-      "description": "Verify application software integrity",
-      "callback_function": "routine_verify_application_integrity",
-      "supported_subfunctions": [
-        "START"
-      ],
-      "supported_sessions": [
-        "DCM_EXTENDED_SESSION",
-        "DCM_PROGRAMMING_SESSION"
-      ],
-      "required_security_levels": [],
-      "subfunction_parameters": {
-        "START": {
-          "option_record_length": 0,
-          "option_record_description": "No parameters",
-          "status_record_length": 1,
-          "status_record_description": "Status byte (0x00=Valid, 0x01=Invalid)"
-        }
-      }
-    },
-    {
-      "rid": "0x0204",
-      "routine_name": "ROUTINE_CHECK_PROGRAMMING_INTEGRITY",
-      "description": "Check if programming session was completed successfully",
-      "callback_function": "routine_check_programming_integrity",
-      "supported_subfunctions": [
-        "START"
-      ],
-      "supported_sessions": [
-        "DCM_PROGRAMMING_SESSION",
-        "DCM_EXTENDED_SESSION"
-      ],
-      "required_security_levels": [
-        1
-      ],
-      "subfunction_parameters": {
-        "START": {
-          "option_record_length": 0,
-          "option_record_description": "No parameters",
-          "status_record_length": 1,
-          "status_record_description": "Status byte (0x00=OK, 0x01=Failed)"
         }
       }
     }
@@ -343,5 +277,25 @@
         "description": "Secondary Fee sector (maps to NVM_Sector_B)"
       }
     ]
+  },
+  "memory_layout": {
+    "bootloader_region": {
+      "name": "Bootloader",
+      "start_address": "0x08000000",
+      "size": "0x00040000",
+      "description": "Bootloader firmware region"
+    },
+    "application_region": {
+      "name": "Application",
+      "start_address": "0x08100000",
+      "size": "0x00100000",
+      "description": "Application firmware region"
+    },
+    "download_region": {
+      "start_address": "0x08100000",
+      "size": "0x00100000",
+      "alignment": "32",
+      "max_block_length": "200"
+    }
   }
 }

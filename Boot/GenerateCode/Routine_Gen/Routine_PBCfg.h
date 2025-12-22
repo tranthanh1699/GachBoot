@@ -4,7 +4,7 @@
 /**
  * @file Routine_PBCfg.h
  * @brief UDS Routine Control Configuration (Service 0x31)
- * @date Generated on 2025-12-21 21:05:14
+ * @date Generated on 2025-12-22 21:55:54
  * 
  * This file contains routine registry and callback declarations
  */
@@ -72,7 +72,7 @@ typedef struct {
  */
 /**
  * @brief Erase flash memory region - START
- * @param option_record Memory address (4 bytes) + Memory size (4 bytes)
+ * @param option_record Optional: Memory address (4 bytes) + Memory size (4 bytes). If omitted, erases default region (Bank 2).
  * @param option_record_len Length of option record
  * @param status_record Status byte (0x00=Success)
  * @param status_record_len Length of status record (output)
@@ -100,102 +100,11 @@ extern Std_ReturnType routine_erase_memory_request_results(
     uint16_t *status_record_len
 );
 
-/**
- * @brief Check programming preconditions (voltage, temperature, etc.)
- */
-/**
- * @brief Check programming preconditions (voltage, temperature, etc.) - START
- * @param option_record No parameters
- * @param option_record_len Length of option record
- * @param status_record Status byte (0x00=OK, 0x01=NOT OK)
- * @param status_record_len Length of status record (output)
- * @return E_OK on success, E_NOT_OK on failure
- */
-extern Std_ReturnType routine_check_programming_dependencies_start(
-    const uint8_t *option_record,
-    uint16_t option_record_len,
-    uint8_t *status_record,
-    uint16_t *status_record_len
-);
-
-/**
- * @brief Verify memory integrity using CRC/Checksum
- */
-/**
- * @brief Verify memory integrity using CRC/Checksum - START
- * @param option_record Memory address (4 bytes) + Memory size (4 bytes)
- * @param option_record_len Length of option record
- * @param status_record Status byte (0x00=Started)
- * @param status_record_len Length of status record (output)
- * @return E_OK on success, E_NOT_OK on failure
- */
-extern Std_ReturnType routine_check_memory_start(
-    const uint8_t *option_record,
-    uint16_t option_record_len,
-    uint8_t *status_record,
-    uint16_t *status_record_len
-);
-
-/**
- * @brief Verify memory integrity using CRC/Checksum - REQUEST_RESULTS
- * @param option_record No parameters
- * @param option_record_len Length of option record
- * @param status_record Status byte + CRC32 (4 bytes)
- * @param status_record_len Length of status record (output)
- * @return E_OK on success, E_NOT_OK on failure
- */
-extern Std_ReturnType routine_check_memory_request_results(
-    const uint8_t *option_record,
-    uint16_t option_record_len,
-    uint8_t *status_record,
-    uint16_t *status_record_len
-);
-
-/**
- * @brief Verify application software integrity
- */
-/**
- * @brief Verify application software integrity - START
- * @param option_record No parameters
- * @param option_record_len Length of option record
- * @param status_record Status byte (0x00=Valid, 0x01=Invalid)
- * @param status_record_len Length of status record (output)
- * @return E_OK on success, E_NOT_OK on failure
- */
-extern Std_ReturnType routine_verify_application_integrity_start(
-    const uint8_t *option_record,
-    uint16_t option_record_len,
-    uint8_t *status_record,
-    uint16_t *status_record_len
-);
-
-/**
- * @brief Check if programming session was completed successfully
- */
-/**
- * @brief Check if programming session was completed successfully - START
- * @param option_record No parameters
- * @param option_record_len Length of option record
- * @param status_record Status byte (0x00=OK, 0x01=Failed)
- * @param status_record_len Length of status record (output)
- * @return E_OK on success, E_NOT_OK on failure
- */
-extern Std_ReturnType routine_check_programming_integrity_start(
-    const uint8_t *option_record,
-    uint16_t option_record_len,
-    uint8_t *status_record,
-    uint16_t *status_record_len
-);
-
 /* ========================================================================== */
 /*                           Routine Name Constants                           */
 /* ========================================================================== */
 
 #define ROUTINE_ERASE_MEMORY                               0xFF00  /**< Erase flash memory region */
-#define ROUTINE_CHECK_PROGRAMMING_DEPENDENCIES             0xFF01  /**< Check programming preconditions (voltage, temperature, etc.) */
-#define ROUTINE_CHECK_MEMORY                               0x0202  /**< Verify memory integrity using CRC/Checksum */
-#define ROUTINE_VERIFY_APPLICATION_INTEGRITY               0x0203  /**< Verify application software integrity */
-#define ROUTINE_CHECK_PROGRAMMING_INTEGRITY                0x0204  /**< Check if programming session was completed successfully */
 
 /* ========================================================================== */
 /*                         Registry Access Functions                          */

@@ -50,5 +50,26 @@ const dcm_service_config_t dcm_service_config_table[DCM_SERVICE_COUNT] = {
         .handler = uds_service_0x31_handler,
         .session_mask = 12u,  /* DCM_PROGRAMMING_SESSION, DCM_EXTENDED_SESSION */
         .security_mask = 0u  /*  */
+    },
+    /* Service 0x36 - 0x36 */
+    {
+        .service_id = 0x36,
+        .handler = uds_service_0x36_handler,
+        .session_mask = 4u,  /* DCM_PROGRAMMING_SESSION */
+        .security_mask = 6u  /* Level 1, Level 2 */
+    },
+    /* Service 0x34 - 0x34 */
+    {
+        .service_id = 0x34,
+        .handler = uds_service_0x34_handler,
+        .session_mask = 4u,  /* DCM_PROGRAMMING_SESSION */
+        .security_mask = 6u  /* Level 1, Level 2 */
+    },
+    /* Service 0x37 - 0x37 */
+    {
+        .service_id = 0x37,
+        .handler = uds_service_0x37_handler,
+        .session_mask = 4u,  /* DCM_PROGRAMMING_SESSION */
+        .security_mask = 6u  /* Level 1, Level 2 */
     }
 };

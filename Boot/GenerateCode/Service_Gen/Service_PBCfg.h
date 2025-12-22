@@ -39,10 +39,13 @@ extern Std_ReturnType uds_service_0x22_handler(const uds_message_t *message, Err
 extern Std_ReturnType uds_service_0x27_handler(const uds_message_t *message, ErrorCode_t *error_code);
 extern Std_ReturnType uds_service_0x2E_handler(const uds_message_t *message, ErrorCode_t *error_code);
 extern Std_ReturnType uds_service_0x31_handler(const uds_message_t *message, ErrorCode_t *error_code);
+extern Std_ReturnType uds_service_0x34_handler(const uds_message_t *message, ErrorCode_t *error_code);
+extern Std_ReturnType uds_service_0x36_handler(const uds_message_t *message, ErrorCode_t *error_code);
+extern Std_ReturnType uds_service_0x37_handler(const uds_message_t *message, ErrorCode_t *error_code);
 extern Std_ReturnType uds_service_0x3E_handler(const uds_message_t *message, ErrorCode_t *error_code);
 
 /* Service configuration table */
-#define DCM_SERVICE_COUNT 7u
+#define DCM_SERVICE_COUNT 10u
 extern const dcm_service_config_t dcm_service_config_table[DCM_SERVICE_COUNT];
 
 #endif /* SERVICE_PBCFG_H */
