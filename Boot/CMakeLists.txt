@@ -44,6 +44,7 @@ add_subdirectory(components/dev_crc)
 add_subdirectory(components/dev_com_if)
 add_subdirectory(components/dev_com_tp)
 add_subdirectory(components/dev_memstack)  # Memory Stack (Fls, Fee, MemIf, NvM)
+add_subdirectory(components/dev_flashblock)  # Flash Block Management
 add_subdirectory(GenerateCode)
 # Add user service modules
 add_subdirectory(service/svc_app)
@@ -89,6 +90,7 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
     dev_com_if
     dev_com_tp
     dev_memstack  # Memory Stack (includes Fls, Fee, MemIf, NvM)
+    dev_flashblock  # Flash Block Management
 
     # Add generated code library (headers and non-circular sources)
     GenerateCode

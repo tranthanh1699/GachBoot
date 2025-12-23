@@ -198,8 +198,7 @@
       "description": "Erase flash memory region",
       "callback_function": "routine_erase_memory",
       "supported_subfunctions": [
-        "START",
-        "REQUEST_RESULTS"
+        "START"
       ],
       "supported_sessions": [
         "DCM_PROGRAMMING_SESSION",
@@ -215,12 +214,6 @@
           "option_record_description": "Optional: Memory address (4 bytes) + Memory size (4 bytes). If omitted, erases default region (Bank 2).",
           "status_record_length": 0,
           "status_record_description": "Status byte (0x00=Success)"
-        },
-        "REQUEST_RESULTS": {
-          "option_record_length": 8,
-          "option_record_description": "No parameters",
-          "status_record_length": 2,
-          "status_record_description": "Status byte"
         }
       }
     }

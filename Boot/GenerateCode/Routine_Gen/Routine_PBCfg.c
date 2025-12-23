@@ -1,7 +1,7 @@
 /**
  * @file Routine_PBCfg.c
  * @brief UDS Routine Control Configuration Implementation
- * @date Generated on 2025-12-23 21:09:20
+ * @date Generated on 2025-12-23 21:50:58
  * 
  * Auto-generated from gachboot_config.json
  * DO NOT EDIT MANUALLY
@@ -29,9 +29,6 @@ static Std_ReturnType routine_erase_memory(
         case UDS_ROUTINE_CONTROL_START:
             return routine_erase_memory_start(option_record, option_record_len,
                                               status_record, status_record_len);
-        case UDS_ROUTINE_CONTROL_REQUEST_RESULTS:
-            return routine_erase_memory_request_results(option_record, option_record_len,
-                                              status_record, status_record_len);
         default:
             return E_NOT_OK;
     }
@@ -44,13 +41,13 @@ static Std_ReturnType routine_erase_memory(
 static const uds_routine_entry_t routine_registry[] = {
     {
         .rid = 0xFF00,
-        .supported_subfunctions = 0x05U,
+        .supported_subfunctions = 0x01U,
         .start_option_len = 8U,
         .start_status_len = 0U,
         .stop_option_len = 0U,
         .stop_status_len = 0U,
-        .results_option_len = 8U,
-        .results_status_len = 2U,
+        .results_option_len = 0U,
+        .results_status_len = 0U,
         .callback = routine_erase_memory,
         .session_mask = DCM_PROGRAMMING_SESSION_MASK | DCM_EXTENDED_SESSION_MASK,
         .security_mask = (1U << 1U) | (1U << 2U)  // Erase flash memory region

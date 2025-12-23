@@ -4,7 +4,7 @@
 /**
  * @file Routine_PBCfg.h
  * @brief UDS Routine Control Configuration (Service 0x31)
- * @date Generated on 2025-12-23 21:09:20
+ * @date Generated on 2025-12-23 21:50:58
  * 
  * This file contains routine registry and callback declarations
  */
@@ -90,21 +90,6 @@ extern Std_ReturnType routine_erase_memory_start(
     uint16_t *status_record_len
 );
 
-/**
- * @brief Erase flash memory region - REQUEST_RESULTS
- * @param option_record No parameters
- * @param option_record_len Length of option record
- * @param status_record Status byte
- * @param status_record_len Length of status record (output)
- * @return E_OK on success, E_NOT_OK on failure
- */
-extern Std_ReturnType routine_erase_memory_request_results(
-    const uint8_t *option_record,
-    uint16_t option_record_len,
-    uint8_t *status_record,
-    uint16_t *status_record_len
-);
-
 /* ========================================================================== */
 /*                           Routine Name Constants                           */
 /* ========================================================================== */
@@ -117,8 +102,6 @@ extern Std_ReturnType routine_erase_memory_request_results(
 
 #define ROUTINE_ERASE_MEMORY_START_OPTION_LENGTH    8U
 #define ROUTINE_ERASE_MEMORY_START_STATUS_LENGTH    0U
-#define ROUTINE_ERASE_MEMORY_REQUEST_RESULTS_OPTION_LENGTH    8U
-#define ROUTINE_ERASE_MEMORY_REQUEST_RESULTS_STATUS_LENGTH    2U
 
 /* ========================================================================== */
 /*                         Registry Access Functions                          */
