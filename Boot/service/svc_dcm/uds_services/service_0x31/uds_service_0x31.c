@@ -45,6 +45,39 @@ Std_ReturnType uds_service_0x31_handler(const uds_message_t *message, ErrorCode_
         return E_NOT_OK;
     }
 
+    // Phase 4.5: Validate sub-function is supported
+    uint8_t sf_bit = 0;
+    if (sub_function == UDS_ROUTINE_CONTROL_START) {
+        sf_bit = (1 << 0);
+    } else if (sub_function == UDS_ROUTINE_CONTROL_STOP) {
+        sf_bit = (1 << 1);
+    } else if (sub_function == UDS_ROUTINE_CONTROL_REQUEST_RESULTS) {
+        sf_bit = (1 << 2);
+    }
+    
+    if ((routine_entry->supported_subfunctions & sf_bit) == 0) {
+        DBG_OUT_W("RID 0x%04X does not support sub-function 0x%02X", rid, sub_function);
+        *error_code = UDS_NRC_SUBFUNCTION_NOT_SUPPORTED;
+        return E_NOT_OK;
+    }
+
+    // Phase 4.6: Validate option_record length
+    if (!uds_routine_validate_option_length(routine_entry, sub_function, option_record_len)) {
+        uint16_t expected_len = 0;
+        if (sub_function == UDS_ROUTINE_CONTROL_START) {
+            expected_len = routine_entry->start_option_len;
+        } else if (sub_function == UDS_ROUTINE_CONTROL_STOP) {
+            expected_len = routine_entry->stop_option_len;
+        } else if (sub_function == UDS_ROUTINE_CONTROL_REQUEST_RESULTS) {
+            expected_len = routine_entry->results_option_len;
+        }
+        
+        DBG_OUT_E("RID 0x%04X invalid option length: expected %u, got %u", 
+                  rid, expected_len, option_record_len);
+        *error_code = UDS_NRC_INCORRECT_MESSAGE_LENGTH;
+        return E_NOT_OK;
+    }
+
     // Phase 5: Get current session and security (using dynamic code gen API)
     uint8_t current_session = dcmdsl_get_session();
     uint8_t current_security_level = uds_security_get_active_level();
@@ -86,6 +119,30 @@ Std_ReturnType uds_service_0x31_handler(const uds_message_t *message, ErrorCode_
     else if (result != E_OK) {
         DBG_OUT_E("RID 0x%04X execution failed", rid);
         *error_code = UDS_NRC_CONDITIONS_NOT_CORRECT;
+        return E_NOT_OK;
+    }
+
+    // Phase 7.5: Validate status_record length
+    uint16_t expected_status_len = 0;
+    if (sub_function == UDS_ROUTINE_CONTROL_START) {
+        expected_status_len = routine_entry->start_status_len;
+    } else if (sub_function == UDS_ROUTINE_CONTROL_STOP) {
+        expected_status_len = routine_entry->stop_status_len;
+    } else if (sub_function == UDS_ROUTINE_CONTROL_REQUEST_RESULTS) {
+        expected_status_len = routine_entry->results_status_len;
+    }
+    
+    // Check if callback returned correct status length (if configured, 0 = variable length allowed)
+    if (expected_status_len > 0 && status_record_len != expected_status_len) {
+        DBG_OUT_W("RID 0x%04X returned wrong status length: expected %u, got %u", 
+                  rid, expected_status_len, status_record_len);
+        // Note: Some implementations may return variable length, so this is a warning not error
+    }
+    
+    // Validate status_record_len doesn't overflow response buffer
+    if (status_record_len > 253) {  // Max: 256 (UDS buffer) - 3 (SID + RID bytes)
+        DBG_OUT_E("RID 0x%04X status record too long: %u bytes (max 253)", rid, status_record_len);
+        *error_code = UDS_NRC_RESPONSE_TOO_LONG;
         return E_NOT_OK;
     }
 

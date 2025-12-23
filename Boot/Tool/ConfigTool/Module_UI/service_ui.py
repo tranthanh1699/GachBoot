@@ -41,9 +41,9 @@ class ServiceUI:
         toolbar = ttk.Frame(self.parent_frame)
         toolbar.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
         
-        ttk.Button(toolbar, text="➕ Add Service", command=add_cmd).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="✏️ Edit Service", command=edit_cmd).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="🗑️ Delete Service", command=delete_cmd).pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="➕ Add Service", command=add_cmd, style='Success.TButton').pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="✏️ Edit Service", command=edit_cmd, style='TButton').pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="🗑️ Delete Service", command=delete_cmd, style='Warning.TButton').pack(side=tk.LEFT, padx=2)
         
         ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
         ttk.Label(toolbar, text=f"Total Services: ", font=('', 9)).pack(side=tk.LEFT, padx=5)

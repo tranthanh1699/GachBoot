@@ -41,9 +41,9 @@ class SessionUI:
         toolbar = ttk.Frame(self.parent_frame)
         toolbar.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
         
-        ttk.Button(toolbar, text="➕ Add Session", command=add_cmd).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="✏️ Edit Session", command=edit_cmd).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="🗑️ Delete Session", command=delete_cmd).pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="➕ Add Session", command=add_cmd, style='Success.TButton').pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="✏️ Edit Session", command=edit_cmd, style='TButton').pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="🗑️ Delete Session", command=delete_cmd, style='Warning.TButton').pack(side=tk.LEFT, padx=2)
         
         ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
         ttk.Label(toolbar, text=f"Total Sessions: ", font=('', 9)).pack(side=tk.LEFT, padx=5)
@@ -139,6 +139,18 @@ class SessionUI:
         # Initial update
         form_frame.update_idletasks()
         canvas.configure(scrollregion=canvas.bbox("all"))
+        
+        # Mousewheel scrolling
+        def on_mousewheel(event):
+            if canvas.winfo_exists():
+                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        
+        canvas.bind_all("<MouseWheel>", on_mousewheel)
+        
+        # Unbind mousewheel when canvas is destroyed
+        def cleanup():
+            canvas.unbind_all("<MouseWheel>")
+        canvas.bind("<Destroy>", lambda e: cleanup())
     
     def show_info_panel(self, info_text_widget, session):
         """Show session details in info panel"""

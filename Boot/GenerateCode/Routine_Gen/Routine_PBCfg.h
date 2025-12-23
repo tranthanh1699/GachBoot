@@ -4,7 +4,7 @@
 /**
  * @file Routine_PBCfg.h
  * @brief UDS Routine Control Configuration (Service 0x31)
- * @date Generated on 2025-12-22 21:55:54
+ * @date Generated on 2025-12-23 21:09:20
  * 
  * This file contains routine registry and callback declarations
  */
@@ -57,8 +57,13 @@ typedef Std_ReturnType (*uds_routine_callback_t)(
  * @brief Routine control entry structure
  */
 typedef struct {
-    uint16_t rid;                    /**< Routine Identifier */
-    uds_routine_callback_t callback; /**< Routine handler callback */
+    uint16_t rid;                    /**< Routine Identifier */    uint8_t supported_subfunctions;  /**< Bitmask: bit0=START, bit1=STOP, bit2=REQUEST_RESULTS */
+    uint16_t start_option_len;       /**< Expected option_record length for START (0=variable) */
+    uint16_t start_status_len;       /**< Expected status_record length for START */
+    uint16_t stop_option_len;        /**< Expected option_record length for STOP (0=variable) */
+    uint16_t stop_status_len;        /**< Expected status_record length for STOP */
+    uint16_t results_option_len;     /**< Expected option_record length for REQUEST_RESULTS (0=variable) */
+    uint16_t results_status_len;     /**< Expected status_record length for REQUEST_RESULTS */    uds_routine_callback_t callback; /**< Routine handler callback */
     uint32_t session_mask;           /**< Allowed sessions bitmask */
     uint32_t security_mask;          /**< Required security bitmask */
 } uds_routine_entry_t;
@@ -89,7 +94,7 @@ extern Std_ReturnType routine_erase_memory_start(
  * @brief Erase flash memory region - REQUEST_RESULTS
  * @param option_record No parameters
  * @param option_record_len Length of option record
- * @param status_record Status byte (0x00=Complete)
+ * @param status_record Status byte
  * @param status_record_len Length of status record (output)
  * @return E_OK on success, E_NOT_OK on failure
  */
@@ -107,6 +112,15 @@ extern Std_ReturnType routine_erase_memory_request_results(
 #define ROUTINE_ERASE_MEMORY                               0xFF00  /**< Erase flash memory region */
 
 /* ========================================================================== */
+/*                    Record Length Definitions                               */
+/* ========================================================================== */
+
+#define ROUTINE_ERASE_MEMORY_START_OPTION_LENGTH    8U
+#define ROUTINE_ERASE_MEMORY_START_STATUS_LENGTH    0U
+#define ROUTINE_ERASE_MEMORY_REQUEST_RESULTS_OPTION_LENGTH    8U
+#define ROUTINE_ERASE_MEMORY_REQUEST_RESULTS_STATUS_LENGTH    2U
+
+/* ========================================================================== */
 /*                         Registry Access Functions                          */
 /* ========================================================================== */
 
@@ -116,6 +130,18 @@ extern Std_ReturnType routine_erase_memory_request_results(
  * @return Pointer to routine entry, or NULL if not found
  */
 const uds_routine_entry_t* uds_routine_find_entry(uint16_t rid);
+
+/**
+ * @brief Validate option_record length for routine
+ * @param entry Routine entry
+ * @param sub_function Sub-function (0x01=START, 0x02=STOP, 0x03=REQUEST_RESULTS)
+ * @param option_record_len Actual length from request
+ * @return true if valid, false otherwise
+ * @note If expected length is 0, any length is accepted (variable/optional)
+ */
+bool uds_routine_validate_option_length(const uds_routine_entry_t *entry, 
+                                         uint8_t sub_function, 
+                                         uint16_t option_record_len);
 
 /**
  * @brief Get routine registry

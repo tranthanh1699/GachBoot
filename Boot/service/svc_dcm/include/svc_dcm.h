@@ -20,20 +20,29 @@ typedef uint8_t ErrorCode_t;
 #define SVC_DCM_TICK_INTERVAL_MS    10u // DCM service tick interval in milliseconds
 
 // UDS Negative Response Code
-#define UDS_NRC_POSITIVE_RESPONSE                        0x00
-#define UDS_NRC_GENERAL_REJECT                           0x10
-#define UDS_NRC_SERVICE_NOT_SUPPORTED                    0x11
-#define UDS_NRC_SUBFUNCTION_NOT_SUPPORTED                0x12
-#define UDS_NRC_INCORRECT_MESSAGE_LENGTH                 0x13
-#define UDS_NRC_CONDITIONS_NOT_CORRECT                   0x22
-#define UDS_NRC_REQUEST_SEQUENCE_ERROR                   0x24
-#define UDS_NRC_REQUEST_OUT_OF_RANGE                     0x31
-#define UDS_NRC_SECURITY_ACCESS_DENIED                   0x33
-#define UDS_NRC_INVALID_KEY                              0x35
-#define UDS_NRC_EXCEED_NUMBER_OF_ATTEMPTS                0x36
-#define UDS_NRC_REQUIRED_TIME_DELAY_NOT_EXPIRED          0x37
-#define UDS_NRC_SERVICE_NOT_SUPPORTED_IN_ACTIVE_SESSION  0x7F
-#define UDS_NRC_REQUEST_CORRECTLY_RECEIVED_RESPONSE_PENDING  0x78  // Response pending - need more time
+#define UDS_NRC_POSITIVE_RESPONSE                               0x00
+#define UDS_NRC_GENERAL_REJECT                                  0x10
+#define UDS_NRC_SERVICE_NOT_SUPPORTED                           0x11
+#define UDS_NRC_SUBFUNCTION_NOT_SUPPORTED                       0x12
+#define UDS_NRC_INCORRECT_MESSAGE_LENGTH                        0x13
+#define UDS_NRC_RESPONSE_TOO_LONG                               0x14
+#define UDS_NRC_BUSY_REPEAT_REQUEST                             0x21
+#define UDS_NRC_CONDITIONS_NOT_CORRECT                          0x22
+#define UDS_NRC_REQUEST_SEQUENCE_ERROR                          0x24
+#define UDS_NRC_NO_RESPONSE_FROM_SUBNET_COMPONENT               0x25
+#define UDS_NRC_FAILURE_PREVENT_EXECUTION                       0x26
+#define UDS_NRC_REQUEST_OUT_OF_RANGE                            0x31
+#define UDS_NRC_SECURITY_ACCESS_DENIED                          0x33
+#define UDS_NRC_INVALID_KEY                                     0x35
+#define UDS_NRC_EXCEED_NUMBER_OF_ATTEMPTS                       0x36
+#define UDS_NRC_REQUIRED_TIME_DELAY_NOT_EXPIRED                 0x37
+#define UDS_NRC_UPLOAD_DOWNLOAD_NOT_ACCEPTED                    0x70
+#define UDS_NRC_TRANSFER_DATA_SUSPEND                           0x71
+#define UDS_NRC_GENERAL_PROGRAMMING_FAILURE                     0x72
+#define UDS_NRC_WRONG_BLOCK_SEQUENCE_COUNTER                    0x73
+#define UDS_NRC_SUBFUNCTION_NOT_SUPPORTED_IN_ACTIVE_SESSION     0x7E
+#define UDS_NRC_SERVICE_NOT_SUPPORTED_IN_ACTIVE_SESSION         0x7F
+#define UDS_NRC_REQUEST_CORRECTLY_RECEIVED_RESPONSE_PENDING     0x78  // Response pending - need more time
 
 // UDS Timing Parameters (ISO 14229-2)
 #define UDS_S3_SERVER_TIMEOUT_MS                5000u  // 5 seconds

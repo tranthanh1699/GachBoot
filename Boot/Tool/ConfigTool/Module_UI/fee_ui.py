@@ -42,9 +42,9 @@ class FeeUI:
         toolbar = ttk.Frame(self.parent_frame)
         toolbar.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
         
-        ttk.Button(toolbar, text="➕ Add Mapping", command=add_cmd).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="✏️ Edit Mapping", command=edit_cmd).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="🗑️ Delete Mapping", command=delete_cmd).pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="➕ Add Mapping", command=add_cmd, style='Success.TButton').pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="✏️ Edit Mapping", command=edit_cmd, style='TButton').pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="🗑️ Delete Mapping", command=delete_cmd, style='Warning.TButton').pack(side=tk.LEFT, padx=2)
         
         ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
         ttk.Label(toolbar, text="Total Mappings: ", font=('', 9)).pack(side=tk.LEFT, padx=5)
@@ -210,10 +210,17 @@ When active sector reaches threshold, Fee switches to standby sector."""
         form_frame.update_idletasks()
         canvas.configure(scrollregion=canvas.bbox("all"))
         
-        def on_frame_configure(event):
-            canvas.configure(scrollregion=canvas.bbox("all"))
+        # Mousewheel scrolling
+        def on_mousewheel(event):
+            if canvas.winfo_exists():
+                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
         
-        form_frame.bind('<Configure>', on_frame_configure)
+        canvas.bind_all("<MouseWheel>", on_mousewheel)
+        
+        # Unbind mousewheel when canvas is destroyed
+        def cleanup():
+            canvas.unbind_all("<MouseWheel>")
+        canvas.bind("<Destroy>", lambda e: cleanup())
     
     def show_mapping_edit_form(self, config_panel_frame, index, config, set_modified_callback):
         """Render edit form for individual Fee sector mapping"""
@@ -322,7 +329,14 @@ When active sector reaches threshold, Fee switches to standby sector."""
         form_frame.update_idletasks()
         canvas.configure(scrollregion=canvas.bbox("all"))
         
-        def on_frame_configure(event):
-            canvas.configure(scrollregion=canvas.bbox("all"))
+        # Mousewheel scrolling
+        def on_mousewheel(event):
+            if canvas.winfo_exists():
+                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
         
-        form_frame.bind('<Configure>', on_frame_configure)
+        canvas.bind_all("<MouseWheel>", on_mousewheel)
+        
+        # Unbind mousewheel when canvas is destroyed
+        def cleanup():
+            canvas.unbind_all("<MouseWheel>")
+        canvas.bind("<Destroy>", lambda e: cleanup())

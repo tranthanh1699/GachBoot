@@ -36,10 +36,15 @@ class ConfigEditor:
         
         self.config_file = "gachboot_config.json"
         self.config = None
-        self.set_modified(False)
         
         # Track current active form for saving
         self.current_form_widget = None
+        
+        # Track which modules have been modified (for incremental generation)
+        self.modified_modules = set()
+        
+        # Set modified flag after initializing modified_modules
+        self.set_modified(False)
         
         # Initialize UI modules
         self.service_ui = None
@@ -52,9 +57,147 @@ class ConfigEditor:
         self.fee_ui = None
         self.memory_layout_ui = None
         
-        # Apply theme
+        # Apply modern theme with colors
         style = ttk.Style()
         style.theme_use('clam')
+        
+        # Modern color palette
+        bg_primary = '#f5f6fa'      # Light gray background
+        bg_secondary = '#ffffff'    # White
+        bg_input = '#ffffff'        # Input background
+        accent_blue = '#0066cc'     # Professional blue
+        accent_green = '#00b894'    # Success green
+        accent_orange = '#fd7e14'   # Warning orange
+        text_primary = '#2d3436'    # Dark gray text
+        text_secondary = '#636e72'  # Medium gray
+        border_color = '#dfe6e9'    # Light border
+        
+        # Configure base styles
+        style.configure('TFrame', background=bg_primary)
+        style.configure('TLabel', background=bg_primary, foreground=text_primary, font=('Segoe UI', 9))
+        style.configure('TLabelframe', background=bg_primary, foreground=text_primary, borderwidth=1, relief='solid')
+        style.configure('TLabelframe.Label', font=('Segoe UI', 9, 'bold'), foreground=accent_blue)
+        
+        # Text styles
+        style.configure('Title.TLabel', font=('Segoe UI', 12, 'bold'), foreground=accent_blue)
+        style.configure('Section.TLabel', font=('Segoe UI', 10, 'bold'), foreground=accent_blue)
+        style.configure('Success.TLabel', foreground=accent_green, font=('Segoe UI', 9, 'bold'))
+        style.configure('Warning.TLabel', foreground=accent_orange, font=('Segoe UI', 9, 'bold'))
+        style.configure('Info.TLabel', foreground=text_secondary, font=('Segoe UI', 9, 'italic'))
+        
+        # Entry widgets - modern flat style
+        style.configure('TEntry', 
+                       fieldbackground=bg_input,
+                       foreground=text_primary,
+                       borderwidth=1,
+                       relief='solid',
+                       padding=5)
+        style.map('TEntry',
+                 fieldbackground=[('focus', bg_input)],
+                 bordercolor=[('focus', accent_blue)])
+        
+        # Combobox - modern style
+        style.configure('TCombobox',
+                       fieldbackground=bg_input,
+                       background=bg_input,
+                       foreground=text_primary,
+                       borderwidth=1,
+                       relief='solid',
+                       padding=5,
+                       arrowsize=15)
+        style.map('TCombobox',
+                 fieldbackground=[('readonly', bg_input), ('focus', bg_input)],
+                 bordercolor=[('focus', accent_blue)])
+        
+        # Button styles - modern flat design
+        style.configure('TButton',
+                       background=accent_blue,
+                       foreground='white',
+                       borderwidth=0,
+                       focuscolor='none',
+                       padding=(10, 5),
+                       font=('Segoe UI', 9, 'bold'))
+        style.map('TButton',
+                 background=[('active', '#0052a3'), ('pressed', '#004080')],
+                 foreground=[('active', 'white'), ('pressed', 'white')])
+        
+        # Success button
+        style.configure('Success.TButton',
+                       background=accent_green,
+                       foreground='white',
+                       borderwidth=0,
+                       padding=(10, 5),
+                       font=('Segoe UI', 9, 'bold'))
+        style.map('Success.TButton',
+                 background=[('active', '#00a178'), ('pressed', '#008c68')])
+        
+        # Warning button
+        style.configure('Warning.TButton',
+                       background=accent_orange,
+                       foreground='white',
+                       borderwidth=0,
+                       padding=(10, 5),
+                       font=('Segoe UI', 9, 'bold'))
+        style.map('Warning.TButton',
+                 background=[('active', '#e67112'), ('pressed', '#cc6410')])
+        
+        # Secondary button
+        style.configure('Secondary.TButton',
+                       background='#dfe6e9',
+                       foreground=text_primary,
+                       borderwidth=0,
+                       padding=(10, 5),
+                       font=('Segoe UI', 9))
+        style.map('Secondary.TButton',
+                 background=[('active', '#b2bec3'), ('pressed', '#95a5a6')])
+        
+        # Checkbutton - modern style
+        style.configure('TCheckbutton',
+                       background=bg_primary,
+                       foreground=text_primary,
+                       font=('Segoe UI', 9))
+        
+        # Radiobutton
+        style.configure('TRadiobutton',
+                       background=bg_primary,
+                       foreground=text_primary,
+                       font=('Segoe UI', 9))
+        
+        # Notebook tabs
+        style.configure('TNotebook', background=bg_primary, borderwidth=0)
+        style.configure('TNotebook.Tab',
+                       background='#dfe6e9',
+                       foreground=text_primary,
+                       padding=(20, 10),
+                       font=('Segoe UI', 9, 'bold'))
+        style.map('TNotebook.Tab',
+                 background=[('selected', accent_blue)],
+                 foreground=[('selected', 'white')])
+        
+        # Treeview - modern style
+        style.configure('Treeview',
+                       background=bg_input,
+                       foreground=text_primary,
+                       fieldbackground=bg_input,
+                       borderwidth=0,
+                       font=('Segoe UI', 9))
+        style.configure('Treeview.Heading',
+                       background=accent_blue,
+                       foreground='white',
+                       borderwidth=0,
+                       font=('Segoe UI', 9, 'bold'))
+        style.map('Treeview',
+                 background=[('selected', accent_blue)],
+                 foreground=[('selected', 'white')])
+        
+        # Scrollbar
+        style.configure('Vertical.TScrollbar',
+                       background=border_color,
+                       troughcolor=bg_primary,
+                       borderwidth=0,
+                       arrowsize=12)
+        
+        self.root.configure(bg=bg_primary)
         
         # Bind Ctrl+S for save
         self.root.bind('<Control-s>', lambda e: self.save_config())
@@ -172,7 +315,7 @@ class ConfigEditor:
         self.config_file_var = tk.StringVar(value=self.config_file)
         config_entry = ttk.Entry(project_frame, textvariable=self.config_file_var, width=50, state='readonly')
         config_entry.grid(row=0, column=1, columnspan=2, padx=5, sticky=(tk.W, tk.E))
-        ttk.Button(project_frame, text="Browse...", command=self.browse_config_file, width=10).grid(row=0, column=3, padx=5)
+        ttk.Button(project_frame, text="📂 Browse...", command=self.browse_config_file, style='TButton', width=12).grid(row=0, column=3, padx=5)
         
         # Project name and version row
         ttk.Label(project_frame, text="Project Name:").grid(row=1, column=0, sticky=tk.W, pady=5)
@@ -188,7 +331,7 @@ class ConfigEditor:
         self.output_path_var = tk.StringVar()
         output_entry = ttk.Entry(project_frame, textvariable=self.output_path_var, width=50)
         output_entry.grid(row=2, column=1, columnspan=2, padx=5, sticky=(tk.W, tk.E))
-        ttk.Button(project_frame, text="Browse...", command=self.browse_output_path, width=10).grid(row=2, column=3, padx=5)
+        ttk.Button(project_frame, text="📂 Browse...", command=self.browse_output_path, style='TButton', width=12).grid(row=2, column=3, padx=5)
         
         # Configure column weights
         project_frame.columnconfigure(1, weight=1)
@@ -344,9 +487,19 @@ class ConfigEditor:
         modified_mark = " *" if self.modified else ""
         self.root.title(f"GachBoot ConfigTool - {filename}{modified_mark}")
     
-    def set_modified(self, modified=True):
-        """Set modified flag and update title"""
+    def set_modified(self, modified=True, module_name=None):
+        """Set modified flag and update title
+        
+        Args:
+            modified: Whether config has been modified
+            module_name: Name of the modified module (e.g., 'nvm', 'did', 'routine', etc.)
+        """
         self.modified = modified
+        if module_name and modified:
+            self.modified_modules.add(module_name)
+        elif not modified:
+            # Clear all modified modules when saving
+            self.modified_modules.clear()
         self.update_title()
     
     def refresh_ui(self):
@@ -857,7 +1010,7 @@ class ConfigEditor:
                 index,
                 self.config,
                 {
-                    'set_modified': self.set_modified,
+                    'set_modified': lambda: self.set_modified(module_name='nvm'),
                     'refresh_ui': self.refresh_ui
                 }
             )
@@ -871,7 +1024,7 @@ class ConfigEditor:
                 index,
                 self.config,
                 {
-                    'set_modified': self.set_modified,
+                    'set_modified': lambda: self.set_modified(module_name='did'),
                     'refresh_ui': self.refresh_ui
                 }
             )
@@ -1234,7 +1387,7 @@ class ConfigEditor:
                 index=index,
                 config=self.config,
                 on_change_callback=self.refresh_ui,
-                set_modified_callback=self.set_modified
+                set_modified_callback=lambda: self.set_modified(module_name='service')
             )
             self._cache_current_form_widget()
     
@@ -1242,7 +1395,7 @@ class ConfigEditor:
         """Show routine edit form using RoutineUI module"""
         if self.routine_ui:
             callbacks = {
-                'save_callback': lambda: self.set_modified()  # Only mark as modified, don't rebuild UI
+                'save_callback': lambda: self.set_modified(module_name='routine')  # Only mark as modified, don't rebuild UI
             }
             self.routine_ui.show_edit_form(
                 config_panel_frame=self.config_panel_frame,
@@ -1489,10 +1642,107 @@ class ConfigEditor:
         if messagebox.askyesno("Confirm Delete", f"Delete mapping {mapping.get('name', f'Mapping {index}')}?"):
             del mappings[index]
             self.refresh_ui()
-            self.set_modified()
+            self.set_modified(module_name='fee')
     
-    def generate_code(self):
-        """Generate code from configuration"""
+    def show_generate_dialog(self):
+        """Show dialog to select which modules to generate"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Generate Code")
+        dialog.geometry("500x600")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # Title
+        title_frame = ttk.Frame(dialog, padding="10")
+        title_frame.pack(fill=tk.X)
+        ttk.Label(title_frame, text="⚙️ Code Generation Options", style='Title.TLabel').pack()
+        
+        # Info about modified modules
+        info_frame = ttk.LabelFrame(dialog, text="ℹ️ Modified Modules", padding="10")
+        info_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        if self.modified_modules:
+            modified_text = f"Modified: {', '.join(sorted(self.modified_modules))}"
+            ttk.Label(info_frame, text=modified_text, foreground='#00b894', font=('Segoe UI', 9, 'bold')).pack()
+        else:
+            ttk.Label(info_frame, text="No modules modified", foreground='#636e72', font=('Segoe UI', 9, 'italic')).pack()
+        
+        # Generate options
+        options_frame = ttk.LabelFrame(dialog, text="📦 Select Modules to Generate", padding="15")
+        options_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Module checkboxes
+        modules = [
+            ('nvm', 'NVM Blocks (Non-Volatile Memory)'),
+            ('did', 'DIDs (Data Identifiers)'),
+            ('session', 'DCM Sessions'),
+            ('security', 'Security Levels'),
+            ('service', 'DCM Services'),
+            ('routine', 'Routines (Service 0x31)'),
+            ('fls', 'Flash Driver Config'),
+            ('fee', 'Flash EEPROM Emulation'),
+            ('memory_layout', 'Memory Layout (Service 0x34)'),
+            ('cmake', 'CMakeLists.txt')
+        ]
+        
+        module_vars = {}
+        for module_key, module_name in modules:
+            var = tk.BooleanVar(value=(module_key in self.modified_modules))
+            module_vars[module_key] = var
+            
+            # Highlight modified modules
+            if module_key in self.modified_modules:
+                cb = ttk.Checkbutton(options_frame, text=f"✓ {module_name}", variable=var)
+            else:
+                cb = ttk.Checkbutton(options_frame, text=module_name, variable=var)
+            cb.pack(anchor=tk.W, pady=3)
+        
+        # Quick select buttons
+        quick_frame = ttk.Frame(options_frame)
+        quick_frame.pack(fill=tk.X, pady=10)
+        
+        def select_all():
+            for var in module_vars.values():
+                var.set(True)
+        
+        def select_none():
+            for var in module_vars.values():
+                var.set(False)
+        
+        def select_modified():
+            for key, var in module_vars.items():
+                var.set(key in self.modified_modules)
+        
+        ttk.Button(quick_frame, text="✔ All", command=select_all, style='TButton', width=12).pack(side=tk.LEFT, padx=2)
+        ttk.Button(quick_frame, text="✖ None", command=select_none, style='Secondary.TButton', width=12).pack(side=tk.LEFT, padx=2)
+        ttk.Button(quick_frame, text="🔄 Modified", command=select_modified, style='Success.TButton', width=12).pack(side=tk.LEFT, padx=2)
+        
+        # Action buttons
+        button_frame = ttk.Frame(dialog, padding="10")
+        button_frame.pack(fill=tk.X)
+        
+        def on_generate():
+            selected_modules = [key for key, var in module_vars.items() if var.get()]
+            if not selected_modules:
+                messagebox.showwarning("No Selection", "Please select at least one module to generate")
+                return
+            
+            dialog.destroy()
+            self.generate_code(selected_modules=selected_modules)
+        
+        ttk.Button(button_frame, text="⚙️ Generate", command=on_generate, style='Success.TButton', width=15).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=dialog.destroy, style='Secondary.TButton', width=15).pack(side=tk.LEFT, padx=5)
+    
+    def generate_code(self, selected_modules=None):
+        """Generate code from configuration
+        
+        Args:
+            selected_modules: List of module names to generate. If None, shows selection dialog.
+        """
+        # If no modules specified, show selection dialog
+        if selected_modules is None:
+            self.show_generate_dialog()
+            return
         try:
             # Save current form first
             self.save_current_form()
@@ -1556,54 +1806,88 @@ class ConfigEditor:
             version = self.config['project']['version']
             
             print(f"[DEBUG] Generating code to: {output_path}")
+            print(f"[DEBUG] Selected modules: {selected_modules}")
             
-            nvm_files = generate_nvm_code(self.config['nvm_blocks'], project_name, version, output_path)
-            did_files = generate_did_code(self.config['dids'], self.config.get('sessions', []), 
-                                          self.config.get('security_levels', []), project_name, version, output_path)
-            session_files = []
-            if self.config.get('sessions'):
+            # Generate code for selected modules only
+            all_files = []
+            
+            if 'nvm' in selected_modules:
+                nvm_files = generate_nvm_code(self.config['nvm_blocks'], project_name, version, output_path)
+                all_files.extend(nvm_files)
+                print(f"[DEBUG] Generated NVM files: {len(nvm_files)}")
+            
+            if 'did' in selected_modules:
+                did_files = generate_did_code(self.config['dids'], self.config.get('sessions', []), 
+                                              self.config.get('security_levels', []), project_name, version, output_path)
+                all_files.extend(did_files)
+                print(f"[DEBUG] Generated DID files: {len(did_files)}")
+            
+            if 'session' in selected_modules and self.config.get('sessions'):
                 session_success = generate_session_code(self.config['sessions'], output_path)
                 if session_success:
                     session_files = [
                         os.path.join(output_path, "DCM_Session_Gen", "DCM_Session_PBCfg.h"),
                         os.path.join(output_path, "DCM_Session_Gen", "DCM_Session_PBCfg.c")
                     ]
-            security_files = []
-            if self.config.get('security_levels'):
+                    all_files.extend(session_files)
+                    print(f"[DEBUG] Generated Session files")
+            
+            if 'security' in selected_modules and self.config.get('security_levels'):
                 security_files = generate_security_code(self.config['security_levels'], self.config.get('sessions', []), 
                                                        project_name, version, output_path)
-            service_files = []
-            if self.config.get('dcm_services'):
+                all_files.extend(security_files)
+                print(f"[DEBUG] Generated Security files: {len(security_files)}")
+            
+            if 'service' in selected_modules and self.config.get('dcm_services'):
                 service_files = generate_service_code(self.config['dcm_services'], self.config.get('sessions', []),
                                                      self.config.get('security_levels', []), output_path)
-            routine_files = []
-            if self.config.get('routines'):
+                all_files.extend(service_files)
+                print(f"[DEBUG] Generated Service files: {len(service_files)}")
+            
+            if 'routine' in selected_modules and self.config.get('routines'):
                 routine_success, routine_messages = generate_routine_config(self.config, output_path)
                 if routine_success:
                     routine_files = [
                         os.path.join(output_path, "Routine_Gen", "Routine_PBCfg.h"),
                         os.path.join(output_path, "Routine_Gen", "Routine_PBCfg.c")
                     ]
-            fls_files = []
-            if self.config.get('fls_config'):
+                    all_files.extend(routine_files)
+                    print(f"[DEBUG] Generated Routine files")
+            
+            if 'fls' in selected_modules and self.config.get('fls_config'):
                 fls_files = generate_fls_code(self.config, output_path)
-            fee_files = []
-            if self.config.get('fee_config'):
+                all_files.extend(fls_files)
+                print(f"[DEBUG] Generated Fls files: {len(fls_files)}")
+            
+            if 'fee' in selected_modules and self.config.get('fee_config'):
                 fee_files = generate_fee_code(self.config, output_path)
+                all_files.extend(fee_files)
+                print(f"[DEBUG] Generated Fee files: {len(fee_files)}")
             
             # Generate Memory Layout code
-            memory_files = []
-            if self.config.get('memory_layout'):
+            if 'memory_layout' in selected_modules and self.config.get('memory_layout'):
                 memory_output = generate_memory_layout_code(self.config['memory_layout'], output_path, project_name)
-                memory_files = [memory_output]
+                all_files.append(memory_output)
                 self.status_var.set(f"Generated: {os.path.basename(memory_output)}")
                 self.root.update()
+                print(f"[DEBUG] Generated Memory Layout file")
             
-            cmake_file = generate_cmake_file(output_path, project_name, version)
+            # Generate CMake file
+            if 'cmake' in selected_modules:
+                cmake_file = generate_cmake_file(output_path, project_name, version)
+                all_files.append(cmake_file)
+                print(f"[DEBUG] Generated CMake file")
             
-            all_files = nvm_files + did_files + session_files + security_files + service_files + routine_files + fls_files + fee_files + memory_files + [cmake_file]
-            messagebox.showinfo("Success", f"Generated {len(all_files)} files:\n" + "\n".join([os.path.basename(f) for f in all_files]))
-            self.status_var.set("Code generation complete")
+            # Show success message with generated files
+            if all_files:
+                file_list = "\n".join([f"  • {os.path.basename(f)}" for f in all_files[:10]])
+                if len(all_files) > 10:
+                    file_list += f"\n  ... and {len(all_files) - 10} more files"
+                messagebox.showinfo("Success", f"Generated {len(all_files)} files for modules:\n{', '.join(selected_modules)}\n\n{file_list}")
+                self.status_var.set(f"Code generation complete: {len(all_files)} files")
+            else:
+                messagebox.showwarning("No Files", "No files were generated. Please check your selection.")
+                self.status_var.set("Code generation: No files generated")
         except Exception as e:
             messagebox.showerror("Error", f"Code generation failed: {e}")
     
@@ -2249,8 +2533,8 @@ class ServiceDialog:
         button_frame = ttk.Frame(main_frame)
         button_frame.grid(row=5, column=0, columnspan=3, pady=20)
         
-        ttk.Button(button_frame, text="OK", command=self.on_ok).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Cancel", command=self.dialog.destroy).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="OK", command=self.on_ok, style='TButton').pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=self.dialog.destroy, style='Secondary.TButton').pack(side=tk.LEFT, padx=5)
         
         # Configure grid weights
         main_frame.columnconfigure(1, weight=1)

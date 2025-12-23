@@ -133,8 +133,13 @@ typedef Std_ReturnType (*uds_routine_callback_t)(
  * @brief Routine control entry structure
  */
 typedef struct {{
-    uint16_t rid;                    /**< Routine Identifier */
-    uds_routine_callback_t callback; /**< Routine handler callback */
+    uint16_t rid;                    /**< Routine Identifier */    uint8_t supported_subfunctions;  /**< Bitmask: bit0=START, bit1=STOP, bit2=REQUEST_RESULTS */
+    uint16_t start_option_len;       /**< Expected option_record length for START (0=variable) */
+    uint16_t start_status_len;       /**< Expected status_record length for START */
+    uint16_t stop_option_len;        /**< Expected option_record length for STOP (0=variable) */
+    uint16_t stop_status_len;        /**< Expected status_record length for STOP */
+    uint16_t results_option_len;     /**< Expected option_record length for REQUEST_RESULTS (0=variable) */
+    uint16_t results_status_len;     /**< Expected status_record length for REQUEST_RESULTS */    uds_routine_callback_t callback; /**< Routine handler callback */
     uint32_t session_mask;           /**< Allowed sessions bitmask */
     uint32_t security_mask;          /**< Required security bitmask */
 }} uds_routine_entry_t;
@@ -194,6 +199,32 @@ extern Std_ReturnType {base_callback}_{sf_lower}(
         desc = routine.get('description', '')
         content += f"#define {name:<50} {rid}  /**< {desc} */\n"
     
+    # Generate record length definitions
+    content += """
+/* ========================================================================== */
+/*                    Record Length Definitions                               */
+/* ========================================================================== */
+
+"""
+    
+    for routine in routines:
+        name = routine['routine_name']
+        subfunction_params = routine.get('subfunction_parameters', {})
+        
+        for sf in routine['supported_subfunctions']:
+            params = subfunction_params.get(sf, {})
+            opt_len = params.get('option_record_length', 0)
+            stat_len = params.get('status_record_length', 0)
+            
+            # Define for option record length (0 = variable/optional)
+            content += f"#define {name}_{sf}_OPTION_LENGTH    {opt_len}U"
+            if opt_len == 0:
+                content += "  /**< Variable or no input */"
+            content += "\n"
+            
+            # Define for status record length
+            content += f"#define {name}_{sf}_STATUS_LENGTH    {stat_len}U\n"
+    
     # Generate registry access functions
     content += """
 /* ========================================================================== */
@@ -206,6 +237,18 @@ extern Std_ReturnType {base_callback}_{sf_lower}(
  * @return Pointer to routine entry, or NULL if not found
  */
 const uds_routine_entry_t* uds_routine_find_entry(uint16_t rid);
+
+/**
+ * @brief Validate option_record length for routine
+ * @param entry Routine entry
+ * @param sub_function Sub-function (0x01=START, 0x02=STOP, 0x03=REQUEST_RESULTS)
+ * @param option_record_len Actual length from request
+ * @return true if valid, false otherwise
+ * @note If expected length is 0, any length is accepted (variable/optional)
+ */
+bool uds_routine_validate_option_length(const uds_routine_entry_t *entry, 
+                                         uint8_t sub_function, 
+                                         uint16_t option_record_len);
 
 /**
  * @brief Get routine registry
@@ -315,9 +358,39 @@ static const uds_routine_entry_t routine_registry[] = {
         session_mask = build_session_mask(routine['supported_sessions'])
         security_mask = build_security_mask(routine.get('required_security_levels', []))
         desc = routine.get('description', '')
+        subfuncs = routine['supported_subfunctions']
+        subfunction_params = routine.get('subfunction_parameters', {})
+        
+        # Build supported subfunctions bitmask
+        sf_bitmask = 0
+        if 'START' in subfuncs:
+            sf_bitmask |= (1 << 0)
+        if 'STOP' in subfuncs:
+            sf_bitmask |= (1 << 1)
+        if 'REQUEST_RESULTS' in subfuncs:
+            sf_bitmask |= (1 << 2)
+        
+        # Get record lengths for each subfunction
+        start_params = subfunction_params.get('START', {})
+        stop_params = subfunction_params.get('STOP', {})
+        results_params = subfunction_params.get('REQUEST_RESULTS', {})
+        
+        start_opt_len = start_params.get('option_record_length', 0)
+        start_stat_len = start_params.get('status_record_length', 0)
+        stop_opt_len = stop_params.get('option_record_length', 0)
+        stop_stat_len = stop_params.get('status_record_length', 0)
+        results_opt_len = results_params.get('option_record_length', 0)
+        results_stat_len = results_params.get('status_record_length', 0)
         
         content += f"""    {{
         .rid = {rid},
+        .supported_subfunctions = 0x{sf_bitmask:02X}U,
+        .start_option_len = {start_opt_len}U,
+        .start_status_len = {start_stat_len}U,
+        .stop_option_len = {stop_opt_len}U,
+        .stop_status_len = {stop_stat_len}U,
+        .results_option_len = {results_opt_len}U,
+        .results_status_len = {results_stat_len}U,
         .callback = {callback},
         .session_mask = {session_mask},
         .security_mask = {security_mask}  // {desc}
@@ -354,6 +427,42 @@ const uds_routine_entry_t* uds_routine_get_registry(uint16_t *count)
         *count = ROUTINE_REGISTRY_SIZE;
     }
     return routine_registry;
+}
+
+/**
+ * @brief Validate option_record length for routine
+ */
+bool uds_routine_validate_option_length(const uds_routine_entry_t *entry, 
+                                         uint8_t sub_function, 
+                                         uint16_t option_record_len)
+{
+    if (entry == NULL) {
+        return false;
+    }
+    
+    uint16_t expected_len = 0;
+    
+    switch (sub_function) {
+        case UDS_ROUTINE_CONTROL_START:
+            expected_len = entry->start_option_len;
+            break;
+        case UDS_ROUTINE_CONTROL_STOP:
+            expected_len = entry->stop_option_len;
+            break;
+        case UDS_ROUTINE_CONTROL_REQUEST_RESULTS:
+            expected_len = entry->results_option_len;
+            break;
+        default:
+            return false;
+    }
+    
+    // If expected_len is 0, any length is accepted (variable/optional)
+    if (expected_len == 0) {
+        return true;
+    }
+    
+    // Otherwise, must match exactly
+    return (option_record_len == expected_len);
 }
 """
     

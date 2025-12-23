@@ -45,9 +45,9 @@ class DidUI:
         """Setup toolbar with action buttons"""
         toolbar = self.parent.winfo_children()[0]  # Get toolbar frame
         
-        ttk.Button(toolbar, text="➕ Add DID", command=add_cmd).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="✏️ Edit DID", command=edit_cmd).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="🗑️ Delete DID", command=delete_cmd).pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="➕ Add DID", command=add_cmd, style='Success.TButton').pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="✏️ Edit DID", command=edit_cmd, style='TButton').pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="🗑️ Delete DID", command=delete_cmd, style='Warning.TButton').pack(side=tk.LEFT, padx=2)
         
         ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
         ttk.Label(toolbar, text=f"Total DIDs: ", font=('', 9)).pack(side=tk.LEFT, padx=5)
@@ -308,6 +308,18 @@ class DidUI:
         # Initial update
         form_frame.update_idletasks()
         canvas.configure(scrollregion=canvas.bbox("all"))
+        
+        # Mousewheel scrolling
+        def on_mousewheel(event):
+            if canvas.winfo_exists():
+                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        
+        canvas.bind_all("<MouseWheel>", on_mousewheel)
+        
+        # Unbind mousewheel when canvas is destroyed
+        def cleanup():
+            canvas.unbind_all("<MouseWheel>")
+        canvas.bind("<Destroy>", lambda e: cleanup())
     
     def show_info_panel(self, info_widget, did):
         """Display DID details in info panel"""

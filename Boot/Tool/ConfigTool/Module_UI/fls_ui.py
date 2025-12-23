@@ -42,9 +42,9 @@ class FlsUI:
         toolbar = ttk.Frame(self.parent_frame)
         toolbar.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
         
-        ttk.Button(toolbar, text="➕ Add Sector", command=add_cmd).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="✏️ Edit Sector", command=edit_cmd).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="🗑️ Delete Sector", command=delete_cmd).pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="➕ Add Sector", command=add_cmd, style='Success.TButton').pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="✏️ Edit Sector", command=edit_cmd, style='TButton').pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="🗑️ Delete Sector", command=delete_cmd, style='Warning.TButton').pack(side=tk.LEFT, padx=2)
         
         ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
         ttk.Label(toolbar, text="Total Sectors: ", font=('', 9)).pack(side=tk.LEFT, padx=5)
@@ -217,6 +217,18 @@ class FlsUI:
         # Update canvas scroll region
         form_frame.update_idletasks()
         canvas.configure(scrollregion=canvas.bbox("all"))
+        
+        # Mousewheel scrolling
+        def on_mousewheel(event):
+            if canvas.winfo_exists():
+                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        
+        canvas.bind_all("<MouseWheel>", on_mousewheel)
+        
+        # Unbind mousewheel when canvas is destroyed
+        def cleanup():
+            canvas.unbind_all("<MouseWheel>")
+        canvas.bind("<Destroy>", lambda e: cleanup())
         
         # Info label
         info_label = ttk.Label(form_frame, text="ℹ️ Changes are saved automatically", 

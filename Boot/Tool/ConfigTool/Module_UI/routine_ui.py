@@ -46,9 +46,9 @@ class RoutineUI:
         """Setup toolbar with action buttons"""
         toolbar = self.parent.winfo_children()[0]  # Get toolbar frame
         
-        ttk.Button(toolbar, text="➕ Add Routine", command=add_cmd).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="✏️ Edit Routine", command=edit_cmd).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="🗑️ Delete Routine", command=delete_cmd).pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="➕ Add Routine", command=add_cmd, style='Success.TButton').pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="✏️ Edit Routine", command=edit_cmd, style='TButton').pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="🗑️ Delete Routine", command=delete_cmd, style='Warning.TButton').pack(side=tk.LEFT, padx=2)
         
         ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
         ttk.Label(toolbar, text=f"Total Routines: ", font=('', 9)).pack(side=tk.LEFT, padx=5)
@@ -452,9 +452,16 @@ class RoutineUI:
         
         # Mousewheel scrolling
         def on_mousewheel(event):
-            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            # Check if canvas still exists before scrolling
+            if canvas.winfo_exists():
+                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
         
         canvas.bind_all("<MouseWheel>", on_mousewheel)
+        
+        # Unbind mousewheel when canvas is destroyed
+        def cleanup():
+            canvas.unbind_all("<MouseWheel>")
+        canvas.bind("<Destroy>", lambda e: cleanup())
     
     def show_add_form(self, parent_window, config, on_add_callback):
         """Show dialog to add new routine"""

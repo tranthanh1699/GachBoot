@@ -42,8 +42,8 @@ class MemoryLayoutUI:
         for widget in self.parent_frame.winfo_children():
             widget.destroy()
         
-        # Create scrollable canvas
-        canvas = tk.Canvas(self.parent_frame)
+        # Create scrollable canvas with modern look
+        canvas = tk.Canvas(self.parent_frame, bg='#ffffff', highlightthickness=0)
         scrollbar = ttk.Scrollbar(self.parent_frame, orient=tk.VERTICAL, command=canvas.yview)
         self.form_frame = ttk.Frame(canvas, padding="20")
         
@@ -53,26 +53,44 @@ class MemoryLayoutUI:
         
         canvas_frame = canvas.create_window((0, 0), window=self.form_frame, anchor=tk.NW)
         
-        # Bind canvas resize
+        # Bind canvas resize for full width
         def on_frame_configure(event):
             canvas.configure(scrollregion=canvas.bbox("all"))
-            canvas_width = event.width
-            canvas.itemconfig(canvas_frame, width=canvas_width)
+        
+        def on_canvas_configure(event):
+            canvas.itemconfig(canvas_frame, width=event.width)
         
         self.form_frame.bind('<Configure>', on_frame_configure)
-        canvas.bind('<Configure>', lambda e: canvas.itemconfig(canvas_frame, width=e.width))
+        canvas.bind('<Configure>', on_canvas_configure)
+        
+        # Mousewheel scrolling
+        def on_mousewheel(event):
+            if canvas.winfo_exists():
+                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        
+        canvas.bind_all("<MouseWheel>", on_mousewheel)
+        
+        # Unbind mousewheel when canvas is destroyed
+        def cleanup():
+            canvas.unbind_all("<MouseWheel>")
+        canvas.bind("<Destroy>", lambda e: cleanup())
+        
+        # Configure column weights for responsive layout
+        self.form_frame.columnconfigure(1, weight=1)
         
         row = 0
         
-        # Title
-        title_label = ttk.Label(self.form_frame, text="Memory Layout Configuration", 
-                                font=('TkDefaultFont', 12, 'bold'))
+        # Title with modern style
+        title_label = ttk.Label(self.form_frame, text="🔧 Memory Layout Configuration", 
+                                style='Title.TLabel')
         title_label.grid(row=row, column=0, columnspan=3, sticky=tk.W, pady=(0, 20))
         row += 1
         
         # ===== Bootloader Region =====
-        ttk.Label(self.form_frame, text="🔧 Bootloader Region", 
-                  font=('TkDefaultFont', 10, 'bold')).grid(row=row, column=0, columnspan=3, sticky=tk.W, pady=(10, 5))
+        ttk.Separator(self.form_frame, orient=tk.HORIZONTAL).grid(row=row, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 10))
+        row += 1
+        ttk.Label(self.form_frame, text="🔷 Bootloader Region", 
+                  style='Section.TLabel').grid(row=row, column=0, columnspan=3, sticky=tk.W, pady=(5, 10))
         row += 1
         
         bootloader = memory_layout.get('bootloader_region', {})
@@ -128,8 +146,10 @@ class MemoryLayoutUI:
         row += 1
         
         # ===== Application Region =====
+        ttk.Separator(self.form_frame, orient=tk.HORIZONTAL).grid(row=row, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(5, 10))
+        row += 1
         ttk.Label(self.form_frame, text="📱 Application Region", 
-                  font=('TkDefaultFont', 10, 'bold')).grid(row=row, column=0, columnspan=3, sticky=tk.W, pady=(10, 5))
+                  style='Section.TLabel').grid(row=row, column=0, columnspan=3, sticky=tk.W, pady=(5, 10))
         row += 1
         
         application = memory_layout.get('application_region', {})
@@ -185,8 +205,10 @@ class MemoryLayoutUI:
         row += 1
         
         # ===== Download Region (UDS 0x34) =====
+        ttk.Separator(self.form_frame, orient=tk.HORIZONTAL).grid(row=row, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(5, 10))
+        row += 1
         ttk.Label(self.form_frame, text="📥 Download Region (UDS Service 0x34)", 
-                  font=('TkDefaultFont', 10, 'bold')).grid(row=row, column=0, columnspan=3, sticky=tk.W, pady=(10, 5))
+                  style='Section.TLabel').grid(row=row, column=0, columnspan=3, sticky=tk.W, pady=(5, 10))
         row += 1
         
         download = memory_layout.get('download_region', {})
@@ -250,39 +272,100 @@ class MemoryLayoutUI:
         row += 1
         
         # ===== Info Panel =====
-        info_frame = ttk.LabelFrame(self.form_frame, text="ℹ️  Memory Map Overview", padding="10")
-        info_frame.grid(row=row, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
+        info_frame = ttk.LabelFrame(self.form_frame, text="ℹ️  Memory Map Overview", padding="15")
+        info_frame.grid(row=row, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=15)
         row += 1
         
-        info_text = tk.Text(info_frame, height=8, width=70, font=('Courier', 9), wrap=tk.WORD)
+        info_text = tk.Text(info_frame, height=10, wrap=tk.WORD, font=('Consolas', 9), 
+                           bg='#f8f9fa', fg='#2d3436', relief=tk.FLAT, padx=10, pady=10)
         info_text.pack(fill=tk.BOTH, expand=True)
         
         def update_info(*args):
+            """Update memory map overview with color-coded info"""
+            info_text.config(state=tk.NORMAL)
+            info_text.delete(1.0, tk.END)
+            
             try:
                 bl_start = int(self.bl_start_var.get(), 16)
                 bl_size = int(self.bl_size_var.get(), 16)
+                bl_end = bl_start + bl_size - 1
+                
                 app_start = int(self.app_start_var.get(), 16)
                 app_size = int(self.app_size_var.get(), 16)
+                app_end = app_start + app_size - 1
                 
-                info_text.config(state=tk.NORMAL)
-                info_text.delete(1.0, tk.END)
-                info_text.insert(tk.END, f"Memory Map:\n")
-                info_text.insert(tk.END, f"{'='*60}\n")
-                info_text.insert(tk.END, f"Bootloader: 0x{bl_start:08X} - 0x{bl_start+bl_size-1:08X} ({bl_size//1024}KB)\n")
-                info_text.insert(tk.END, f"Application: 0x{app_start:08X} - 0x{app_start+app_size-1:08X} ({app_size//1024}KB)\n")
+                # Header
+                info_text.insert(tk.END, "=" * 60 + "\n", 'header')
+                info_text.insert(tk.END, "         STM32H743 Flash Memory Layout\n", 'header')
+                info_text.insert(tk.END, "=" * 60 + "\n\n", 'header')
                 
-                # Check overlap
-                if app_start < bl_start + bl_size:
-                    info_text.insert(tk.END, f"\n⚠️  WARNING: Regions overlap!\n", 'warning')
-                else:
-                    gap = app_start - (bl_start + bl_size)
-                    info_text.insert(tk.END, f"\n✓ Gap between regions: {gap//1024}KB\n", 'ok')
+                # Bootloader
+                info_text.insert(tk.END, "🔷 BOOTLOADER REGION\n", 'section')
+                info_text.insert(tk.END, f"   Start:  0x{bl_start:08X}\n", 'normal')
+                info_text.insert(tk.END, f"   End:    0x{bl_end:08X}\n", 'normal')
+                info_text.insert(tk.END, f"   Size:   {bl_size//1024}KB (0x{bl_size:X})\n\n", 'size')
                 
-                info_text.tag_config('warning', foreground='red')
-                info_text.tag_config('ok', foreground='green')
-                info_text.config(state=tk.DISABLED)
-            except:
-                pass
+                # Application
+                info_text.insert(tk.END, "📱 APPLICATION REGION\n", 'section')
+                info_text.insert(tk.END, f"   Start:  0x{app_start:08X}\n", 'normal')
+                info_text.insert(tk.END, f"   End:    0x{app_end:08X}\n", 'normal')
+                info_text.insert(tk.END, f"   Size:   {app_size//1024}KB (0x{app_size:X})\n\n", 'size')
+                
+                # Download region if enabled
+                if self.dl_enabled_var and self.dl_enabled_var.get():
+                    try:
+                        dl_start = int(self.dl_start_var.get(), 16)
+                        dl_size = int(self.dl_size_var.get(), 16)
+                        dl_end = dl_start + dl_size - 1
+                        
+                        info_text.insert(tk.END, "📥 DOWNLOAD REGION (UDS 0x34)\n", 'section')
+                        info_text.insert(tk.END, f"   Start:  0x{dl_start:08X}\n", 'normal')
+                        info_text.insert(tk.END, f"   End:    0x{dl_end:08X}\n", 'normal')
+                        info_text.insert(tk.END, f"   Size:   {dl_size//1024}KB (0x{dl_size:X})\n", 'size')
+                        info_text.insert(tk.END, f"   Align:  {self.dl_align_var.get()} bytes\n", 'normal')
+                        info_text.insert(tk.END, f"   Block:  {self.dl_max_block_var.get()} bytes\n\n", 'normal')
+                    except:
+                        pass
+                
+                # Validation
+                info_text.insert(tk.END, "-" * 60 + "\n", 'separator')
+                overlap = False
+                
+                # Check for overlaps
+                if bl_end >= app_start:
+                    info_text.insert(tk.END, "⚠️  WARNING: Bootloader overlaps with Application!\n", 'error')
+                    overlap = True
+                
+                if self.dl_enabled_var and self.dl_enabled_var.get():
+                    try:
+                        dl_start = int(self.dl_start_var.get(), 16)
+                        dl_end = dl_start + int(self.dl_size_var.get(), 16) - 1
+                        
+                        if (dl_start <= app_end and dl_end >= app_start):
+                            info_text.insert(tk.END, "⚠️  WARNING: Download region overlaps with Application!\n", 'error')
+                            overlap = True
+                        if (dl_start <= bl_end and dl_end >= bl_start):
+                            info_text.insert(tk.END, "⚠️  WARNING: Download region overlaps with Bootloader!\n", 'error')
+                            overlap = True
+                    except:
+                        pass
+                
+                if not overlap:
+                    info_text.insert(tk.END, "✅ Memory layout is valid - No overlaps detected\n", 'success')
+                    
+            except ValueError:
+                info_text.insert(tk.END, "⚠️  Invalid hex values - Cannot compute memory map\n", 'error')
+            
+            # Configure text tags for colors
+            info_text.tag_config('header', foreground='#0066cc', font=('Consolas', 9, 'bold'))
+            info_text.tag_config('section', foreground='#0066cc', font=('Consolas', 9, 'bold'))
+            info_text.tag_config('normal', foreground='#2d3436')
+            info_text.tag_config('size', foreground='#00b894', font=('Consolas', 9, 'bold'))
+            info_text.tag_config('error', foreground='#d63031', font=('Consolas', 9, 'bold'))
+            info_text.tag_config('success', foreground='#00b894', font=('Consolas', 9, 'bold'))
+            info_text.tag_config('separator', foreground='#b2bec3')
+            
+            info_text.config(state=tk.DISABLED)
         
         self.bl_start_var.trace_add('write', update_info)
         self.bl_size_var.trace_add('write', update_info)
