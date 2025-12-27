@@ -31,32 +31,16 @@ dev_err_t svc_dcm_init(void)
     return DEV_OK;
 }
 
-#if SVC_DCM_CONFIG_USE_RTOS == 1
-void svc_dcm_task(void * argument)
-#else 
 void svc_dcm_main_function(void)
-#endif
 {
-#if SVC_DCM_CONFIG_USE_RTOS == 1
-    while (1)
-#else
-    if (DEV_DELAY_NON_BLOCKING_MS(dcm_main_delay_timer, SVC_DCM_TICK_INTERVAL_MS)) // 10 ms interval
-#endif
-    {
-        // DSL manages timing and session
-        dcmdsl_main_function(SVC_DCM_TICK_INTERVAL_MS);
-        
-        // DSD processes pending requests
-        dcmdsd_process_pending();
-        
-        // Process pending ECU reset
-        uds_service_0x11_process_reset();
-        
-#if SVC_DCM_CONFIG_USE_RTOS == 1
-        // Yield to RTOS if applicable
-        dev_rtos_yield();
-#endif  
-    }
+    // DSL manages timing and session
+    dcmdsl_main_function(SVC_DCM_TICK_INTERVAL_MS);
+    
+    // DSD processes pending requests
+    dcmdsd_process_pending();
+    
+    // Process pending ECU reset
+    uds_service_0x11_process_reset();
 }
 
 /**

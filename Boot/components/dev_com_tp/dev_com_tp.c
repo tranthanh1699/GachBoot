@@ -85,19 +85,6 @@ dev_err_t dev_com_tp_transmit(dev_com_tp_sdu_t * sdu_info_p)
 void dev_com_tp_main_function(void)
 {
     // Main processing loop for transport protocol layer
-#if DEV_CONFIG_COM_TP_USE_RTOS == 1
-    while (1)
-#else
-    if (DEV_DELAY_NON_BLOCKING_MS(tp_main_delay_timer, 10)) // 10 ms interval
-#endif
-    {
-        // Process incoming and outgoing packets here
-        
-#if DEV_CONFIG_COM_TP_USE_RTOS == 1
-        // Yield to RTOS if applicable
-        dev_rtos_yield();   
-#endif
-    }
 }
 
 /* =================== Static Function =================== */

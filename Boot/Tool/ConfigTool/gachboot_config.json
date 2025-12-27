@@ -290,5 +290,36 @@
       "alignment": "32",
       "max_block_length": "200"
     }
-  }
+  },
+  "os_tasks": [
+    {
+      "task_type": "init",
+      "task_name": "svc_app_init",
+      "function_name": "svc_app_init",
+      "description": "Initialize hardware peripherals (GPIO, UART, CAN, etc.)",
+      "enabled": true
+    },
+    {
+      "task_type": "background",
+      "task_name": "dev_com_main_function",
+      "function_name": "dev_com_main_function",
+      "description": "backgourd task com",
+      "enabled": true
+    },
+    {
+      "task_type": "background",
+      "task_name": "dev_com_tp_main_function",
+      "function_name": "dev_com_tp_main_function",
+      "description": "TP task",
+      "enabled": true
+    },
+    {
+      "task_type": "cyclic",
+      "task_name": "svc_dcm_main_function",
+      "function_name": "svc_dcm_main_function",
+      "description": "DCM main",
+      "enabled": true,
+      "cycle_time": 10
+    }
+  ]
 }

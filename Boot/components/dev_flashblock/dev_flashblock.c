@@ -5,9 +5,11 @@
 
 #include "dev_flashblock.h"
 #include "dev_fls.h"
-#include "dev_log.h"
+#include "dev_common.h"
 #include "Fls_PBCfg.h"
 #include <string.h>
+
+CONFIG_LOG_TAG(FLASHBLOCK, true)
 
 /* ===== Private Data Structures ===== */
 
@@ -116,22 +118,22 @@ static bool determine_erase_sectors(uint32_t address, uint32_t length,
 {
     int32_t first_idx = find_sector_by_address(address);
     if (first_idx < 0) {
-        dev_log("[FLASHBLOCK] ERROR: Start address 0x%08X not in any sector\n", address);
+        DBG_OUT_E("Start address 0x%08X not in any sector", address);
         return false;
     }
     
     uint32_t end_address = address + length - 1;
     int32_t last_idx = find_sector_by_address(end_address);
     if (last_idx < 0) {
-        dev_log("[FLASHBLOCK] ERROR: End address 0x%08X not in any sector\n", end_address);
+        DBG_OUT_E("End address 0x%08X not in any sector", end_address);
         return false;
     }
     
     *first_sector = (uint32_t)first_idx;
     *last_sector = (uint32_t)last_idx;
     
-    dev_log("[FLASHBLOCK] INFO: Erase range: sectors %u to %u (total: %u sectors)\n",
-                 *first_sector, *last_sector, (*last_sector - *first_sector + 1));
+    DBG_OUT_I("Erase range: sectors %u to %u (total: %u sectors)",
+              *first_sector, *last_sector, (*last_sector - *first_sector + 1));
     
     return true;
 }
@@ -156,7 +158,7 @@ dev_flashblock_result_t dev_flashblock_init(const dev_flashblock_config_t *confi
     memset(&g_flashblock_state.erase_ctx, 0, sizeof(erase_context_t));
     g_flashblock_state.initialized = true;
     
-    dev_log("[FLASHBLOCK] INFO: Flash block module initialized\n");
+    DBG_OUT_I("Flash block module initialized");
     return DEV_FLASHBLOCK_OK;
 }
 
@@ -164,24 +166,24 @@ dev_flashblock_result_t dev_flashblock_erase_start(uint32_t address, uint32_t le
 {
     // Check initialization
     if (!g_flashblock_state.initialized) {
-        dev_log("[FLASHBLOCK] ERROR: Module not initialized\n");
+        DBG_OUT_E("Module not initialized");
         return DEV_FLASHBLOCK_ERROR_NOT_INIT;
     }
     
     // Check state - must be IDLE
     if (g_flashblock_state.erase_state != DEV_FLASHBLOCK_ERASE_IDLE) {
-        dev_log("[FLASHBLOCK] ERROR: Erase already in progress (state: %d)\n", g_flashblock_state.erase_state);
+        DBG_OUT_E("Erase already in progress (state: %d)", g_flashblock_state.erase_state);
         return DEV_FLASHBLOCK_ERROR_INVALID_STATE;
     }
     
     // Validate parameters
     if (length == 0) {
-        dev_log("[FLASHBLOCK] ERROR: Invalid length: 0\n");
+        DBG_OUT_E("Invalid length: 0");
         return DEV_FLASHBLOCK_ERROR_INVALID_LEN;
     }
     
     if (!is_valid_flash_address(address, length)) {
-        dev_log("[FLASHBLOCK] ERROR: Invalid flash range: 0x%08X - 0x%08X\n", address, address + length - 1);
+        DBG_OUT_E("Invalid flash range: 0x%08X - 0x%08X", address, address + length - 1);
         return DEV_FLASHBLOCK_ERROR_INVALID_ADDR;
     }
     
@@ -202,8 +204,8 @@ dev_flashblock_result_t dev_flashblock_erase_start(uint32_t address, uint32_t le
     // Transition to PREPARED state
     g_flashblock_state.erase_state = DEV_FLASHBLOCK_ERASE_PREPARED;
     
-    dev_log("[FLASHBLOCK] INFO: Erase prepared: addr=0x%08X, len=%u, sectors=[%u..%u]\n",
-                 address, length, first_sector, last_sector);
+    DBG_OUT_I("Erase prepared: addr=0x%08X, len=%u, sectors=[%u..%u]",
+              address, length, first_sector, last_sector);
     
     return DEV_FLASHBLOCK_OK;
 }
@@ -218,7 +220,7 @@ dev_flashblock_result_t dev_flashblock_erase_do(void)
     // Check state - must be PREPARED or ERASING
     if (g_flashblock_state.erase_state != DEV_FLASHBLOCK_ERASE_PREPARED &&
         g_flashblock_state.erase_state != DEV_FLASHBLOCK_ERASE_ERASING) {
-        dev_log("[FLASHBLOCK] ERROR: Invalid state for erase_do: %d\n", g_flashblock_state.erase_state);
+        DBG_OUT_E("Invalid state for erase_do: %d", g_flashblock_state.erase_state);
         return DEV_FLASHBLOCK_ERROR_INVALID_STATE;
     }
     
@@ -233,14 +235,14 @@ dev_flashblock_result_t dev_flashblock_erase_do(void)
         uint32_t sector_addr = Fls_SectorTable[i].base_address;
         uint32_t sector_size = Fls_SectorTable[i].size;
         
-        dev_log("[FLASHBLOCK] INFO: Erasing sector %u (addr=0x%08X, size=%u bytes)...\n",
-                     i, sector_addr, sector_size);
+        DBG_OUT_I("Erasing sector %u (addr=0x%08X, size=%u bytes)...",
+                  i, sector_addr, sector_size);
         
         // Erase sector using dev_fls (pass sector index, not ID)
         dev_err_t fls_result = dev_fls_erase_sector((uint8_t)i);
         
         if (fls_result != DEV_OK) {
-            dev_log("[FLASHBLOCK] ERROR: Failed to erase sector %u: error %d\n", i, fls_result);
+            DBG_OUT_E("Failed to erase sector %u: error %d", i, fls_result);
             g_flashblock_state.erase_state = DEV_FLASHBLOCK_ERASE_IDLE;
             return DEV_FLASHBLOCK_ERROR_ERASE;
         }
@@ -262,8 +264,8 @@ dev_flashblock_result_t dev_flashblock_erase_do(void)
     // All sectors erased successfully
     g_flashblock_state.erase_state = DEV_FLASHBLOCK_ERASE_COMPLETED;
     
-    dev_log("[FLASHBLOCK] INFO: Erase completed successfully (%u sectors)\n",
-                 g_flashblock_state.erase_ctx.total_sectors);
+    DBG_OUT_I("Erase completed successfully (%u sectors)",
+              g_flashblock_state.erase_ctx.total_sectors);
     
     return DEV_FLASHBLOCK_OK;
 }
@@ -277,7 +279,7 @@ dev_flashblock_result_t dev_flashblock_erase_finish(void)
     
     // Check state - must be COMPLETED
     if (g_flashblock_state.erase_state != DEV_FLASHBLOCK_ERASE_COMPLETED) {
-        dev_log("[FLASHBLOCK] ERROR: Invalid state for erase_finish: %d\n", g_flashblock_state.erase_state);
+        DBG_OUT_E("Invalid state for erase_finish: %d", g_flashblock_state.erase_state);
         return DEV_FLASHBLOCK_ERROR_INVALID_STATE;
     }
     
@@ -285,7 +287,7 @@ dev_flashblock_result_t dev_flashblock_erase_finish(void)
     memset(&g_flashblock_state.erase_ctx, 0, sizeof(erase_context_t));
     g_flashblock_state.erase_state = DEV_FLASHBLOCK_ERASE_IDLE;
     
-    dev_log("[FLASHBLOCK] INFO: Erase operation finalized, ready for next operation\n");
+    DBG_OUT_I("Erase operation finalized, ready for next operation");
     
     return DEV_FLASHBLOCK_OK;
 }

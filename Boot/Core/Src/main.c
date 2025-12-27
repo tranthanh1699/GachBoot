@@ -18,13 +18,15 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "tim.h"
 #include "usart.h"
 #include "usb_device.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "svc_app.h"
+// #include "svc_app.h"
+#include "dev_os.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -94,8 +96,10 @@ int main(void)
   MX_GPIO_Init();
   MX_USART1_UART_Init();
   MX_USB_DEVICE_Init();
+  MX_TIM17_Init();
   /* USER CODE BEGIN 2 */
-  svc_app_init();
+  // svc_app_init();
+  dev_os_init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -105,7 +109,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    svc_app_run();
+    dev_os_process_bg_tasks();
   }
   /* USER CODE END 3 */
 }

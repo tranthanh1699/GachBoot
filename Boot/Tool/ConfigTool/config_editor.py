@@ -18,6 +18,7 @@ from Module.fls_module import validate_fls_config, generate_fls_code
 from Module.fee_module import validate_fee_config, generate_fee_code
 from Module.memory_layout_module import validate_memory_layout, generate_memory_layout_code
 from Module.cmake_module import generate_cmake_file
+from Module.os_module import validate_os_config, generate_os_config
 from Module_UI.service_ui import ServiceUI
 from Module_UI.session_ui import SessionUI
 from Module_UI.security_ui import SecurityUI
@@ -27,6 +28,7 @@ from Module_UI.did_ui import DidUI
 from Module_UI.fls_ui import FlsUI
 from Module_UI.fee_ui import FeeUI
 from Module_UI.memory_layout_ui import MemoryLayoutUI
+from Module_UI.os_ui import OsUI
 
 class ConfigEditor:
     def __init__(self, root):
@@ -56,6 +58,7 @@ class ConfigEditor:
         self.fls_ui = None
         self.fee_ui = None
         self.memory_layout_ui = None
+        self.os_ui = None
         
         # Apply modern theme with colors
         style = ttk.Style()
@@ -270,6 +273,7 @@ class ConfigEditor:
         self.setup_fls_tab()
         self.setup_fee_tab()
         self.setup_memory_layout_tab()
+        self.setup_os_tab()
         
         # Status bar
         self.status_var = tk.StringVar(value="Ready")
@@ -466,20 +470,70 @@ class ConfigEditor:
         # Just initialize it with None for now
         self.memory_layout_ui = MemoryLayoutUI(None)
     
+    def setup_os_tab(self):
+        """Setup OS Task Scheduler tab using OsUI module"""
+        os_frame = ttk.Frame(self.config_panel_frame)
+        
+        # Initialize OsUI
+        self.os_ui = OsUI(os_frame, self.root)
+        
+        # Setup tree and toolbar using UI module
+        self.os_tree = self.os_ui.setup_tab()
+        self.os_count_var = self.os_ui.setup_toolbar(
+            add_cmd=self.add_os_task,
+            edit_cmd=self.edit_os_task,
+            delete_cmd=self.delete_os_task
+        )
+    
     def load_config(self):
         """Load configuration from file"""
         try:
             if os.path.exists(self.config_file):
                 with open(self.config_file, 'r', encoding='utf-8') as f:
                     self.config = json.load(f)
+                
+                print(f"[DEBUG] Config type: {type(self.config)}")
+                print(f"[DEBUG] Config keys: {self.config.keys() if isinstance(self.config, dict) else 'NOT A DICT'}")
+                
+                # Validate config structure
+                if not isinstance(self.config, dict):
+                    raise ValueError("Config must be a dictionary/object")
+                
+                if 'project' not in self.config:
+                    raise ValueError("Config missing 'project' section")
+                
+                print(f"[DEBUG] Project type: {type(self.config['project'])}")
+                print(f"[DEBUG] Project value: {self.config['project']}")
+                
+                if not isinstance(self.config['project'], dict):
+                    raise ValueError("'project' must be a dictionary/object")
+                
+                # Ensure all required arrays exist
+                if 'nvm_blocks' not in self.config:
+                    self.config['nvm_blocks'] = []
+                if 'dids' not in self.config:
+                    self.config['dids'] = []
+                if 'sessions' not in self.config:
+                    self.config['sessions'] = []
+                if 'os_tasks' not in self.config:
+                    self.config['os_tasks'] = []
+                
+                print("[DEBUG] About to call refresh_ui")
                 self.refresh_ui()
+                print("[DEBUG] refresh_ui completed")
                 self.set_modified(False)
                 self.update_title()
                 self.status_var.set(f"Loaded: {self.config_file}")
             else:
                 self.new_config()
+        except json.JSONDecodeError as e:
+            messagebox.showerror("JSON Error", f"Invalid JSON format: {e}")
+            self.new_config()
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to load config: {e}")
+            messagebox.showerror("Error", f"Failed to load config: {e}\n\nCreating new config instead.")
+            import traceback
+            traceback.print_exc()
+            self.new_config()
     
     def update_title(self):
         """Update window title with file name and modified status"""
@@ -494,9 +548,11 @@ class ConfigEditor:
             modified: Whether config has been modified
             module_name: Name of the modified module (e.g., 'nvm', 'did', 'routine', etc.)
         """
+        print(f"[ConfigEditor] set_modified called: modified={modified}, module_name={module_name}")
         self.modified = modified
         if module_name and modified:
             self.modified_modules.add(module_name)
+            print(f"[ConfigEditor] modified_modules now: {self.modified_modules}")
         elif not modified:
             # Clear all modified modules when saving
             self.modified_modules.clear()
@@ -507,10 +563,12 @@ class ConfigEditor:
         if not self.config:
             return
         
-        # Project info
-        self.project_name_var.set(self.config['project']['name'])
-        self.version_var.set(self.config['project']['version'])
-        self.output_path_var.set(self.config['project']['generated_path'])
+        # Project info (with safe access)
+        project = self.config.get('project', {})
+        if isinstance(project, dict):
+            self.project_name_var.set(project.get('name', 'GachBoot'))
+            self.version_var.set(project.get('version', '1.0.0'))
+            self.output_path_var.set(project.get('generated_path', '../../service/svc_dcm/generated'))
         self.config_file_var.set(self.config_file)
         
         # Navigation tree
@@ -564,6 +622,12 @@ class ConfigEditor:
             self.fee_ui.refresh_tree(fee_config)
         mappings = fee_config.get('sector_mapping', [])
         self.fee_count_var.set(str(len(mappings)))
+        
+        # OS Task Scheduler
+        tasks = self.config.get('os_tasks', [])
+        if self.os_ui:
+            self.os_ui.refresh_tree(self.config)
+        self.os_count_var.set(str(len(tasks)))
     
     def save_current_form(self):
         """Save current form data before validate/generate"""
@@ -696,6 +760,18 @@ class ConfigEditor:
         # Memory Layout branch
         memory_layout = self.config.get('memory_layout', {})
         self.nav_tree.insert(root, tk.END, text="🗺️ Memory Layout", open=True, tags=('memory_layout',))
+        
+        # OS Task Scheduler branch
+        tasks = self.config.get('os_tasks', [])
+        task_count = len(tasks)
+        os_root = self.nav_tree.insert(root, tk.END, text=f"⚙️ OS Task Scheduler ({task_count})", open=True, tags=('os_root',))
+        for i, task in enumerate(tasks):
+            task_type = task.get('task_type', '')
+            type_icon = {'init': '🔧', 'cyclic': '🔄', 'background': '⏳'}.get(task_type, '📌')
+            cycle_info = f" [{task.get('cycle_time', '')}]" if task_type == 'cyclic' else ""
+            self.nav_tree.insert(os_root, tk.END,
+                text=f"  {type_icon} {task.get('task_name', 'Unnamed')}{cycle_info}",
+                tags=('os_task', str(i)))
     
     def browse_config_file(self):
         """Browse for config file"""
@@ -922,8 +998,27 @@ class ConfigEditor:
             self.info_text.insert(tk.END, f"  Start: {application.get('start_address', 'N/A')}\n")
             self.info_text.insert(tk.END, f"  Size: {application.get('size', 'N/A')}\n")
             
-            # Show edit form
             self.show_memory_layout_edit_form()
+        
+        elif tags and tags[0] == 'os_task':
+            # Show OS Task details
+            idx = int(tags[1])
+            tasks = self.config.get('os_tasks', [])
+            if idx < len(tasks):
+                task = tasks[idx]
+                task_type = task.get('task_type', '')
+                type_name = {'init': 'Initialization', 'cyclic': 'Cyclic', 'background': 'Background'}.get(task_type, task_type)
+                
+                self.info_text.insert(tk.END, f"{type_name} Task\n")
+                self.info_text.insert(tk.END, f"{'='*30}\n")
+                self.info_text.insert(tk.END, f"Name: {task.get('task_name', '')}\n")
+                self.info_text.insert(tk.END, f"Function: {task.get('function_name', '')}\n")
+                if task_type == 'cyclic':
+                    self.info_text.insert(tk.END, f"Cycle Time: {task.get('cycle_time', '-')}\n")
+                self.info_text.insert(tk.END, f"Enabled: {'Yes' if task.get('enabled', True) else 'No'}\n")
+                self.info_text.insert(tk.END, f"Description: {task.get('description', '')}\n")
+                
+                self.show_os_task_edit_form(idx)
         
         self.info_text.config(state=tk.DISABLED)
     
@@ -957,6 +1052,8 @@ class ConfigEditor:
             menu.add_command(label="➕ Add New Sector", command=self.add_fls_sector)
         elif tags and tags[0] == 'fee_root':
             menu.add_command(label="➕ Add New Mapping", command=self.add_fee_mapping)
+        elif tags and tags[0] == 'os_root':
+            menu.add_command(label="➕ Add New Task", command=self.add_os_task)
         elif tags and tags[0] == 'nvm':
             menu.add_command(label="✏️ Edit Block", command=self.edit_nvm_block)
             menu.add_command(label="🗑️ Delete Block", command=self.delete_nvm_block)
@@ -978,6 +1075,9 @@ class ConfigEditor:
         elif tags and tags[0] == 'fls_sector':
             menu.add_command(label="✏️ Edit Sector", command=self.edit_fls_sector)
             menu.add_command(label="🗑️ Delete Sector", command=self.delete_fls_sector)
+        elif tags and tags[0] == 'os_task':
+            menu.add_command(label="✏️ Edit Task", command=self.edit_os_task)
+            menu.add_command(label="🗑️ Delete Task", command=self.delete_os_task)
         else:
             return
         
@@ -1042,7 +1142,7 @@ class ConfigEditor:
             self._cache_current_form_widget()
     
     def new_config(self):
-        """Create new configuration"""
+        """Create new configuration with example data"""
         self.config = {
             "project": {
                 "name": "GachBoot",
@@ -1051,12 +1151,84 @@ class ConfigEditor:
             },
             "nvm_blocks": [],
             "dids": [],
-            "sessions": []
+            "sessions": [],
+            "security_levels": [],
+            "services": [],
+            "routines": [],
+            "fls_config": {
+                "sectors": []
+            },
+            "fee_config": {
+                "blocks": []
+            },
+            "memory_layout": {},
+            "os_tasks": [
+                {
+                    "task_name": "hardware_init_task",
+                    "task_type": "init",
+                    "function_name": "hardware_init_task",
+                    "enabled": True,
+                    "description": "Initialize hardware peripherals (GPIO, UART, CAN, etc.)"
+                },
+                {
+                    "task_name": "software_init_task",
+                    "task_type": "init",
+                    "function_name": "software_init_task",
+                    "enabled": True,
+                    "description": "Initialize software modules (OS, DCM, NvM, etc.)"
+                },
+                {
+                    "task_name": "sensor_read_task",
+                    "task_type": "cyclic",
+                    "function_name": "sensor_read_task",
+                    "cycle_time": 1,
+                    "enabled": True,
+                    "description": "Read analog sensors and digital inputs"
+                },
+                {
+                    "task_name": "can_rx_task",
+                    "task_type": "cyclic",
+                    "function_name": "can_rx_task",
+                    "cycle_time": 10,
+                    "enabled": True,
+                    "description": "Process received CAN messages"
+                },
+                {
+                    "task_name": "diagnostics_task",
+                    "task_type": "cyclic",
+                    "function_name": "diagnostics_task",
+                    "cycle_time": 100,
+                    "enabled": True,
+                    "description": "Process UDS diagnostic requests"
+                },
+                {
+                    "task_name": "heartbeat_task",
+                    "task_type": "cyclic",
+                    "function_name": "heartbeat_task",
+                    "cycle_time": 1000,
+                    "enabled": True,
+                    "description": "Send periodic heartbeat and watchdog refresh"
+                },
+                {
+                    "task_name": "flash_program_task",
+                    "task_type": "background",
+                    "function_name": "flash_program_task",
+                    "enabled": True,
+                    "description": "Program flash memory blocks during idle time"
+                },
+                {
+                    "task_name": "crc_calculate_task",
+                    "task_type": "background",
+                    "function_name": "crc_calculate_task",
+                    "enabled": True,
+                    "description": "Calculate CRC checksums for data verification"
+                }
+            ]
         }
         self.refresh_ui()
         self.set_modified()
         self.update_title()
-        self.status_var.set("New configuration created")
+        self.status_var.set("New configuration created with example OS tasks")
     
     def open_config(self):
         """Open configuration file"""
@@ -1644,6 +1816,79 @@ class ConfigEditor:
             self.refresh_ui()
             self.set_modified(module_name='fee')
     
+    # ========================================================================
+    # OS Task Scheduler CRUD Operations
+    # ========================================================================
+    
+    def add_os_task(self):
+        """Add new OS task"""
+        if 'os_tasks' not in self.config:
+            self.config['os_tasks'] = []
+        
+        # Prepare callbacks
+        callbacks = {
+            'set_modified': lambda: self.set_modified(module_name='os'),
+            'refresh_ui': self.refresh_ui
+        }
+        
+        if self.os_ui:
+            self.os_ui.show_edit_form(self.config_panel_frame, None, self.config, callbacks)
+    
+    def edit_os_task(self):
+        """Edit selected OS task"""
+        selection = self.nav_tree.selection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a task to edit")
+            return
+        
+        item = self.nav_tree.item(selection[0])
+        tags = item['tags']
+        
+        if not tags or tags[0] != 'os_task':
+            messagebox.showwarning("Invalid Selection", "Please select an OS task")
+            return
+        
+        index = int(tags[1])
+        self.show_os_task_edit_form(index)
+    
+    def delete_os_task(self):
+        """Delete selected OS task"""
+        selection = self.nav_tree.selection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a task to delete")
+            return
+        
+        item = self.nav_tree.item(selection[0])
+        tags = item['tags']
+        
+        if not tags or tags[0] != 'os_task':
+            messagebox.showwarning("Invalid Selection", "Please select an OS task")
+            return
+        
+        index = int(tags[1])
+        tasks = self.config.get('os_tasks', [])
+        
+        if index >= len(tasks):
+            return
+        
+        task = tasks[index]
+        
+        if messagebox.askyesno("Confirm Delete", f"Delete task {task.get('task_name', f'Task {index}')}?"):
+            del tasks[index]
+            self.refresh_ui()
+            self.set_modified(module_name='os')
+    
+    def show_os_task_edit_form(self, index):
+        """Show OS task edit form"""
+        # Prepare callbacks
+        callbacks = {
+            'set_modified': lambda: self.set_modified(module_name='os'),
+            'refresh_ui': self.refresh_ui
+        }
+        
+        if self.os_ui:
+            self.os_ui.show_edit_form(self.config_panel_frame, index, self.config, callbacks)
+    
     def show_generate_dialog(self):
         """Show dialog to select which modules to generate"""
         dialog = tk.Toplevel(self.root)
@@ -1682,6 +1927,7 @@ class ConfigEditor:
             ('fls', 'Flash Driver Config'),
             ('fee', 'Flash EEPROM Emulation'),
             ('memory_layout', 'Memory Layout (Service 0x34)'),
+            ('os', 'OS Task Scheduler'),
             ('cmake', 'CMakeLists.txt')
         ]
         
@@ -1872,6 +2118,14 @@ class ConfigEditor:
                 self.root.update()
                 print(f"[DEBUG] Generated Memory Layout file")
             
+            # Generate OS Task Scheduler code
+            if 'os' in selected_modules and self.config.get('os_tasks'):
+                os_files = generate_os_config(self.config, output_path)
+                all_files.extend(os_files)
+                self.status_var.set(f"Generated OS config")
+                self.root.update()
+                print(f"[DEBUG] Generated OS files: {len(os_files)}")
+            
             # Generate CMake file
             if 'cmake' in selected_modules:
                 cmake_file = generate_cmake_file(output_path, project_name, version)
@@ -1908,8 +2162,11 @@ class ConfigEditor:
             # Validate Memory Layout
             memory_errors = validate_memory_layout(self.config.get('memory_layout', {}))
             
+            # Validate OS Task Scheduler
+            os_valid, os_errors = validate_os_config(self.config)
+            
             # Collect all messages
-            all_errors = nvm_errors + did_errors + session_errors + security_errors + fls_errors + fee_errors + memory_errors
+            all_errors = nvm_errors + did_errors + session_errors + security_errors + fls_errors + fee_errors + memory_errors + os_errors
             all_warnings = nvm_warnings + did_warnings + session_warnings + security_warnings + fls_warnings + fee_warnings
             
             # Basic project validation

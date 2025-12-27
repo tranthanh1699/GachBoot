@@ -27,15 +27,3 @@ dev_err_t svc_app_init(void)
     DEV_RETURN_ON_FALSE(err == DEV_OK, err, "Failed to initialize DCM Service, Error: %d", err);
     return DEV_OK;
 }
-
-/**
- * @brief Service Application Main Run Loop
- */
-void svc_app_run(void)
-{
-#if DEV_CONFIG_COMMON_USE_RTOS == 0
-    dev_com_main_function();
-    dev_com_tp_main_function();
-    svc_dcm_main_function();
-#endif
-}

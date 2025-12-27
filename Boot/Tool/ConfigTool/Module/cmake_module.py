@@ -109,6 +109,15 @@ if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Memory_Layout_Gen)
     message(STATUS "Added Memory_Layout_Gen include directory")
 endif()
 
+# Add OS Generated Code
+if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Os_Gen)
+    file(GLOB OS_GEN_SOURCES 
+        "${{CMAKE_CURRENT_SOURCE_DIR}}/Os_Gen/*.c"
+    )
+    list(APPEND GENERATED_SOURCES ${{OS_GEN_SOURCES}})
+    message(STATUS "Added Os_Gen sources: ${{OS_GEN_SOURCES}}")
+endif()
+
 # Create library from generated code
 add_library(GenerateCode STATIC ${{GENERATED_SOURCES}})
 
@@ -167,6 +176,12 @@ if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Memory_Layout_Gen)
     )
 endif()
 
+if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Os_Gen)
+    target_include_directories(GenerateCode PUBLIC
+        ${{CMAKE_CURRENT_SOURCE_DIR}}/Os_Gen
+    )
+endif()
+
 # Link dependencies
 target_link_libraries(GenerateCode PUBLIC stm32cubemx)
 """
@@ -176,3 +191,29 @@ target_link_libraries(GenerateCode PUBLIC stm32cubemx)
         f.write(content)
     
     return cmake_file
+
+
+def generate_cmake_code(config_data: dict, output_dir: str) -> tuple:
+    """
+    Generate CMakeLists.txt for GenerateCode directory.
+    
+    Args:
+        config_data: Full configuration dictionary
+        output_dir: Base output directory (usually "GenerateCode/")
+    
+    Returns:
+        (success: bool, messages: List[str])
+    """
+    try:
+        project = config_data.get('project', {})
+        project_name = project.get('name', 'GachBoot')
+        version = project.get('version', '1.0.0')
+        
+        cmake_file = generate_cmake_file(output_dir, project_name, version)
+        
+        return True, [
+            f"Generated: {cmake_file}",
+            "CMakeLists.txt will auto-detect all *_Gen folders"
+        ]
+    except Exception as e:
+        return False, [f"CMake generation failed: {str(e)}"]

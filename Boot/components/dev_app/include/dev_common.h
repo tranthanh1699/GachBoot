@@ -11,6 +11,9 @@
 #include "stm32h7xx_hal.h"
 #include "usbd_cdc_if.h"
 
+/* Extern device variables */
+extern TIM_HandleTypeDef htim17;
+
 /* Device Configuration */
 #define DEV_CONFIG_COMMON_USE_RTOS    0  // Set to 1 if using RTOS
 

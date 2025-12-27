@@ -146,22 +146,13 @@ dev_err_t dev_com_transmit(const dev_mailbox_context_t *mailbox_ctx)
  */
 void dev_com_main_function(void)
 {
-#if DEV_COM_CONFIG_USE_RTOS == 1
-    while (1)
-#endif 
+    if(dev_uart_available() > 0)
     {
-        if(dev_uart_available() > 0)
+        uint8_t data;
+        if (dev_uart_get_uint8(&data) == DEV_OK)
         {
-            uint8_t data;
-            if (dev_uart_get_uint8(&data) == DEV_OK)
-            {
-                min_poll(&s_Min_Context, &data, 1);
-            }
+            min_poll(&s_Min_Context, &data, 1);
         }
-
-#if DEV_COM_CONFIG_USE_RTOS == 1
-        dev_rtos_yield();
-#endif
     }
 }
 
