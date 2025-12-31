@@ -320,6 +320,14 @@
       "description": "DCM main",
       "enabled": true,
       "cycle_time": 10
+    },
+    {
+      "task_type": "cyclic",
+      "task_name": "svc_app_1000ms_task",
+      "function_name": "svc_app_1000ms_task",
+      "description": "svc_app_1000ms_task",
+      "enabled": true,
+      "cycle_time": 1000
     }
   ]
 }

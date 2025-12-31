@@ -6,6 +6,6 @@
 #include "dev_com_tp.h"
 
 /* Service Application Initialization */
-dev_err_t svc_app_init(void);
+void svc_app_init(void);
 
 #endif // SVC_APP_H
