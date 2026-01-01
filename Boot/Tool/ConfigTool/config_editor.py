@@ -672,7 +672,7 @@ class ConfigEditor:
             return
         
         # Root node
-        root = self.nav_tree.insert('', tk.END, text=f"📦 {self.config['project']['name']}", open=True)
+        root = self.nav_tree.insert('', tk.END, text=f"📦 {self.config['project']['name']}", open=True, tags=('project_root',))
         
         # NVM Blocks branch with count
         nvm_count = len(self.config['nvm_blocks'])
@@ -1036,7 +1036,10 @@ class ConfigEditor:
         # Create context menu
         menu = tk.Menu(self.root, tearoff=0)
         
-        if tags and tags[0] == 'nvm_root':
+        if tags and tags[0] == 'project_root':
+            menu.add_command(label="📂 Expand All", command=self.expand_all)
+            menu.add_command(label="📁 Collapse All", command=self.collapse_all)
+        elif tags and tags[0] == 'nvm_root':
             menu.add_command(label="➕ Add New NVM Block", command=self.add_nvm_block)
         elif tags and tags[0] == 'did_root':
             menu.add_command(label="➕ Add New DID", command=self.add_did)
@@ -1082,6 +1085,31 @@ class ConfigEditor:
             return
         
         menu.post(event.x_root, event.y_root)
+    
+    def expand_all(self):
+        """Expand all tree nodes"""
+        def expand_node(node):
+            self.nav_tree.item(node, open=True)
+            for child in self.nav_tree.get_children(node):
+                expand_node(child)
+        
+        # Get root node (first child of '')
+        root_nodes = self.nav_tree.get_children('')
+        if root_nodes:
+            expand_node(root_nodes[0])
+    
+    def collapse_all(self):
+        """Collapse all tree nodes except root"""
+        def collapse_node(node, is_root=False):
+            if not is_root:
+                self.nav_tree.item(node, open=False)
+            for child in self.nav_tree.get_children(node):
+                collapse_node(child, False)
+        
+        # Get root node (first child of '')
+        root_nodes = self.nav_tree.get_children('')
+        if root_nodes:
+            collapse_node(root_nodes[0], is_root=True)
     
     def _cache_current_form_widget(self):
         """Helper to cache the current form widget for saving later"""

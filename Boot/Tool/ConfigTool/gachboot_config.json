@@ -328,6 +328,13 @@
       "description": "svc_app_1000ms_task",
       "enabled": true,
       "cycle_time": 1000
+    },
+    {
+      "task_type": "background",
+      "task_name": "routine_erase_memory_proc",
+      "function_name": "routine_erase_memory_proc",
+      "description": "Task to handle erase block",
+      "enabled": true
     }
   ]
 }
