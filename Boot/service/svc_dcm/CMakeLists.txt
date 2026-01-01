@@ -39,4 +39,5 @@ target_include_directories(svc_dcm PUBLIC
 # Link to stm32cubemx to get HAL includes and definitions
 target_link_libraries(svc_dcm PUBLIC stm32cubemx)
 target_link_libraries(svc_dcm PUBLIC dev_com_tp)
+target_link_libraries(svc_dcm PUBLIC dev_flashblock)
 target_link_libraries(svc_dcm PUBLIC GenerateCode)

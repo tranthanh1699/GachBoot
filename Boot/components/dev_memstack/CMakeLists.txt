@@ -15,11 +15,13 @@ add_subdirectory(dev_fee)    # Flash EEPROM Emulation (sector management)
 add_subdirectory(dev_memif)  # Memory Interface (abstraction)
 add_subdirectory(dev_nvm)    # NV Manager (block management)
 
-# Create a combined memory stack library
-add_library(dev_memstack INTERFACE)
+# Create a combined memory stack library with initialization module
+add_library(dev_memstack STATIC
+    dev_memstack.c
+)
 
 # Link all layers in correct dependency order
-target_link_libraries(dev_memstack INTERFACE
+target_link_libraries(dev_memstack PUBLIC
     dev_fls     # Bottom layer - hardware
     dev_fee     # Sector management
     dev_memif   # Abstraction layer
@@ -27,7 +29,8 @@ target_link_libraries(dev_memstack INTERFACE
 )
 
 # Expose include directories from all layers
-target_include_directories(dev_memstack INTERFACE
+target_include_directories(dev_memstack PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/dev_fls/include
     ${CMAKE_CURRENT_SOURCE_DIR}/dev_fee/include
     ${CMAKE_CURRENT_SOURCE_DIR}/dev_memif/include

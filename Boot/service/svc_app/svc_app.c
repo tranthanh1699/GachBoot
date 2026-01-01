@@ -1,12 +1,21 @@
 #include "svc_app.h"
 #include "stm32h7xx_hal_gpio.h"
 #include "svc_dcm.h"
+#include "dev_flashblock.h"
+#include "dev_memstack.h"
 
 CONFIG_LOG_TAG(SVC_APP, true)
 /* Service Application Initialization */
 void svc_app_init(void)
 {
     DBG_OUT_I("Service Application Initialization Started");
+    
+    // Initialize Memory Stack (FLS + FEE + NVM)
+    (void)dev_memstack_init();
+    
+    // Initialize Flash Block Driver
+    (void)dev_flashblock_init(NULL); // Use default configuration
+    
     // Initialize UART Driver
     (void)dev_com_init(dev_com_if_rx_indication);
 

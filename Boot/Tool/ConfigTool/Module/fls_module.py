@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """
 Fls Module - Validation and Code Generation for Flash Driver Configuration
+
+Architecture: 
+- FLS declares ALL physical sectors of the MCU (16 sectors for STM32H7)
+- FEE references specific sectors for NVM usage
+- Clear separation: Hardware layer (FLS) vs Virtual layer (FEE)
 """
 
 from typing import Dict, List, Tuple
@@ -12,6 +17,29 @@ STM32H7_FLASH_SIZE = 2 * 1024 * 1024  # 2MB
 STM32H7_BANK_SIZE = 1024 * 1024  # 1MB per bank
 STM32H7_SECTOR_SIZE = 128 * 1024  # 128KB per sector
 STM32H7_SECTORS_PER_BANK = 8
+
+def generate_all_stm32h7_sectors() -> List[Dict]:
+    """
+    Auto-generate complete sector table for STM32H743
+    
+    Returns all 16 physical sectors (2 banks × 8 sectors)
+    This ensures FLS layer has complete hardware visibility.
+    """
+    sectors = []
+    for bank in [1, 2]:
+        bank_base = STM32H7_FLASH_BASE if bank == 1 else (STM32H7_FLASH_BASE + STM32H7_BANK_SIZE)
+        for sector_idx in range(STM32H7_SECTORS_PER_BANK):
+            sector_addr = bank_base + (sector_idx * STM32H7_SECTOR_SIZE)
+            sectors.append({
+                "name": f"Bank{bank}_Sector{sector_idx}",
+                "description": f"Bank {bank}, Sector {sector_idx}",
+                "bank_index": bank,
+                "sector_index": sector_idx,
+                "start_address": f"0x{sector_addr:08X}",
+                "size": STM32H7_SECTOR_SIZE,
+                "erase_value": 0xFF
+            })
+    return sectors
 
 class FlsValidator:
     """Validator for Fls configuration"""
@@ -153,6 +181,10 @@ def generate_fls_code(config: Dict, output_dir: str) -> List[str]:
     """
     Generate Fls configuration C code
     
+    Architecture note:
+    - Always generates complete 16-sector table for STM32H743
+    - FEE layer will reference specific sectors for NVM usage
+    
     Args:
         config: Full configuration dictionary
         output_dir: Output directory path
@@ -166,18 +198,23 @@ def generate_fls_code(config: Dict, output_dir: str) -> List[str]:
     if not fls_config:
         return []
     
+    # Auto-generate complete sector table
+    # This ensures FLS has visibility of all hardware sectors
+    fls_config_with_sectors = fls_config.copy()
+    fls_config_with_sectors['sectors'] = generate_all_stm32h7_sectors()
+    
     # Create output directory
     fls_gen_dir = os.path.join(output_dir, 'Fls_Gen')
     os.makedirs(fls_gen_dir, exist_ok=True)
     
     # Generate header
-    header_content = generate_fls_header(fls_config, config)
+    header_content = generate_fls_header(fls_config_with_sectors, config)
     header_path = os.path.join(fls_gen_dir, 'Fls_PBCfg.h')
     with open(header_path, 'w', encoding='utf-8') as f:
         f.write(header_content)
     
     # Generate source
-    source_content = generate_fls_source(fls_config, config)
+    source_content = generate_fls_source(fls_config_with_sectors, config)
     source_path = os.path.join(fls_gen_dir, 'Fls_PBCfg.c')
     with open(source_path, 'w', encoding='utf-8') as f:
         f.write(source_content)
@@ -291,9 +328,12 @@ typedef struct {{
  * 
  * Configuration Summary:
  * - MCU: {mcu_name}
- * - Total Sectors: {len(fls_config.get('sectors', []))}
+ * - Total Sectors: {len(fls_config.get('sectors', []))} (Complete Hardware Map)
  * - Flash Base: {base_addr}
  * - Total Size: {total_size // (1024*1024)}MB
+ * 
+ * Note: This table contains ALL physical sectors of the MCU.
+ *       FEE layer will reference specific sectors for NVM usage.
  */
 extern const Fls_SectorDescriptor_t Fls_SectorTable[];
 extern const uint8_t Fls_SectorCount;

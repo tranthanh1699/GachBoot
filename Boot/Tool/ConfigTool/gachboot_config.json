@@ -220,7 +220,7 @@
   ],
   "fls_config": {
     "mcu_name": "STM32H743VIT6",
-    "description": "Flash Driver Configuration for NVM Storage",
+    "description": "Flash Driver Configuration - Complete Hardware Map",
     "base_address": "0x08000000",
     "total_size": 2097152,
     "write_alignment": 32,
@@ -228,10 +228,138 @@
     "erase_value": 255,
     "write_timeout_ms": 100,
     "erase_timeout_ms": 2000,
+    "auto_generate_sectors": true,
+    "_comment": "Sectors are auto-generated for complete STM32H743 map (16 sectors). Do not manually add sectors here.",
     "sectors": [
       {
-        "name": "NVM_Sector_A",
-        "description": "Primary NVM storage sector",
+        "name": "Sector_0",
+        "description": "",
+        "bank_index": 1,
+        "sector_index": 0,
+        "start_address": "0x08000000",
+        "size": 131072,
+        "erase_value": 255
+      },
+      {
+        "name": "Sector_1",
+        "description": "",
+        "bank_index": 1,
+        "sector_index": 1,
+        "start_address": "0x08020000",
+        "size": 131072,
+        "erase_value": 255
+      },
+      {
+        "name": "Sector_2",
+        "description": "",
+        "bank_index": 1,
+        "sector_index": 2,
+        "start_address": "0x08040000",
+        "size": 131072,
+        "erase_value": 255
+      },
+      {
+        "name": "Sector_3",
+        "description": "",
+        "bank_index": 1,
+        "sector_index": 3,
+        "start_address": "0x08060000",
+        "size": 131072,
+        "erase_value": 255
+      },
+      {
+        "name": "Sector_4",
+        "description": "",
+        "bank_index": 1,
+        "sector_index": 4,
+        "start_address": "0x08080000",
+        "size": 131072,
+        "erase_value": 255
+      },
+      {
+        "name": "Sector_5",
+        "description": "",
+        "bank_index": 1,
+        "sector_index": 5,
+        "start_address": "0x080A0000",
+        "size": 131072,
+        "erase_value": 255
+      },
+      {
+        "name": "Sector_6",
+        "description": "",
+        "bank_index": 1,
+        "sector_index": 6,
+        "start_address": "0x080C0000",
+        "size": 131072,
+        "erase_value": 255
+      },
+      {
+        "name": "Sector_7",
+        "description": "",
+        "bank_index": 1,
+        "sector_index": 7,
+        "start_address": "0x080E0000",
+        "size": 131072,
+        "erase_value": 255
+      },
+      {
+        "name": "Sector_8",
+        "description": "",
+        "bank_index": 2,
+        "sector_index": 0,
+        "start_address": "0x08100000",
+        "size": 131072,
+        "erase_value": 255
+      },
+      {
+        "name": "Sector_9",
+        "description": "",
+        "bank_index": 2,
+        "sector_index": 1,
+        "start_address": "0x08120000",
+        "size": 131072,
+        "erase_value": 255
+      },
+      {
+        "name": "Sector_10",
+        "description": "",
+        "bank_index": 2,
+        "sector_index": 2,
+        "start_address": "0x08140000",
+        "size": 131072,
+        "erase_value": 255
+      },
+      {
+        "name": "Sector_11",
+        "description": "",
+        "bank_index": 2,
+        "sector_index": 3,
+        "start_address": "0x08160000",
+        "size": 131072,
+        "erase_value": 255
+      },
+      {
+        "name": "Sector_12",
+        "description": "",
+        "bank_index": 2,
+        "sector_index": 4,
+        "start_address": "0x08180000",
+        "size": 131072,
+        "erase_value": 255
+      },
+      {
+        "name": "Sector_13",
+        "description": "",
+        "bank_index": 2,
+        "sector_index": 5,
+        "start_address": "0x081A0000",
+        "size": 131072,
+        "erase_value": 255
+      },
+      {
+        "name": "Sector_14",
+        "description": "",
         "bank_index": 2,
         "sector_index": 6,
         "start_address": "0x081C0000",
@@ -239,8 +367,8 @@
         "erase_value": 255
       },
       {
-        "name": "NVM_Sector_B",
-        "description": "Secondary NVM storage sector",
+        "name": "Sector_15",
+        "description": "",
         "bank_index": 2,
         "sector_index": 7,
         "start_address": "0x081E0000",
@@ -252,24 +380,27 @@
   "fee_config": {
     "description": "Flash EEPROM Emulation Configuration",
     "virtual_start": "0x00000000",
-    "virtual_size": 131072,
+    "virtual_size": 262144,
     "sector_full_threshold": 130048,
     "write_alignment": 32,
     "erase_value": 255,
     "sector_mapping": [
       {
         "name": "Fee_Primary",
-        "fls_sector_index": 0,
+        "fls_sector_reference": "Bank2_Sector6",
         "is_primary": true,
-        "description": "Primary Fee sector (maps to NVM_Sector_A)"
+        "description": "Primary NVM sector (Bank 2, Sector 6 @ 0x081C0000)",
+        "fls_sector_index": 6
       },
       {
         "name": "Fee_Secondary",
-        "fls_sector_index": 1,
+        "fls_sector_reference": "Bank2_Sector7",
         "is_primary": false,
-        "description": "Secondary Fee sector (maps to NVM_Sector_B)"
+        "description": "Secondary NVM sector (Bank 2, Sector 7 @ 0x081E0000)",
+        "fls_sector_index": 7
       }
-    ]
+    ],
+    "_comment": "fls_sector_reference format: 'Bank{1|2}_Sector{0-7}'. References auto-generated FLS sectors."
   },
   "memory_layout": {
     "bootloader_region": {

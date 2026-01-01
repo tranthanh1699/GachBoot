@@ -207,7 +207,74 @@ See [AI_CONVERSATION/CONVERSATION_HISTORY.md](AI_CONVERSATION/CONVERSATION_HISTO
 │   • 32-byte write alignment & padding                   │
 │   • Sector boundary protection                          │
 │   • 128KB sector management                             │
+│   • COMPLETE SECTOR MAP: All 16 physical sectors        │
 └─────────────────────────────────────────────────────────┘
+```
+
+#### Flash Architecture (Phương Án 2 - Implemented)
+
+**Design Philosophy:**
+- **FLS Layer**: Declares ALL physical sectors (hardware abstraction)
+- **FEE Layer**: References specific sectors for NVM usage (virtual mapping)
+- **Clear Separation**: Hardware visibility (FLS) vs Logical allocation (FEE)
+
+**STM32H743VIT6 Complete Flash Map (2MB Total):**
+
+```
+Bank 1 (1MB) - Base: 0x08000000
+├── Sector 0 (128KB) - 0x08000000 → Bootloader/Application
+├── Sector 1 (128KB) - 0x08020000
+├── Sector 2 (128KB) - 0x08040000
+├── Sector 3 (128KB) - 0x08060000
+├── Sector 4 (128KB) - 0x08080000
+├── Sector 5 (128KB) - 0x080A0000
+├── Sector 6 (128KB) - 0x080C0000
+└── Sector 7 (128KB) - 0x080E0000
+
+Bank 2 (1MB) - Base: 0x08100000
+├── Sector 0 (128KB) - 0x08100000
+├── Sector 1 (128KB) - 0x08120000
+├── Sector 2 (128KB) - 0x08140000
+├── Sector 3 (128KB) - 0x08160000
+├── Sector 4 (128KB) - 0x08180000
+├── Sector 5 (128KB) - 0x081A0000
+├── Sector 6 (128KB) - 0x081C0000 ← FEE Primary (NVM Sector A)
+└── Sector 7 (128KB) - 0x081E0000 ← FEE Secondary (NVM Sector B)
+```
+
+**FLS Configuration:**
+```c
+// Generated: Fls_PBCfg.h/c
+const Fls_SectorDescriptor_t Fls_SectorTable[16] = {
+    // All 16 sectors with bank_index, sector_index, address, size
+};
+```
+
+**FEE Sector Mapping:**
+```json
+{
+  "fee_config": {
+    "sector_mapping": [
+      {
+        "name": "Fee_Primary",
+        "fls_sector_reference": "Bank2_Sector6",  // Reference by name
+        "is_primary": true
+      },
+      {
+        "name": "Fee_Secondary",
+        "fls_sector_reference": "Bank2_Sector7",
+        "is_primary": false
+      }
+    ]
+  }
+}
+```
+
+**Benefits:**
+- ✅ **Complete Hardware Visibility**: FLS knows all 16 sectors
+- ✅ **Flexible NVM Allocation**: FEE can reference any sector
+- ✅ **Future-Proof**: Easy to add OTA, bootloader, or logging sectors
+- ✅ **AUTOSAR Compliant**: Clear layer separation (HW vs SW abstraction)
 ```
 
 #### NVM Block Configuration

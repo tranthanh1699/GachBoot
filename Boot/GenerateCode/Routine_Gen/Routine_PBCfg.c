@@ -1,7 +1,7 @@
 /**
  * @file Routine_PBCfg.c
  * @brief UDS Routine Control Configuration Implementation
- * @date Generated on 2025-12-27 21:38:25
+ * @date Generated on 2026-01-01 15:57:00
  * 
  * Auto-generated from gachboot_config.json
  * DO NOT EDIT MANUALLY
