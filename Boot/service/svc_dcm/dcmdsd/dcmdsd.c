@@ -1,12 +1,13 @@
 #include "dcmdsd.h"
 #include "svc_dcm.h"
 #include "dcmdsp/dcmdsp.h"
+#include "dcmdsl/dcmdsl.h"
 #include <string.h>
 
 CONFIG_LOG_TAG(DCMDSD, true)
 
-// Pending request state
-static dcmdsd_pending_state_t pending_state = {0};
+// Pending request state - volatile to prevent compiler optimization
+static volatile dcmdsd_pending_state_t pending_state = {0};
 
 /**
  * @brief Get system tick in milliseconds
@@ -47,6 +48,10 @@ void dcmdsd_process_pending(void)
     // Update retry timestamp
     pending_state.last_retry_time_ms = current_time;
     
+    // Reset S3 timer on every retry to keep session alive during pending operation
+    // This is more reliable than only resetting when sending NRC 0x78
+    dcmdsl_reset_s3_timer();
+    
     // Prepare response buffer
     uint8_t response_buffer[256];
     memset(response_buffer, 0, sizeof(response_buffer));
@@ -68,6 +73,13 @@ void dcmdsd_process_pending(void)
         // Still pending - check if we need to send NRC 0x78
         uint32_t nrc78_elapsed = current_time - pending_state.last_nrc78_time_ms;
         
+        // Debug: log every 500ms
+        // static uint32_t last_log_time = 0;
+        // if ((current_time - last_log_time) >= 500) {
+        //     DBG_OUT_I("Pending: elapsed=%lu, need=%u", nrc78_elapsed, DCMDSD_PENDING_NRC78_INTERVAL_MS);
+        //     last_log_time = current_time;
+        // }
+        
         if (nrc78_elapsed >= DCMDSD_PENDING_NRC78_INTERVAL_MS) {
             // Time to send another NRC 0x78
             
@@ -84,6 +96,9 @@ void dcmdsd_process_pending(void)
             // Send NRC 0x78
             pending_state.nrc78_count++;
             pending_state.last_nrc78_time_ms = current_time;
+            
+            // Reset S3 timer to keep session alive during pending operation
+            dcmdsl_reset_s3_timer();
             
             DBG_OUT_I("Service 0x%02X still pending - sending NRC 0x78 (%d/%d)", 
                       pending_state.service_id, pending_state.nrc78_count, DCMDSD_MAX_PENDING_NRC78_COUNT);
@@ -110,7 +125,7 @@ void dcmdsd_process_pending(void)
         dev_com_tp_transmit(&response_sdu);
         
         // Clear pending state
-        memset(&pending_state, 0, sizeof(pending_state));
+        memset((void*)&pending_state, 0, sizeof(pending_state));
     }
     else {
         // Success - send positive response
@@ -123,7 +138,7 @@ void dcmdsd_process_pending(void)
         dev_com_tp_transmit(&response_sdu);
         
         // Clear pending state
-        memset(&pending_state, 0, sizeof(pending_state));
+        memset((void*)&pending_state, 0, sizeof(pending_state));
     }
 }
 
@@ -177,6 +192,9 @@ dev_err_t dcmdsd_process_request(dev_com_tp_sdu_t * sdu_info_p)
         pending_state.nrc78_count = 1;
         pending_state.last_nrc78_time_ms = dcmdsd_get_tick_ms();
         pending_state.last_retry_time_ms = dcmdsd_get_tick_ms();
+        
+        // Reset S3 timer to keep session alive during pending operation
+        dcmdsl_reset_s3_timer();
         
         // Send first NRC 0x78
         dev_com_tp_sdu_t response_sdu;

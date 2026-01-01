@@ -51,6 +51,22 @@ Std_ReturnType routine_erase_memory_start(
     uint8_t *status_record,
     uint16_t *status_record_len)
 {
+    static uint16_t counter = 0; 
+    if(counter >= 2000)
+    {
+        DBG_OUT_I("Counter reached 2000, returning E_OK");
+        counter = 0; 
+        return E_OK; 
+    }
+    else
+    {
+        if (counter % 100 == 0) {
+            DBG_OUT_I("Counter: %u", counter);
+        }
+        counter++; 
+        return DCM_E_PENDING; 
+    }
+#if 0
     // Validate input parameters
     if (option_record == NULL || option_record_len < 8) {
         DBG_OUT_E("Invalid option record (need 8 bytes: addr + length)");
@@ -120,6 +136,7 @@ Std_ReturnType routine_erase_memory_start(
     }
     
     return E_OK;  // Accepted, background processing started
+#endif
 }
 
 /**
@@ -130,6 +147,7 @@ Std_ReturnType routine_erase_memory_start(
  */
 void routine_erase_memory_proc(void)
 {
+#if 0
     switch (s_erase_state) {
         case ERASE_STATE_IDLE:
         case ERASE_STATE_COMPLETED:
@@ -171,6 +189,7 @@ void routine_erase_memory_proc(void)
             }
             break;
     }
+#endif
 }
 
 /**

@@ -25,8 +25,6 @@ Std_ReturnType uds_service_0x31_handler(const uds_message_t *message, ErrorCode_
     const uint8_t *option_record = (message->request_len > 4) ? &message->request[4] : NULL;
     uint16_t option_record_len = (message->request_len > 4) ? (message->request_len - 4) : 0;
 
-    DBG_OUT_I("Routine Control: RID=0x%04X, SubFunc=0x%02X, OptionLen=%d", rid, sub_function, option_record_len);
-
     // Phase 3: Validate sub-function
     if (sub_function != UDS_ROUTINE_CONTROL_START &&
         sub_function != UDS_ROUTINE_CONTROL_STOP &&
@@ -87,9 +85,6 @@ Std_ReturnType uds_service_0x31_handler(const uds_message_t *message, ErrorCode_
     uint32_t current_security_mask = dcm_service_get_security_mask(current_security_level);
 
     // Phase 6: Check session support
-    DBG_OUT_I("Session check: routine_mask=0x%08X, current_mask=0x%08X, AND=0x%08X", 
-              routine_entry->session_mask, current_session_mask, 
-              (routine_entry->session_mask & current_session_mask));
     if ((routine_entry->session_mask & current_session_mask) == 0) {
         DBG_OUT_E("RID 0x%04X not supported in session 0x%02X (mask=0x%08X)", rid, current_session, current_session_mask);
         *error_code = UDS_NRC_CONDITIONS_NOT_CORRECT;
@@ -112,7 +107,6 @@ Std_ReturnType uds_service_0x31_handler(const uds_message_t *message, ErrorCode_
                                                      status_record, &status_record_len);
 
     if (result == DCM_E_PENDING) {
-        DBG_OUT_I("RID 0x%04X pending", rid);
         *error_code = UDS_NRC_REQUEST_CORRECTLY_RECEIVED_RESPONSE_PENDING;
         return DCM_E_PENDING;
     }
