@@ -13,12 +13,13 @@
 
 /* Extern device variables */
 extern TIM_HandleTypeDef htim17;
-
+extern UART_HandleTypeDef huart1;
 /* Device Configuration */
 #define DEV_CONFIG_COMMON_USE_RTOS    0  // Set to 1 if using RTOS
 
 /* User lib */
 #include "dev_log.h"
+#define DEV_LOG_BUFF(buff, len) HAL_UART_Transmit(&huart1, buff, len, 10);
 #define DEV_LOG dev_log
 #define DEV_LOG_HEX dev_log_hex
 
@@ -87,7 +88,7 @@ typedef enum
 										}
 
 #else
-#define CONFIG_LOG_TAG(name)				
+#define CONFIG_LOG_TAG(name, enable)		
 #define DBG_OUT(...)
 #define DBG_OUT_RAW(...)
 #define DBG_OUT_E(...)

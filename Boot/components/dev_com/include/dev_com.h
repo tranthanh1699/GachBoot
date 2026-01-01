@@ -41,4 +41,11 @@ dev_err_t dev_com_transmit(const dev_mailbox_context_t *mailbox_ctx);
  */
 void dev_com_main_function(void);
 
+/**
+ * @brief Write single byte to COM ringbuffer (called from USB CDC receive).
+ * @param data Byte to write to ringbuffer.
+ * @return dev_err_t Returns DEV_OK on success, or an appropriate error code on failure.
+ */
+dev_err_t dev_com_set_buffer_uint8(uint8_t data);
+
 #endif // DEV_COM_H

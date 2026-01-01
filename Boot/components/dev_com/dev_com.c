@@ -1,34 +1,51 @@
 #include "dev_com.h"
 /* Device include lib */
 #include "dev_min.h"
-#include "usart.h"
-CONFIG_LOG_TAG(UART, true)
+#include "usbd_cdc_if.h"
+CONFIG_LOG_TAG(COM, true)
 
 #define MIN_PORT  0
+#define MIN_TX_BUFFER_SIZE  512
 
-static dev_ringbuffer_t s_Uart_Ringbuffer;
-static bool s_Uart_Initialized = false;
+static dev_ringbuffer_t s_Com_Ringbuffer;
+static bool s_Com_Initialized = false;
 static struct min_context s_Min_Context;
 static dev_com_if_receive_callback_t s_Receive_Callback = NULL;
+static uint8_t s_Min_Tx_Buffer[MIN_TX_BUFFER_SIZE];
+static uint16_t s_Min_Tx_Index = 0;
 volatile uint8_t rx_byte;
 #if DEV_COM_CONFIG_MUTEX == 1
     #include "dev_mutex.h"
-    dev_mutex_t s_Uart_Mutex;
+    dev_mutex_t s_Com_Mutex;
 #endif
 
 /* Complete dev_min Callback function */
-void min_tx_start(uint8_t port) {}
-void min_tx_finished(uint8_t port) {}
-uint16_t min_tx_space(uint8_t port) { return 512; }
+void min_tx_start(uint8_t port) 
+{
+    // Reset buffer index when starting new frame
+    s_Min_Tx_Index = 0;
+    memset(s_Min_Tx_Buffer, 0, MIN_TX_BUFFER_SIZE);
+}
+
+void min_tx_finished(uint8_t port) 
+{
+    // Send entire buffered frame over USB
+    if(s_Min_Tx_Index > 0) {
+        CDC_Transmit_FS(s_Min_Tx_Buffer, s_Min_Tx_Index);
+        s_Min_Tx_Index = 0;
+    }
+}
+
 void min_tx_byte(uint8_t port, uint8_t byte) 
 {
-    USART1->TDR = byte;
-    while ((USART1->ISR & USART_ISR_TC) == 0);
+    // Buffer byte instead of sending immediately
+    if(s_Min_Tx_Index < MIN_TX_BUFFER_SIZE) {
+        s_Min_Tx_Buffer[s_Min_Tx_Index++] = byte;
+    }
 }
-uint32_t min_time_ms(void) 
-{
-    return DEV_GET_TICK_MS();
-}
+
+uint16_t min_tx_space(uint8_t port) {return MIN_TX_BUFFER_SIZE;}
+uint32_t min_time_ms(void) {return DEV_GET_TICK_MS();}
 
 void min_application_handler(uint8_t min_id, uint8_t const *min_payload, 
 							uint8_t len_payload, uint8_t port)
@@ -48,41 +65,17 @@ void min_application_handler(uint8_t min_id, uint8_t const *min_payload,
 }
 
 /**
- * @brief Write data to the ring buffer.
- * @param data Pointer to the data buffer to be sent (1 byte).
- * @return dev_err_t Returns DEV_OK on success, or an appropriate error code on failure.
- */
-static dev_err_t dev_uart_set_buffer_uint8(uint8_t data); 
-
-/**
- * @brief Set up UART receive interrupt.
- * @return dev_err_t Returns DEV_OK on success, or an appropriate error code on failure
- */
-static dev_err_t dev_uart_set_rx_interrupt(void);
-
-/**
- * @brief Read data from the uart ring buffer.
+ * @brief Read data from the com ring buffer.
  * @param data Pointer to the data buffer to be get (1 byte).
  * @return dev_err_t Returns DEV_OK on success, or an appropriate error code on failure.
  */
-static dev_err_t dev_uart_get_uint8(uint8_t *data); 
+static dev_err_t dev_com_get_uint8(uint8_t *data); 
 
 /**
- * @brief Get the number of available bytes in the UART ring buffer.
+ * @brief Get the number of available bytes in the COM ring buffer.
  * @return uint32_t Returns the number of bytes available to read.
  */
-static uint32_t dev_uart_available(void); 
-
-
-/* Device interrupt callback */
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
-{
-    if (huart->Instance == USART1)
-    {
-        dev_uart_set_buffer_uint8(rx_byte);
-        dev_uart_set_rx_interrupt();
-    }
-}
+static uint32_t dev_com_available(void); 
 
 /**
  * @brief Initialize the COM peripheral for communication.
@@ -95,31 +88,30 @@ dev_err_t dev_com_init(dev_com_if_receive_callback_t receive_callback)
     // Store the receive callback
     s_Receive_Callback = receive_callback;
 
-    dev_ringbuffer_init(&s_Uart_Ringbuffer, 1024); // Initialize ring buffer with 1KB size
+    dev_ringbuffer_init(&s_Com_Ringbuffer, 1024); // Initialize ring buffer with 1KB size
 #if DEV_COM_CONFIG_MUTEX == 1
-    dev_mutex_init(&s_Uart_Mutex);
+    dev_mutex_init(&s_Com_Mutex);
 #endif
-    dev_uart_set_rx_interrupt();
     min_init_context(&s_Min_Context, MIN_PORT);
-    s_Uart_Initialized = true;
+    s_Com_Initialized = true;
     return DEV_OK;
 }
 
 /**
- * @brief Deinitialize the UART peripheral.
+ * @brief Deinitialize the COM peripheral.
  * @return dev_err_t Returns DEV_OK on success, or an appropriate error code on failure.
  */
 dev_err_t dev_com_deinit(void)
 {
-    s_Uart_Initialized = false;
-    dev_ringbuffer_deinit(&s_Uart_Ringbuffer);
+    s_Com_Initialized = false;
+    dev_ringbuffer_deinit(&s_Com_Ringbuffer);
 #if DEV_COM_CONFIG_MUTEX == 1
-    dev_mutex_deinit(&s_Uart_Mutex);
+    dev_mutex_deinit(&s_Com_Mutex);
 #endif
 
-#if DEV_UART_CONFIG_USE_RTOS == 1
+#if DEV_COM_CONFIG_USE_RTOS == 1
     // RTOS-specific deinitialization can be added here 
-    dev_rtos_create_task(dev_uart_main_function, "DevUartTask", 1024, NULL, 1, NULL);
+    dev_rtos_create_task(dev_com_main_function, "DevComTask", 1024, NULL, 1, NULL);
 #endif
     return DEV_OK;
 }
@@ -131,7 +123,7 @@ dev_err_t dev_com_deinit(void)
  */
 dev_err_t dev_com_transmit(const dev_mailbox_context_t *mailbox_ctx)
 {
-    DEV_RETURN_ON_FALSE(s_Uart_Initialized == true, 0, "UART not initialized");
+    DEV_RETURN_ON_FALSE(s_Com_Initialized == true, 0, "COM not initialized");
     DEV_RETURN_ON_FALSE(mailbox_ctx != NULL, DEV_ERR_INVALID_ARG, "Mailbox context is NULL");
     DEV_RETURN_ON_FALSE(mailbox_ctx->mailbox_buffer != NULL, DEV_ERR_INVALID_ARG, "Mailbox buffer is NULL");
     DEV_RETURN_ON_FALSE(mailbox_ctx->mailbox_size > 0, DEV_ERR_INVALID_ARG, "Mailbox size must be greater than zero");
@@ -146,10 +138,10 @@ dev_err_t dev_com_transmit(const dev_mailbox_context_t *mailbox_ctx)
  */
 void dev_com_main_function(void)
 {
-    if(dev_uart_available() > 0)
+    if(dev_com_available() > 0)
     {
         uint8_t data;
-        if (dev_uart_get_uint8(&data) == DEV_OK)
+        if (dev_com_get_uint8(&data) == DEV_OK)
         {
             min_poll(&s_Min_Context, &data, 1);
         }
@@ -157,45 +149,45 @@ void dev_com_main_function(void)
 }
 
 /**
- * @brief Get the number of available bytes in the UART ring buffer.
+ * @brief Get the number of available bytes in the COM ring buffer.
  * @return uint32_t Returns the number of bytes available to read.
  */
-static uint32_t dev_uart_available(void)
+static uint32_t dev_com_available(void)
 {
-    DEV_RETURN_ON_FALSE(s_Uart_Initialized == true, 0, "UART not initialized");
+    DEV_RETURN_ON_FALSE(s_Com_Initialized == true, 0, "COM not initialized");
     uint32_t available_bytes = 0;
 
     #if DEV_COM_CONFIG_MUTEX == 1
-        dev_mutex_lock(&s_Uart_Mutex);
+        dev_mutex_lock(&s_Com_Mutex);
     #endif
 
-    available_bytes = dev_ringbuffer_size(&s_Uart_Ringbuffer);
+    available_bytes = dev_ringbuffer_size(&s_Com_Ringbuffer);
 
     #if DEV_COM_CONFIG_MUTEX == 1
-        dev_mutex_unlock(&s_Uart_Mutex);
+        dev_mutex_unlock(&s_Com_Mutex);
     #endif
 
     return available_bytes;
 }
 
 /**
- * @brief Read data from the uart ring buffer.
+ * @brief Read data from the com ring buffer.
  * @param data Pointer to the data buffer to be get (1 byte).
  * @return dev_err_t Returns DEV_OK on success, or an appropriate error code on failure.
  */
-static dev_err_t dev_uart_get_uint8(uint8_t *data)
+static dev_err_t dev_com_get_uint8(uint8_t *data)
 {
-    DEV_RETURN_ON_FALSE(s_Uart_Initialized == true, 0, "UART not initialized");
+    DEV_RETURN_ON_FALSE(s_Com_Initialized == true, 0, "COM not initialized");
     dev_err_t err = DEV_OK;
     DEV_RETURN_ON_FALSE(data != NULL, DEV_ERR_INVALID_ARG, "Data pointer is NULL");
 
 #if DEV_COM_CONFIG_MUTEX == 1
-    dev_mutex_lock(&s_Uart_Mutex);
+    dev_mutex_lock(&s_Com_Mutex);
 #endif
-    uint32_t available_bytes = dev_ringbuffer_size(&s_Uart_Ringbuffer);
+    uint32_t available_bytes = dev_ringbuffer_size(&s_Com_Ringbuffer);
     if (available_bytes > 0)
     {
-        dev_ringbuffer_read_uint8(&s_Uart_Ringbuffer, data);
+        dev_ringbuffer_read_uint8(&s_Com_Ringbuffer, data);
     }
     else
     {
@@ -204,7 +196,7 @@ static dev_err_t dev_uart_get_uint8(uint8_t *data)
     }
 
 #if DEV_COM_CONFIG_MUTEX == 1
-    dev_mutex_unlock(&s_Uart_Mutex);    
+    dev_mutex_unlock(&s_Com_Mutex);    
 #endif
     return err;
 }
@@ -215,17 +207,17 @@ static dev_err_t dev_uart_get_uint8(uint8_t *data)
  * @param data Pointer to the data buffer to be sent (1 byte).
  * @return dev_err_t Returns DEV_OK on success, or an appropriate error code on failure.
  */
-static dev_err_t dev_uart_set_buffer_uint8(uint8_t data)
+dev_err_t dev_com_set_buffer_uint8(uint8_t data)
 {
     dev_err_t err = DEV_OK;
-    DEV_RETURN_ON_FALSE(s_Uart_Initialized == true, 0, "UART not initialized");
+    DEV_RETURN_ON_FALSE(s_Com_Initialized == true, 0, "COM not initialized");
 #if DEV_COM_CONFIG_MUTEX == 1
-    dev_mutex_lock(&s_Uart_Mutex);
+    dev_mutex_lock(&s_Com_Mutex);
 #endif
 
-    if (dev_ringbuffer_free_space(&s_Uart_Ringbuffer) >= 1)
+    if (dev_ringbuffer_free_space(&s_Com_Ringbuffer) >= 1)
     {
-        dev_ringbuffer_write_uint8(&s_Uart_Ringbuffer, data);
+        dev_ringbuffer_write_uint8(&s_Com_Ringbuffer, data);
     }
     else
     {
@@ -234,13 +226,7 @@ static dev_err_t dev_uart_set_buffer_uint8(uint8_t data)
     }
 
 #if DEV_COM_CONFIG_MUTEX == 1
-    dev_mutex_unlock(&s_Uart_Mutex);
+    dev_mutex_unlock(&s_Com_Mutex);
 #endif
     return err;
-}
-
-static dev_err_t dev_uart_set_rx_interrupt(void)
-{
-    HAL_UART_Receive_IT(&huart1, (uint8_t *)&rx_byte, 1);
-    return DEV_OK;
 }

@@ -1,8 +1,8 @@
 {
     "default_min_id": 16,
     "tester_present_interval_ms": 3000,
-    "enable_tester_present_on_connect": false,
-    "tester_present_suppress": false,
+    "enable_tester_present_on_connect": true,
+    "tester_present_suppress": true,
     "security_exe_path": "C:/Users/thanh/Desktop/Work/Personal_Project/Bootloader/Tool/SecurityUnlock.exe",
     "automation_script_path": "C:/Users/thanh/Desktop/Work/Personal_Project/Bootloader/Tool/automation.txt",
     "security_levels": [
