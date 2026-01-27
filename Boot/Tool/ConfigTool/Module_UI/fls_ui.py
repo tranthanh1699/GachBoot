@@ -121,6 +121,46 @@ class FlsUI:
         ttk.Separator(form_frame, orient=tk.HORIZONTAL).grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
         row += 1
         
+        ttk.Label(form_frame, text="🗺️ Memory Layout (Boot/Application)", 
+                 font=('', 10, 'bold')).grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Get memory layout with defaults
+        memory_layout = fls_config.get('memory_layout', {})
+        bootloader_region = memory_layout.get('bootloader_region', {})
+        application_region = memory_layout.get('application_region', {})
+        download_region = memory_layout.get('download_region', {})
+        
+        # Bootloader Region
+        ttk.Label(form_frame, text="Bootloader Start:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        boot_start_var = tk.StringVar(value=bootloader_region.get('start_address', '0x08000000'))
+        ttk.Entry(form_frame, textvariable=boot_start_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(form_frame, text="(hex address)", foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=5)
+        row += 1
+        
+        ttk.Label(form_frame, text="Bootloader Size:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        boot_size_var = tk.StringVar(value=bootloader_region.get('size', '0x00040000'))
+        ttk.Entry(form_frame, textvariable=boot_size_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(form_frame, text="(hex, 256KB default)", foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=5)
+        row += 1
+        
+        # Application Region
+        ttk.Label(form_frame, text="Application Start:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        app_start_var = tk.StringVar(value=application_region.get('start_address', '0x08100000'))
+        ttk.Entry(form_frame, textvariable=app_start_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(form_frame, text="(hex address)", foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=5)
+        row += 1
+        
+        ttk.Label(form_frame, text="Application Size:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        app_size_var = tk.StringVar(value=application_region.get('size', '0x00100000'))
+        ttk.Entry(form_frame, textvariable=app_size_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(form_frame, text="(hex, 1MB default)", foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=5)
+        row += 1
+        
+        # Separator
+        ttk.Separator(form_frame, orient=tk.HORIZONTAL).grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
+        row += 1
+        
         ttk.Label(form_frame, text="Hardware Parameters", 
                  font=('', 10, 'bold')).grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=5)
         row += 1
@@ -181,6 +221,59 @@ class FlsUI:
         ttk.Label(form_frame, text="ms (per sector)", foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=5)
         row += 1
         
+        # Separator
+        ttk.Separator(form_frame, orient=tk.HORIZONTAL).grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
+        row += 1
+        
+        ttk.Label(form_frame, text="⚡ Flash Block Module (Async Operations)", 
+                 font=('', 10, 'bold')).grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=5)
+        row += 1
+        
+        # Get flashblock config with defaults
+        flashblock_config = config.get('flashblock_config', {})
+        
+        # Queue Size
+        ttk.Label(form_frame, text="Queue Size:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        fb_queue_var = tk.IntVar(value=flashblock_config.get('queue_size', 8))
+        ttk.Entry(form_frame, textvariable=fb_queue_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(form_frame, text="operations (1-32)", foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=5)
+        row += 1
+        
+        # Max Data Size
+        ttk.Label(form_frame, text="Max Data Size:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        fb_maxdata_var = tk.IntVar(value=flashblock_config.get('max_data_size', 256))
+        ttk.Entry(form_frame, textvariable=fb_maxdata_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(form_frame, text="bytes (multiple of chunk size)", foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=5)
+        row += 1
+        
+        # Write Chunk Size
+        ttk.Label(form_frame, text="Write Chunk Size:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        fb_chunk_var = tk.IntVar(value=flashblock_config.get('write_chunk_size', 32))
+        ttk.Entry(form_frame, textvariable=fb_chunk_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(form_frame, text="bytes (MCU-specific)", foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=5)
+        row += 1
+        
+        # Erase Timeout (Flashblock)
+        ttk.Label(form_frame, text="Erase Timeout:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        fb_erase_timeout_var = tk.IntVar(value=flashblock_config.get('erase_timeout_ms', 2000))
+        ttk.Entry(form_frame, textvariable=fb_erase_timeout_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(form_frame, text="ms", foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=5)
+        row += 1
+        
+        # Write Timeout (Flashblock)
+        ttk.Label(form_frame, text="Write Timeout:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        fb_write_timeout_var = tk.IntVar(value=flashblock_config.get('write_timeout_ms', 100))
+        ttk.Entry(form_frame, textvariable=fb_write_timeout_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(form_frame, text="ms (per chunk)", foreground='gray').grid(row=row, column=2, sticky=tk.W, padx=5)
+        row += 1
+        
+        # Auto Verify
+        ttk.Label(form_frame, text="Auto Verify:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        fb_verify_var = tk.BooleanVar(value=flashblock_config.get('auto_verify', False))
+        ttk.Checkbutton(form_frame, variable=fb_verify_var, 
+                       text="Enable write verification").grid(row=row, column=1, sticky=tk.W, pady=5)
+        row += 1
+        
         # Auto-save callback
         def save_changes(*args):
             if 'fls_config' not in config:
@@ -207,11 +300,54 @@ class FlsUI:
             config['fls_config']['write_timeout_ms'] = write_timeout_var.get()
             config['fls_config']['erase_timeout_ms'] = erase_timeout_var.get()
             
+            # Save memory layout
+            if 'memory_layout' not in config['fls_config']:
+                config['fls_config']['memory_layout'] = {}
+            
+            # Bootloader region
+            if 'bootloader_region' not in config['fls_config']['memory_layout']:
+                config['fls_config']['memory_layout']['bootloader_region'] = {}
+            config['fls_config']['memory_layout']['bootloader_region']['name'] = 'Bootloader'
+            config['fls_config']['memory_layout']['bootloader_region']['start_address'] = boot_start_var.get()
+            config['fls_config']['memory_layout']['bootloader_region']['size'] = boot_size_var.get()
+            config['fls_config']['memory_layout']['bootloader_region']['description'] = 'Bootloader firmware region'
+            
+            # Application region
+            if 'application_region' not in config['fls_config']['memory_layout']:
+                config['fls_config']['memory_layout']['application_region'] = {}
+            config['fls_config']['memory_layout']['application_region']['name'] = 'Application'
+            config['fls_config']['memory_layout']['application_region']['start_address'] = app_start_var.get()
+            config['fls_config']['memory_layout']['application_region']['size'] = app_size_var.get()
+            config['fls_config']['memory_layout']['application_region']['description'] = 'Application firmware region'
+            
+            # Download region - auto-derive from application region
+            if 'download_region' not in config['fls_config']['memory_layout']:
+                config['fls_config']['memory_layout']['download_region'] = {}
+            config['fls_config']['memory_layout']['download_region']['start_address'] = app_start_var.get()
+            config['fls_config']['memory_layout']['download_region']['size'] = app_size_var.get()
+            config['fls_config']['memory_layout']['download_region']['alignment'] = '32'
+            config['fls_config']['memory_layout']['download_region']['max_block_length'] = '200'
+            config['fls_config']['memory_layout']['download_region']['description'] = 'Download/programming area'
+            
+            # Save flashblock config
+            if 'flashblock_config' not in config:
+                config['flashblock_config'] = {}
+            
+            config['flashblock_config']['queue_size'] = fb_queue_var.get()
+            config['flashblock_config']['max_data_size'] = fb_maxdata_var.get()
+            config['flashblock_config']['write_chunk_size'] = fb_chunk_var.get()
+            config['flashblock_config']['erase_timeout_ms'] = fb_erase_timeout_var.get()
+            config['flashblock_config']['write_timeout_ms'] = fb_write_timeout_var.get()
+            config['flashblock_config']['auto_verify'] = fb_verify_var.get()
+            
             set_modified_callback()
         
         # Bind auto-save to all variables
         for var in [mcu_var, desc_var, base_var, size_var, write_align_var, 
-                    read_align_var, erase_var, write_timeout_var, erase_timeout_var]:
+                    read_align_var, erase_var, write_timeout_var, erase_timeout_var,
+                    boot_start_var, boot_size_var, app_start_var, app_size_var,
+                    fb_queue_var, fb_maxdata_var, fb_chunk_var, 
+                    fb_erase_timeout_var, fb_write_timeout_var, fb_verify_var]:
             var.trace_add('write', save_changes)
         
         # Update canvas scroll region

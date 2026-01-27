@@ -14,3 +14,4 @@ target_link_libraries(dev_flashblock PUBLIC stm32cubemx)
 target_link_libraries(dev_flashblock PUBLIC dev_app)
 target_link_libraries(dev_flashblock PUBLIC GenerateCode)
 target_link_libraries(dev_flashblock PUBLIC dev_fls)
+target_link_libraries(dev_flashblock PUBLIC dev_queue)  # Queue library for async operations

@@ -16,7 +16,6 @@ from Module.service_module import validate_services, generate_service_code
 from Module.routine_module import validate_routines, generate_routine_config
 from Module.fls_module import validate_fls_config, generate_fls_code
 from Module.fee_module import validate_fee_config, generate_fee_code
-from Module.memory_layout_module import validate_memory_layout, generate_memory_layout_code
 from Module.cmake_module import generate_cmake_file
 from Module.os_module import validate_os_config, generate_os_config
 from Module_UI.service_ui import ServiceUI
@@ -27,7 +26,6 @@ from Module_UI.nvm_ui import NvmUI
 from Module_UI.did_ui import DidUI
 from Module_UI.fls_ui import FlsUI
 from Module_UI.fee_ui import FeeUI
-from Module_UI.memory_layout_ui import MemoryLayoutUI
 from Module_UI.os_ui import OsUI
 
 class ConfigEditor:
@@ -45,6 +43,9 @@ class ConfigEditor:
         # Track which modules have been modified (for incremental generation)
         self.modified_modules = set()
         
+        # Flag to prevent set_modified calls during loading
+        self._loading = False
+        
         # Set modified flag after initializing modified_modules
         self.set_modified(False)
         
@@ -57,7 +58,6 @@ class ConfigEditor:
         self.did_ui = None
         self.fls_ui = None
         self.fee_ui = None
-        self.memory_layout_ui = None
         self.os_ui = None
         
         # Apply modern theme with colors
@@ -272,7 +272,6 @@ class ConfigEditor:
         self.setup_routine_tab()
         self.setup_fls_tab()
         self.setup_fee_tab()
-        self.setup_memory_layout_tab()
         self.setup_os_tab()
         
         # Status bar
@@ -464,12 +463,6 @@ class ConfigEditor:
             delete_cmd=self.delete_fee_mapping
         )
     
-    def setup_memory_layout_tab(self):
-        """Setup Memory Layout tab using MemoryLayoutUI module"""
-        # MemoryLayoutUI will create its own frame inside config_panel_frame when show_edit_form is called
-        # Just initialize it with None for now
-        self.memory_layout_ui = MemoryLayoutUI(None)
-    
     def setup_os_tab(self):
         """Setup OS Task Scheduler tab using OsUI module"""
         os_frame = ttk.Frame(self.config_panel_frame)
@@ -518,9 +511,11 @@ class ConfigEditor:
                 if 'os_tasks' not in self.config:
                     self.config['os_tasks'] = []
                 
-                print("[DEBUG] About to call refresh_ui")
+                # Set loading flag to prevent spurious set_modified calls
+                self._loading = True
                 self.refresh_ui()
-                print("[DEBUG] refresh_ui completed")
+                self._loading = False
+                
                 self.set_modified(False)
                 self.update_title()
                 self.status_var.set(f"Loaded: {self.config_file}")
@@ -548,11 +543,13 @@ class ConfigEditor:
             modified: Whether config has been modified
             module_name: Name of the modified module (e.g., 'nvm', 'did', 'routine', etc.)
         """
-        print(f"[ConfigEditor] set_modified called: modified={modified}, module_name={module_name}")
+        # Skip set_modified calls during loading to avoid spurious state changes
+        if self._loading and modified:
+            return
+        
         self.modified = modified
         if module_name and modified:
             self.modified_modules.add(module_name)
-            print(f"[ConfigEditor] modified_modules now: {self.modified_modules}")
         elif not modified:
             # Clear all modified modules when saving
             self.modified_modules.clear()
@@ -756,10 +753,6 @@ class ConfigEditor:
             self.nav_tree.insert(fee_root, tk.END,
                 text=f"  {name} → Fls[{fls_idx}]{primary}",
                 tags=('fee_mapping', str(i)))
-        
-        # Memory Layout branch
-        memory_layout = self.config.get('memory_layout', {})
-        self.nav_tree.insert(root, tk.END, text="🗺️ Memory Layout", open=True, tags=('memory_layout',))
         
         # OS Task Scheduler branch
         tasks = self.config.get('os_tasks', [])
@@ -984,22 +977,6 @@ class ConfigEditor:
                 
                 self.fee_ui.show_mapping_edit_form(self.config_panel_frame, idx, self.config, self.set_modified)
         
-        elif tags and tags[0] == 'memory_layout':
-            # Show Memory Layout
-            memory_layout = self.config.get('memory_layout', {})
-            bootloader = memory_layout.get('bootloader_region', {})
-            application = memory_layout.get('application_region', {})
-            self.info_text.insert(tk.END, f"Memory Layout Configuration\n")
-            self.info_text.insert(tk.END, f"{'='*30}\n")
-            self.info_text.insert(tk.END, f"Bootloader:\n")
-            self.info_text.insert(tk.END, f"  Start: {bootloader.get('start_address', 'N/A')}\n")
-            self.info_text.insert(tk.END, f"  Size: {bootloader.get('size', 'N/A')}\n")
-            self.info_text.insert(tk.END, f"Application:\n")
-            self.info_text.insert(tk.END, f"  Start: {application.get('start_address', 'N/A')}\n")
-            self.info_text.insert(tk.END, f"  Size: {application.get('size', 'N/A')}\n")
-            
-            self.show_memory_layout_edit_form()
-        
         elif tags and tags[0] == 'os_task':
             # Show OS Task details
             idx = int(tags[1])
@@ -1189,7 +1166,6 @@ class ConfigEditor:
             "fee_config": {
                 "blocks": []
             },
-            "memory_layout": {},
             "os_tasks": [
                 {
                     "task_name": "hardware_init_task",
@@ -1954,7 +1930,6 @@ class ConfigEditor:
             ('routine', 'Routines (Service 0x31)'),
             ('fls', 'Flash Driver Config'),
             ('fee', 'Flash EEPROM Emulation'),
-            ('memory_layout', 'Memory Layout (Service 0x34)'),
             ('os', 'OS Task Scheduler'),
             ('cmake', 'CMakeLists.txt')
         ]
@@ -2138,14 +2113,6 @@ class ConfigEditor:
                 all_files.extend(fee_files)
                 print(f"[DEBUG] Generated Fee files: {len(fee_files)}")
             
-            # Generate Memory Layout code
-            if 'memory_layout' in selected_modules and self.config.get('memory_layout'):
-                memory_output = generate_memory_layout_code(self.config['memory_layout'], output_path, project_name)
-                all_files.append(memory_output)
-                self.status_var.set(f"Generated: {os.path.basename(memory_output)}")
-                self.root.update()
-                print(f"[DEBUG] Generated Memory Layout file")
-            
             # Generate OS Task Scheduler code
             if 'os' in selected_modules and self.config.get('os_tasks'):
                 os_files = generate_os_config(self.config, output_path)
@@ -2187,14 +2154,11 @@ class ConfigEditor:
             fls_valid, fls_errors, fls_warnings = validate_fls_config(self.config)
             fee_valid, fee_errors, fee_warnings = validate_fee_config(self.config)
             
-            # Validate Memory Layout
-            memory_errors = validate_memory_layout(self.config.get('memory_layout', {}))
-            
             # Validate OS Task Scheduler
             os_valid, os_errors = validate_os_config(self.config)
             
             # Collect all messages
-            all_errors = nvm_errors + did_errors + session_errors + security_errors + fls_errors + fee_errors + memory_errors + os_errors
+            all_errors = nvm_errors + did_errors + session_errors + security_errors + fls_errors + fee_errors + os_errors
             all_warnings = nvm_warnings + did_warnings + session_warnings + security_warnings + fls_warnings + fee_warnings
             
             # Basic project validation
@@ -2215,43 +2179,7 @@ class ConfigEditor:
         except Exception as e:
             messagebox.showerror("Error", f"Validation failed: {e}")
     
-    def show_memory_layout_edit_form(self):
-        """Show Memory Layout edit form in config panel using MemoryLayoutUI"""
-        if self.memory_layout_ui:
-            # Set the parent frame to config_panel_frame
-            self.memory_layout_ui.parent_frame = self.config_panel_frame
-            
-            memory_layout = self.config.get('memory_layout', {
-                'bootloader_region': {
-                    'name': 'Bootloader',
-                    'start_address': '0x08000000',
-                    'size': '0x00040000',
-                    'description': 'Bootloader firmware region'
-                },
-                'application_region': {
-                    'name': 'Application',
-                    'start_address': '0x08100000',
-                    'size': '0x00100000',
-                    'description': 'Application firmware region'
-                }
-            })
-            
-            def on_save(updated_layout, show_message=True):
-                self.config['memory_layout'] = updated_layout
-                self.set_modified()
-                self.refresh_nav_tree()
-                if show_message:
-                    messagebox.showinfo("Success", "Memory layout saved successfully!")
-            
-            # Pass on_change callback to mark as modified when fields change
-            self.memory_layout_ui.show_edit_form(
-                memory_layout, 
-                on_save,
-                on_change_callback=self.set_modified
-            )
-            
-            # Cache the UI object (not the frame) for save_current_form
-            self.current_form_widget = self.memory_layout_ui
+
     
     def show_about(self):
         """Show about dialog"""

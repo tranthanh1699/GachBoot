@@ -98,6 +98,11 @@ if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Fee_Gen)
     message(STATUS "Added Fee_Gen sources: ${{FEE_GEN_SOURCES}}")
 endif()
 
+# Add Flashblock Generated Code (header-only)
+if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Flashblock_Gen)
+    message(STATUS "Added Flashblock_Gen include directory")
+endif()
+
 # Add Memory Layout Generated Code
 if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Memory_Layout_Gen)
     # Memory_Layout_Config.h is header-only, no .c files to compile
@@ -167,6 +172,12 @@ endif()
 if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Fee_Gen)
     target_include_directories(GenerateCode PUBLIC
         ${{CMAKE_CURRENT_SOURCE_DIR}}/Fee_Gen
+    )
+endif()
+
+if(EXISTS ${{CMAKE_CURRENT_SOURCE_DIR}}/Flashblock_Gen)
+    target_include_directories(GenerateCode PUBLIC
+        ${{CMAKE_CURRENT_SOURCE_DIR}}/Flashblock_Gen
     )
 endif()
 

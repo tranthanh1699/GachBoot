@@ -230,6 +230,20 @@
     "erase_timeout_ms": 2000,
     "auto_generate_sectors": true,
     "_comment": "Sectors are auto-generated for complete STM32H743 map (16 sectors). Do not manually add sectors here.",
+    "memory_layout": {
+      "bootloader_region": {
+        "name": "Bootloader",
+        "start_address": "0x08000000",
+        "size": "0x00040000",
+        "description": "Bootloader firmware region"
+      },
+      "application_region": {
+        "name": "Application",
+        "start_address": "0x08100000",
+        "size": "0x00100000",
+        "description": "Application firmware region"
+      }
+    },
     "sectors": [
       {
         "name": "Sector_0",
@@ -402,25 +416,15 @@
     ],
     "_comment": "fls_sector_reference format: 'Bank{1|2}_Sector{0-7}'. References auto-generated FLS sectors."
   },
-  "memory_layout": {
-    "bootloader_region": {
-      "name": "Bootloader",
-      "start_address": "0x08000000",
-      "size": "0x00040000",
-      "description": "Bootloader firmware region"
-    },
-    "application_region": {
-      "name": "Application",
-      "start_address": "0x08100000",
-      "size": "0x00100000",
-      "description": "Application firmware region"
-    },
-    "download_region": {
-      "start_address": "0x08100000",
-      "size": "0x00100000",
-      "alignment": "32",
-      "max_block_length": "200"
-    }
+  "flashblock_config": {
+    "description": "Flash Block Module Configuration - Queue-based async operations",
+    "queue_size": 8,
+    "max_data_size": 256,
+    "write_chunk_size": 32,
+    "erase_timeout_ms": 2000,
+    "write_timeout_ms": 100,
+    "auto_verify": false,
+    "_comment": "queue_size: Max queued operations (1-32), max_data_size: Must be multiple of write_chunk_size, write_chunk_size: MCU-specific (STM32H7=32, STM32F4=4, STM32L4=8)"
   },
   "os_tasks": [
     {

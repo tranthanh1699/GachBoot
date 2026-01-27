@@ -26,14 +26,13 @@ extern "C" {
 /* ===== Type Definitions ===== */
 
 /**
- * @brief Flash block erase state
+ * @brief Flash block state machine
  */
 typedef enum {
-    DEV_FLASHBLOCK_ERASE_IDLE = 0,     /**< No active erase operation */
-    DEV_FLASHBLOCK_ERASE_PREPARED,     /**< Erase prepared, sectors identified */
-    DEV_FLASHBLOCK_ERASE_ERASING,      /**< Erase in progress */
-    DEV_FLASHBLOCK_ERASE_COMPLETED     /**< Erase completed, awaiting finish */
-} dev_flashblock_erase_state_t;
+    DEV_FLASHBLOCK_STATE_IDLE = 0,     /**< Idle, ready for new operation */
+    DEV_FLASHBLOCK_STATE_BUSY,         /**< Operation in progress */
+    DEV_FLASHBLOCK_STATE_WAITING       /**< Waiting for flash to be ready */
+} dev_flashblock_state_t;
 
 /**
  * @brief Flash block operation result codes
@@ -62,6 +61,22 @@ typedef enum {
 typedef void (*dev_flashblock_progress_cb_t)(uint32_t current_bytes, uint32_t total_bytes, void *context);
 
 /**
+ * @brief Operation completion callback function type
+ * 
+ * @param result Operation result code
+ * @param context User context pointer
+ */
+typedef void (*dev_flashblock_completion_cb_t)(dev_flashblock_result_t result, void *context);
+
+/**
+ * @brief Operation completion callback function type
+ * 
+ * @param result Operation result code
+ * @param context User context pointer
+ */
+typedef void (*dev_flashblock_completion_cb_t)(dev_flashblock_result_t result, void *context);
+
+/**
  * @brief Flash block configuration
  */
 typedef struct {
@@ -84,81 +99,90 @@ typedef struct {
 dev_flashblock_result_t dev_flashblock_init(const dev_flashblock_config_t *config);
 
 /**
- * @brief Step 1: Prepare erase operation
+ * @brief Enqueue erase operation (Non-blocking)
  * 
- * Determines which sectors need to be erased based on address and length.
- * Uses memory layout configuration to identify affected sectors.
- * 
- * State transition: IDLE -> PREPARED
+ * Adds erase operation to queue. Background task will process it.
  * 
  * @param address Start address in flash
  * @param length Length in bytes to erase
+ * @param callback Completion callback (optional, can be NULL)
+ * @param context User context for callback
  * @return Result code
+ *         - DEV_FLASHBLOCK_OK: Successfully enqueued
+ *         - DEV_FLASHBLOCK_ERROR_INVALID_ADDR: Invalid address
+ *         - DEV_FLASHBLOCK_ERROR_BUSY: Queue is full
  * 
- * @note This only prepares the erase, does not perform actual erase
- * @note Must call dev_flashblock_erase_do() to execute erase
+ * @note Non-blocking: Returns immediately after enqueue
+ * @note Actual erase performed by background task
  */
-dev_flashblock_result_t dev_flashblock_erase_start(uint32_t address, uint32_t length);
+dev_flashblock_result_t dev_flashblock_erase_async(
+    uint32_t address, 
+    uint32_t length,
+    dev_flashblock_completion_cb_t callback,
+    void *context
+);
 
 /**
- * @brief Step 2: Execute erase operation
+ * @brief Enqueue write operation (Non-blocking)
  * 
- * Erases the sectors identified in erase_start().
- * Can be called multiple times to erase sectors incrementally.
+ * Adds write operation to queue. Data is copied to internal buffer.
+ * Background task will process write in 32-byte chunks.
  * 
- * State transition: PREPARED -> ERASING -> COMPLETED
- * 
+ * @param address Start address in flash
+ * @param data Data to write (will be copied)
+ * @param length Length in bytes
+ * @param callback Completion callback (optional, can be NULL)
+ * @param context User context for callback
  * @return Result code
+ *         - DEV_FLASHBLOCK_OK: Successfully enqueued
+ *         - DEV_FLASHBLOCK_ERROR_INVALID_ADDR: Invalid address
+ *         - DEV_FLASHBLOCK_ERROR_INVALID_LEN: Length exceeds 256 bytes
+ *         - DEV_FLASHBLOCK_ERROR_BUSY: Queue is full
  * 
- * @note Must call dev_flashblock_erase_start() first
- * @note Call dev_flashblock_erase_finish() when done
+ * @note Non-blocking: Returns immediately after enqueue
+ * @note Data is copied, caller can free buffer after return
+ * @note Max write size: 256 bytes per call
  */
-dev_flashblock_result_t dev_flashblock_erase_do(void);
+dev_flashblock_result_t dev_flashblock_write_async(
+    uint32_t address,
+    const uint8_t *data,
+    uint32_t length,
+    dev_flashblock_completion_cb_t callback,
+    void *context
+);
 
 /**
- * @brief Step 3: Finalize erase operation
+ * @brief Background task to process flash operations
  * 
- * Confirms erase completion and resets state for next operation.
+ * Processes queued operations one at a time.
+ * Handles 32-byte chunking for STM32H7.
+ * Checks flash busy state before each operation.
  * 
- * State transition: COMPLETED -> IDLE
- * 
- * @return Result code
- * 
- * @note Resets internal state, ready for next erase_start()
+ * @note Must be called periodically (e.g., from main loop or RTOS task)
+ * @note Processes one chunk per call to avoid blocking
  */
-dev_flashblock_result_t dev_flashblock_erase_finish(void);
+void dev_flashblock_process(void);
 
 /**
- * @brief Get current erase state
+ * @brief Get flash block state
  * 
- * @return Current erase state
+ * @return Current state (IDLE, BUSY, WAITING)
  */
-dev_flashblock_erase_state_t dev_flashblock_get_erase_state(void);
+dev_flashblock_state_t dev_flashblock_get_state(void);
 
 /**
- * @brief Get erase progress information
+ * @brief Get number of pending operations in queue
  * 
- * @param current_sector Output: Current sector being erased (can be NULL)
- * @param total_sectors Output: Total sectors to erase (can be NULL)
- * @return Result code
+ * @return Number of operations waiting to be processed
  */
-dev_flashblock_result_t dev_flashblock_get_erase_progress(uint32_t *current_sector, uint32_t *total_sectors);
+uint8_t dev_flashblock_get_queue_count(void);
 
 /**
- * @brief Get current erase state
+ * @brief Check if flash block is busy
  * 
- * @return Current erase state
+ * @return true if busy (processing operation), false if idle
  */
-dev_flashblock_erase_state_t dev_flashblock_get_erase_state(void);
-
-/**
- * @brief Get erase progress information
- * 
- * @param current_sector Output: Current sector being erased (can be NULL)
- * @param total_sectors Output: Total sectors to erase (can be NULL)
- * @return Result code
- */
-dev_flashblock_result_t dev_flashblock_get_erase_progress(uint32_t *current_sector, uint32_t *total_sectors);
+bool dev_flashblock_is_busy(void);
 
 /**
  * @brief Get human-readable error string

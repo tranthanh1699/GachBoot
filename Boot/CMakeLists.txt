@@ -43,6 +43,7 @@ add_subdirectory(components/dev_com)
 add_subdirectory(components/dev_crc)
 add_subdirectory(components/dev_com_if)
 add_subdirectory(components/dev_com_tp)
+add_subdirectory(components/dev_queue)  # Generic Queue Library
 add_subdirectory(components/dev_memstack)  # Memory Stack (Fls, Fee, MemIf, NvM)
 add_subdirectory(components/dev_flashblock)  # Flash Block Management
 add_subdirectory(components/dev_os)
@@ -90,6 +91,7 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
     dev_crc
     dev_com_if
     dev_com_tp
+    dev_queue     # Generic FIFO Queue Library
     dev_memstack  # Memory Stack (includes Fls, Fee, MemIf, NvM)
     dev_flashblock  # Flash Block Management
     dev_os

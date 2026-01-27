@@ -6,8 +6,8 @@
 
 CONFIG_LOG_TAG(DCMDSD, true)
 
-// Pending request state - volatile to prevent compiler optimization
-static volatile dcmdsd_pending_state_t pending_state = {0};
+// Pending request state
+static dcmdsd_pending_state_t pending_state = {0};
 
 /**
  * @brief Get system tick in milliseconds

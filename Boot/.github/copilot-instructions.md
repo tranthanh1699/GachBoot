@@ -104,6 +104,12 @@ This is an automotive bootloader project implementing UDS (Unified Diagnostic Se
 ### Logging
 - **CRITICAL RULE**: NEVER use raw `dev_log()` or `dev_log_hex()` functions directly
 - **ALWAYS** use the logging macros defined in `dev_common.h` for all logging operations
+- **APPLIES TO**: All C source files (`.c`), including:
+  - Component modules (`dev_*`, `svc_*`)
+  - Generated code from ConfigTool
+  - UDS service handlers
+  - Application code
+  - Test code
 - Use `CONFIG_LOG_TAG` macro at the top of each `.c` file (after includes):
   ```c
   #include "dev_common.h"
@@ -125,13 +131,20 @@ This is an automotive bootloader project implementing UDS (Unified Diagnostic Se
   - Centralized enable/disable via `CONFIG_LOG_TAG` 
   - Compile-time removal when `CONFIG_LOG_DEFAULT_LEVEL_NONE` is defined
 - **Do NOT** include module name or "[MODULE]" prefix in log messages - macros handle this automatically
+- **Do NOT** include `\n` newline characters - macros add them automatically
 - **Example** (WRONG vs CORRECT):
   ```c
   // ❌ WRONG - Do not use raw dev_log
   dev_log("[FLASHBLOCK] ERROR: Invalid address 0x%08X\n", addr);
   
+  // ❌ WRONG - Redundant module tag and manual newline
+  DBG_OUT_E("[QUEUE] Error: Invalid size\n");
+  
   // ✅ CORRECT - Use DBG_OUT_E macro (no manual newlines or tags)
   DBG_OUT_E("Invalid address 0x%08X", addr);
+  
+  // ✅ CORRECT - Clean message without redundant info
+  DBG_OUT_I("Queue initialized - capacity=%u", capacity);
   ```
 
 ## Architecture Patterns
@@ -381,6 +394,8 @@ Response ← DCMDSD ← DCMDSP ← (add +0x40 SID) ← Data only
 7. **DO NOT** recreate UI widgets dynamically (use grid_remove()/grid() instead)
 8. **DO NOT** add fields to generated structs without updating library interface
 9. **DO NOT** add Save buttons in ConfigTool GUI forms - use FocusOut/Enter events to auto-save instead
+10. **DO NOT** manually create or edit files in `GenerateCode/` folder - use ConfigTool to generate them
+11. **DO NOT** hardcode configuration values in component modules - use generated `*_PBCfg.h` files instead
 
 ---
 
