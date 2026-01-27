@@ -1,38 +1,74 @@
-# Automation Script Example
-# Lines starting with # are comments
-# Commands:
-#   DELAY <ms>              - Wait for milliseconds
-#   SA <level>              - Security Access unlock (e.g., SA 01, SA 02)
-#   SECURITY_UNLOCK <level> - Same as SA (long form)
-#   <hex data>              - Send UDS command
+# =============================================================================
+# Flash Programming Automation Script
+# =============================================================================
+# Test workflow:
+#   1. Enter Programming Session
+#   2. Unlock Security Access
+#   3. Erase Application Memory
+#   4. Request Download
+#   5. Transfer Data (4 blocks x 64 bytes = 256 bytes)
+#   6. Exit Transfer
+#   7. Reset ECU
+# =============================================================================
 
-# Enter Extended Diagnostic Session
-10 03
+# Step 1: Enter Programming Session (0x10 0x02)
+10 02
 DELAY 100
 
-# Security Access Level 1 (auto unlock with key calculation)
+# Step 2: Security Access Level 1 (unlock programming)
 SA 01
 DELAY 500
 
-# Read VIN (DID F190)
-22 F1 90
-DELAY 200
+# Step 3: Erase Application Memory (Service 0x31 - Routine Control)
+# Format: 31 01 FF00 [Address 4 bytes] [Length 4 bytes]
+# Address: 0x08100000 (APPLICATION_START_ADDRESS)
+# Length:  0x00000100 (256 bytes for test)
+31 01 FF 00 08 10 00 00 00 00 01 00
+DELAY 5000
 
-# Security Access Level 2 (long form)
-SECURITY_UNLOCK 02
-DELAY 500
-
-# Read Boot Software Version (DID F191)
-22 F1 91
-DELAY 200
-
-# Read Application Software Version (DID F192)
-22 F1 92
-DELAY 200
-
-# Tester Present
-3E 00
+# Wait for erase to complete (check routine result)
+31 03 FF 00
 DELAY 100
 
-# Return to Default Session
-10 01
+# Step 4: Request Download (Service 0x34)
+# Format: 34 [dataFormat] [addrLenFormat] [Address 4 bytes] [Size 4 bytes]
+# dataFormat: 0x00
+# addrLenFormat: 0x44 (4 bytes addr + 4 bytes size)
+# Address: 0x08100000
+# Size: 0x00000100 (256 bytes)
+34 00 44 08 10 00 00 00 00 01 00
+DELAY 200
+
+# Step 5: Transfer Data (Service 0x36) - 4 blocks x 64 bytes
+# Block 1: Fill with 0xAA pattern (64 bytes)
+36 01 AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA
+DELAY 100
+
+# Block 2: Fill with 0x55 pattern (64 bytes)
+36 02 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55
+DELAY 100
+
+# Block 3: Fill with 0x33 pattern (64 bytes)
+36 03 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33 33
+DELAY 100
+
+# Block 4: Fill with 0xCC pattern (64 bytes)
+36 04 CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC
+DELAY 100
+
+# Step 6: Request Transfer Exit (Service 0x37)
+37
+DELAY 2000
+
+# Step 7: Reset ECU (Service 0x11 - Hard Reset)
+11 01
+DELAY 500
+
+# =============================================================================
+# Verification: Use external tool (STM32CubeProgrammer, J-Link, etc.) 
+# to read flash memory at 0x08100000 and verify patterns:
+#   0x08100000-0x0810003F: 0xAA pattern (64 bytes)
+#   0x08100040-0x0810007F: 0x55 pattern (64 bytes)  
+#   0x08100080-0x081000BF: 0x33 pattern (64 bytes)
+#   0x081000C0-0x081000FF: 0xCC pattern (64 bytes)
+# =============================================================================

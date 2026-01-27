@@ -34,3 +34,13 @@ void svc_app_1000ms_task(void)
     // This function is called every 1000 ms
     // Add periodic tasks here if needed
 }
+
+/**
+ * @brief Background task - Process flash operations
+ * 
+ * This task should be called as frequently as possible from main loop
+ * to process queued erase/write operations.
+ */
+void svc_app_background_task(void)
+{
+}

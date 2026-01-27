@@ -23,7 +23,7 @@
 
 #define OS_CFG_INIT_TASK_COUNT      1u
 #define OS_CFG_CYCLIC_TASK_COUNT    2u
-#define OS_CFG_BG_TASK_COUNT        3u
+#define OS_CFG_BG_TASK_COUNT        4u
 
 /* ===== Type Definitions (local, must match dev_os.h) ===== */
 
@@ -64,7 +64,8 @@ extern void svc_app_1000ms_task(void);  // 1000ms
 // Background tasks
 extern void dev_com_main_function(void);
 extern void dev_com_tp_main_function(void);
-extern void routine_erase_memory_proc(void);
+extern void svc_app_background_task(void);
+extern void dev_flashblock_process(void);
 
 /* ===== Task Configuration Tables ===== */
 
@@ -95,7 +96,8 @@ extern void routine_erase_memory_proc(void);
     { \
         {dev_com_main_function, "dev_com_main_function"}, \
         {dev_com_tp_main_function, "dev_com_tp_main_function"}, \
-        {routine_erase_memory_proc, "routine_erase_memory_proc"} \
+        {svc_app_background_task, "svc_app_background_task"}, \
+        {dev_flashblock_process, "dev_flashblock_process"} \
     }
 
 /*============================================================================*/

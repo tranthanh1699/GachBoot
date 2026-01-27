@@ -8,4 +8,10 @@
 /* Service Application Initialization */
 void svc_app_init(void);
 
+/* Periodic task (called every 1000ms) */
+void svc_app_1000ms_task(void);
+
+/* Background task (called from main loop) */
+void svc_app_background_task(void);
+
 #endif // SVC_APP_H

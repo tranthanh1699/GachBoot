@@ -7,7 +7,7 @@
  * DO NOT EDIT MANUALLY - Changes will be overwritten on next generation.
  * To modify configuration, edit gachboot_config.json and regenerate.
  * 
- * Generated: 2026-01-27 21:50:12
+ * Generated: 2026-01-27 22:26:34
  */
 
 #ifndef FLASHBLOCK_PBCFG_H

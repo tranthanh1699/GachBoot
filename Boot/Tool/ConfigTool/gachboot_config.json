@@ -449,6 +449,13 @@
       "enabled": true
     },
     {
+      "task_type": "background",
+      "task_name": "svc_app_background_task",
+      "function_name": "svc_app_background_task",
+      "description": "Flash operations and routine processing",
+      "enabled": true
+    },
+    {
       "task_type": "cyclic",
       "task_name": "svc_dcm_main_function",
       "function_name": "svc_dcm_main_function",
@@ -466,9 +473,9 @@
     },
     {
       "task_type": "background",
-      "task_name": "routine_erase_memory_proc",
-      "function_name": "routine_erase_memory_proc",
-      "description": "Task to handle erase block",
+      "task_name": "dev_flashblock_process",
+      "function_name": "dev_flashblock_process",
+      "description": "Background task to flash memory",
       "enabled": true
     }
   ]
