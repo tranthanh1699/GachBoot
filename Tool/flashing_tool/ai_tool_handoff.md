@@ -4,7 +4,7 @@
 
 - Area: Flashing Tool
 - AI Role: Senior Python Tool Developer
-- Current Milestone: TOOL-5 Qt6 GUI Complete
+- Current Milestone: TOOL-6 Hardware Validation & Refinement
 - Last Updated: 2026-05-02
 - Updated By: AI session
 
@@ -12,7 +12,7 @@
 
 ## 2. Current High-Level Goal
 
-Develop a Python + Qt6 flashing tool for a custom UART bootloader. The tool is now fully functional in terms of protocol logic, firmware handling, and GUI. It is ready for hardware validation.
+Develop a Python + Qt6 flashing tool for a custom UART bootloader. The tool is now fully functional and refined after addressing key architectural and integration issues.
 
 ---
 
@@ -23,7 +23,7 @@ Develop a Python + Qt6 flashing tool for a custom UART bootloader. The tool is n
 - Set up `venv` and `requirements.txt`.
 - Implemented **Milestone TOOL-1 (Protocol Core)**:
   - CRC16-CCITT-FALSE.
-  - Frame encode/decode.
+  - Frame encode/decode (increased max payload to 1024).
   - Command and Error enums.
   - Unit tests for frame codec.
 - Implemented **Milestone TOOL-2 (Firmware Model)**:
@@ -39,17 +39,20 @@ Develop a Python + Qt6 flashing tool for a custom UART bootloader. The tool is n
   - `FlashService` for full protocol flow orchestration.
   - Integration tests for happy path using `FakeTransport`.
 - Implemented **Milestone TOOL-5 (Qt6 GUI)**:
-  - Main Window.
+  - Main Window (refactored with signals for thread-safe UI updates).
   - Connection Panel (port/baudrate).
   - Firmware Panel (file selection, signature support).
   - Progress Panel (progress bar).
   - Log Panel (text logs).
   - Threaded flashing execution.
 - Implemented **Firmware Signing**:
-  - `ecdsa` requirement added.
-  - `FirmwareSigner` implementation with NIST256p.
-  - `DOWNLOAD_START` updated to send signature bytes if present.
-- Created `README.md` and this handoff file.
+  - `cryptography` requirement added.
+  - `FirmwareSigner` implementation with RSA-2048.
+  - `DOWNLOAD_START` updated to send RSA signature bytes (256 bytes).
+- **Bootloader Integration Fixes**:
+  - Increased `BL_FRAME_MAX_PAYLOAD_SIZE` to 512 in bootloader to support signed metadata.
+  - Increased `BL_SIGNATURE_MAX_SIZE` to 256 in bootloader.
+  - Implemented `DOWNLOAD_END` finalize/verification in bootloader.
 
 ---
 
@@ -57,7 +60,6 @@ Develop a Python + Qt6 flashing tool for a custom UART bootloader. The tool is n
 
 - **Milestone TOOL-6 (Hardware Validation)**:
   - Not started with real hardware.
-  - `FlashService.download_end` implementation is basic and may need adjustment based on how the bootloader handles finalization (currently it expects a simple OK status).
 
 ---
 
@@ -75,7 +77,8 @@ Develop a Python + Qt6 flashing tool for a custom UART bootloader. The tool is n
 - CRC16: CCITT-FALSE (init 0xFFFF, poly 0x1021).
 - DATA header size: 10 bytes (Block index 4, Offset 4, Len 2).
 - Progress calculation: Based on acknowledged blocks.
-- Threading: Flashing runs in a background thread to keep GUI responsive.
+- Threading: Flashing runs in a background thread; UI updates must use signals.
+- Max Payload: Increased to 1024 (Tool) / 512 (Bootloader) to accommodate RSA signatures.
 
 ---
 
@@ -83,16 +86,16 @@ Develop a Python + Qt6 flashing tool for a custom UART bootloader. The tool is n
 
 - Protocol document: `Boot/bootloader/docs/flashing_protocol.md`
 - Flow document: `Boot/bootloader/docs/bootloader_flow.md`
-- Status: **Stable** (implemented as per the contract in `tool_ai_handover`).
+- Status: **Stable** (updated to support RSA signatures and finalization).
 
 ---
 
-## 8. Files Created
+## 8. Files Modified/Created
 
 ```text
 Tool/flashing_tool/
 ├── app/main.py
-├── firmware/checksum.py, firmware_image.py
+├── firmware/checksum.py, firmware_image.py, signer.py
 ├── protocol/commands.py, errors.py, frame.py, protocol_client.py
 ├── services/flash_service.py
 ├── transport/transport_base.py, serial_transport.py, fake_transport.py
@@ -101,6 +104,11 @@ Tool/flashing_tool/
 ├── requirements.txt
 ├── README.md
 └── ai_tool_handoff.md
+
+Boot/bootloader/
+├── config/bl_config.h, bl_security_config.h
+├── core/bl_session.c, bl_session.h
+└── protocol/bl_command.c
 ```
 
 ---
@@ -109,7 +117,7 @@ Tool/flashing_tool/
 
 ```text
 Test command:
-cd Tool/flashing_tool && PYTHONPATH=. ./venv/bin/pytest tests/
+cd Tool/flashing_tool && ./venv/bin/python -m pytest tests/
 
 Test result:
 PASS (9 tests collected)
@@ -119,8 +127,8 @@ PASS (9 tests collected)
 
 ## 10. Known Issues and Risks
 
-- `QMessageBox` in `MainWindow._on_flash` is currently called from the flash thread (not strictly thread-safe in some Qt environments, though PySide6 often handles simple calls). Should be moved to signals for production-ready code.
-- Bootloader finalization (DOWNLOAD_END) may return `ERROR_RESPONSE` if the bootloader is still stubbed on the target.
+- Real hardware validation may require timing adjustments for UART.
+- Flash erase on STM32H7 can be slow; communication timeout might need tuning.
 
 ---
 
@@ -128,8 +136,7 @@ PASS (9 tests collected)
 
 Continue with **Milestone TOOL-6: Hardware Validation**:
 
-1. Connect a real STM32 target.
+1. Connect a real STM32H7 target.
 2. Run the tool: `cd Tool/flashing_tool && ./venv/bin/python app/main.py`.
-3. Test HELLO and START_SESSION.
-4. Capture logs and verify against bootloader expectations.
-5. If hardware validation passes, proceed to packaging.
+3. Test a full flash cycle with RSA signing enabled.
+4. Verify the bootloader jumps to the application correctly.

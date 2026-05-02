@@ -33,4 +33,4 @@ def test_checksum_mismatch():
 
 def test_payload_too_large():
     with pytest.raises(ValueError, match="Payload too large"):
-        encode_frame(Command.DATA, 0, b"A" * 257)
+        encode_frame(Command.DATA, 0, b"A" * 1025)

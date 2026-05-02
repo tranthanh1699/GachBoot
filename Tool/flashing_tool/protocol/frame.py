@@ -26,8 +26,8 @@ def crc16_ccitt_false(data: bytes) -> int:
     return crc
 
 def encode_frame(command: Command, sequence: int, payload: bytes = b"") -> bytes:
-    if len(payload) > 256:
-        raise ValueError("Payload too large (max 256 bytes)")
+    if len(payload) > 1024:
+        raise ValueError("Payload too large (max 1024 bytes)")
     
     # Body consists of Version, Command ID, Sequence, and Length
     length_le = struct.pack("<H", len(payload))

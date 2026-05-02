@@ -17,7 +17,7 @@
 
 #define BL_UART_BAUDRATE                 115200u
 #define BL_COMM_TIMEOUT_MS               1000u
-#define BL_FRAME_MAX_PAYLOAD_SIZE        256u
+#define BL_FRAME_MAX_PAYLOAD_SIZE        512u
 #define BL_FRAME_MAX_SIZE                (1u + 1u + 1u + 1u + 2u + BL_FRAME_MAX_PAYLOAD_SIZE + 2u)
 
 #define BL_ENABLE_RETRY                  1u

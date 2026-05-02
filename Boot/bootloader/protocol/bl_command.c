@@ -253,8 +253,15 @@ bl_status_t bl_command_handle(bl_session_t *session, const bl_frame_t *request, 
             break;
 
         case BL_CMD_DOWNLOAD_END:
-            bl_command_build_error(request->command, request->sequence, BL_ERROR_FIRMWARE_CHECKSUM_INVALID, response);
-            status = BL_STATUS_NOT_SUPPORTED;
+            status = bl_session_finalize(session);
+            if (status != BL_STATUS_OK)
+            {
+                bl_command_build_error(request->command, request->sequence, BL_ERROR_FIRMWARE_CHECKSUM_INVALID, response);
+            }
+            else
+            {
+                bl_command_build_status_response(BL_RSP_DOWNLOAD_END, request->sequence, BL_ERROR_OK, response);
+            }
             break;
 
         case BL_CMD_RESET:

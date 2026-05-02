@@ -1,4 +1,5 @@
 from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QMessageBox
+from PySide6.QtCore import Signal, QObject
 from .connection_panel import ConnectionPanel
 from .firmware_panel import FirmwarePanel
 from .progress_panel import ProgressPanel
@@ -9,6 +10,12 @@ from transport.serial_transport import SerialTransport
 from firmware.firmware_image import FirmwareImage
 from firmware.signer import FirmwareSigner
 import threading
+
+class FlashSignals(QObject):
+    log = Signal(str)
+    progress = Signal(int, int)
+    finished = Signal()
+    failed = Signal(str)
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -35,6 +42,13 @@ class MainWindow(QMainWindow):
         self.conn_panel.connect_requested.connect(self._on_connect)
         self.fw_panel.flash_requested.connect(self._on_flash)
         
+        # Signals for thread safety
+        self.flash_signals = FlashSignals()
+        self.flash_signals.log.connect(self.log_panel.log)
+        self.flash_signals.progress.connect(self.progress_panel.set_progress)
+        self.flash_signals.failed.connect(self._on_flash_failed)
+        self.flash_signals.finished.connect(self._on_flash_finished)
+
         self.transport = None
         self.service = None
 
@@ -72,18 +86,23 @@ class MainWindow(QMainWindow):
             try:
                 signer = FirmwareSigner(key_path) if key_path else None
                 fw = FirmwareImage.from_file(file_path, signer)
-                self.log_panel.log(f"Starting flash: {file_path} ({fw.size} bytes)")
+                self.flash_signals.log.emit(f"Starting flash: {file_path} ({fw.size} bytes)")
                 
                 def update_progress(current, total):
-                    self.progress_panel.set_progress(current, total)
+                    self.flash_signals.progress.emit(current, total)
                 
                 self.service.flash_firmware(fw, progress_callback=update_progress)
-                self.log_panel.log("Flashing successful!")
+                self.flash_signals.finished.emit()
                 
             except Exception as e:
-                self.log_panel.log(f"Flashing failed: {str(e)}")
-                # QMessageBox.critical is not thread-safe, 
-                # but we'll handle UI updates via signals in a real implementation.
-                # For this prototype, we just log.
+                self.flash_signals.failed.emit(str(e))
         
         threading.Thread(target=flash_thread, daemon=True).start()
+
+    def _on_flash_finished(self):
+        self.log_panel.log("Flashing successful!")
+        QMessageBox.information(self, "Flash Success", "Firmware flashed successfully.")
+
+    def _on_flash_failed(self, error):
+        self.log_panel.log(f"Flashing failed: {error}")
+        QMessageBox.critical(self, "Flash Error", f"Flashing failed: {error}")

@@ -34,5 +34,6 @@ bl_status_t bl_session_set_metadata(bl_session_t *session, uint32_t firmware_siz
                                     const uint8_t *signature, uint16_t signature_length);
 bl_status_t bl_session_validate_block(const bl_session_t *session, uint32_t block_index, uint32_t target_offset, uint16_t data_length);
 bl_status_t bl_session_commit_block(bl_session_t *session, uint16_t data_length);
+bl_status_t bl_session_finalize(bl_session_t *session);
 
 #endif /* BL_SESSION_H */

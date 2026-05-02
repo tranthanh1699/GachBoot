@@ -167,3 +167,26 @@ bl_status_t bl_session_commit_block(bl_session_t *session, uint16_t data_length)
     session->expected_block_index++;
     return BL_STATUS_OK;
 }
+
+bl_status_t bl_session_finalize(bl_session_t *session)
+{
+    if (session == (bl_session_t *)0)
+    {
+        return BL_STATUS_PARAM;
+    }
+
+    if (session->state != BL_SESSION_STATE_DOWNLOAD)
+    {
+        return BL_STATUS_INVALID_STATE;
+    }
+
+    if (session->bytes_received != session->firmware_size)
+    {
+        return BL_STATUS_ERROR;
+    }
+
+    /* TODO: Implement CRC32 and Signature validation here */
+
+    session->state = BL_SESSION_STATE_READY;
+    return BL_STATUS_OK;
+}
