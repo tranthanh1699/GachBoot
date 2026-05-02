@@ -38,7 +38,7 @@ Deliverables:
 
 Exit criteria:
 
-- Firmware is split into max `246` byte DATA chunks unless bootloader reports a smaller max payload.
+- Firmware is split into max `480` byte DATA chunks by default, or a lower 32-byte aligned size if the bootloader reports a smaller max payload.
 
 ## Milestone TOOL-3: Serial Transport
 

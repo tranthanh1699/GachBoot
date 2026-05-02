@@ -59,12 +59,12 @@ Implemented:
 - ABORT
 - DOWNLOAD_START metadata validation
 - DATA sequencing and callout to memory service
+- STM32H7 sector erase and 32-byte flash-word write callouts
+- DOWNLOAD_END byte count and CRC32 verification
 - UART transport receive state machine
 
 Stubbed until hardware validation:
 
-- STM32H7 flash erase/write
-- full firmware CRC32 over flash
 - valid-marker write
 - real signature verification
 - final boot decision policy

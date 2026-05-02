@@ -1,6 +1,45 @@
 #include "bl_session.h"
 #include "bl_config.h"
+#include "bl_hw_config.h"
 #include "bl_memory_map.h"
+#include "bl_signature.h"
+
+#define BL_CRC32_INIT_VALUE             0xFFFFFFFFu
+#define BL_CRC32_POLY                   0xEDB88320u
+
+static uint32_t bl_session_crc32_update_byte(uint32_t crc, uint8_t data)
+{
+    uint8_t bit_index = 0u;
+
+    crc ^= (uint32_t)data;
+    for (bit_index = 0u; bit_index < 8u; bit_index++)
+    {
+        if ((crc & 1u) != 0u)
+        {
+            crc = (crc >> 1u) ^ BL_CRC32_POLY;
+        }
+        else
+        {
+            crc >>= 1u;
+        }
+    }
+
+    return crc;
+}
+
+static uint32_t bl_session_crc32_flash(uint32_t address, uint32_t length)
+{
+    uint32_t crc = BL_CRC32_INIT_VALUE;
+    uint32_t index = 0u;
+    const uint8_t *flash_data = (const uint8_t *)(uintptr_t)address;
+
+    for (index = 0u; index < length; index++)
+    {
+        crc = bl_session_crc32_update_byte(crc, flash_data[index]);
+    }
+
+    return ~crc;
+}
 
 static bool bl_range_is_in_application(uint32_t address, uint32_t size)
 {
@@ -20,6 +59,33 @@ static bool bl_range_is_in_application(uint32_t address, uint32_t size)
     }
 
     return ((address >= BL_APP_START_ADDR) && (request_end <= app_end));
+}
+
+static bool bl_size_align_up(uint32_t size, uint32_t alignment, uint32_t *aligned_size)
+{
+    uint32_t remainder;
+
+    if ((size == 0u) || (alignment == 0u) || (aligned_size == (uint32_t *)0))
+    {
+        return false;
+    }
+
+    remainder = size % alignment;
+    if (remainder == 0u)
+    {
+        *aligned_size = size;
+    }
+    else
+    {
+        uint32_t padding = alignment - remainder;
+        *aligned_size = size + padding;
+        if (*aligned_size < size)
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 void bl_session_init(bl_session_t *session)
@@ -68,6 +134,7 @@ bl_status_t bl_session_set_metadata(bl_session_t *session, uint32_t firmware_siz
                                     const uint8_t *signature, uint16_t signature_length)
 {
     uint16_t index = 0u;
+    uint32_t aligned_firmware_size = 0u;
 
     if (session == (bl_session_t *)0)
     {
@@ -79,7 +146,12 @@ bl_status_t bl_session_set_metadata(bl_session_t *session, uint32_t firmware_siz
         return BL_STATUS_INVALID_STATE;
     }
 
-    if (bl_range_is_in_application(target_address, firmware_size) == false)
+    if (bl_size_align_up(firmware_size, BL_PLATFORM_FLASH_WRITE_ALIGN, &aligned_firmware_size) == false)
+    {
+        return BL_STATUS_PARAM;
+    }
+
+    if (bl_range_is_in_application(target_address, aligned_firmware_size) == false)
     {
         return BL_STATUS_PARAM;
     }
@@ -88,6 +160,13 @@ bl_status_t bl_session_set_metadata(bl_session_t *session, uint32_t firmware_siz
     {
         return BL_STATUS_PARAM;
     }
+
+#if (BL_ENABLE_SIGNATURE_VERIFY == 0u)
+    if (signature_enabled != 0u)
+    {
+        return BL_STATUS_NOT_SUPPORTED;
+    }
+#endif
 
     if ((signature_length > 0u) && (signature == (const uint8_t *)0))
     {
@@ -142,8 +221,18 @@ bl_status_t bl_session_validate_block(const bl_session_t *session, uint32_t bloc
         return BL_STATUS_ERROR;
     }
 
+    if ((target_offset % BL_PLATFORM_FLASH_WRITE_ALIGN) != 0u)
+    {
+        return BL_STATUS_PARAM;
+    }
+
     next_total = session->bytes_received + (uint32_t)data_length;
     if ((next_total < session->bytes_received) || (next_total > session->firmware_size))
+    {
+        return BL_STATUS_PARAM;
+    }
+
+    if ((next_total < session->firmware_size) && (((uint32_t)data_length % BL_PLATFORM_FLASH_WRITE_ALIGN) != 0u))
     {
         return BL_STATUS_PARAM;
     }
@@ -170,6 +259,9 @@ bl_status_t bl_session_commit_block(bl_session_t *session, uint16_t data_length)
 
 bl_status_t bl_session_finalize(bl_session_t *session)
 {
+    uint32_t calculated_crc32;
+    bl_status_t signature_status;
+
     if (session == (bl_session_t *)0)
     {
         return BL_STATUS_PARAM;
@@ -185,7 +277,21 @@ bl_status_t bl_session_finalize(bl_session_t *session)
         return BL_STATUS_ERROR;
     }
 
-    /* TODO: Implement CRC32 and Signature validation here */
+    calculated_crc32 = bl_session_crc32_flash(session->target_address, session->firmware_size);
+    if (calculated_crc32 != session->firmware_crc32)
+    {
+        return BL_STATUS_CHECKSUM;
+    }
+
+    if (session->signature_enabled != 0u)
+    {
+        signature_status = bl_signature_verify(session->target_address, session->firmware_size,
+                                               session->signature, session->signature_length);
+        if (signature_status != BL_STATUS_OK)
+        {
+            return signature_status;
+        }
+    }
 
     session->state = BL_SESSION_STATE_READY;
     return BL_STATUS_OK;

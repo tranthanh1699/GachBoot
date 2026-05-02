@@ -20,6 +20,7 @@ function flash_firmware(port, baudrate, firmware_path):
 
         max_payload = boot_info.max_payload_size
         max_data_per_frame = max_payload - 10
+        max_data_per_frame = max_data_per_frame - (max_data_per_frame % 32)
         if max_data_per_frame <= 0:
             fail "invalid bootloader max payload"
 

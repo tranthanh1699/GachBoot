@@ -2,8 +2,6 @@
 #include "bl_config.h"
 #include "bl_memory.h"
 #include "bl_memory_map.h"
-#include "bl_transport.h"
-#include "platform_reset.h"
 
 static uint32_t bl_read_u32_le(const uint8_t *data)
 {
@@ -130,7 +128,14 @@ static bl_status_t bl_command_handle_download_start(bl_session_t *session, const
                                      &request->payload[15], signature_length);
     if (status != BL_STATUS_OK)
     {
-        bl_command_build_error(request->command, request->sequence, BL_ERROR_FIRMWARE_SIZE_INVALID, response);
+        if (status == BL_STATUS_NOT_SUPPORTED)
+        {
+            bl_command_build_error(request->command, request->sequence, BL_ERROR_FIRMWARE_SIGNATURE_INVALID, response);
+        }
+        else
+        {
+            bl_command_build_error(request->command, request->sequence, BL_ERROR_FIRMWARE_SIZE_INVALID, response);
+        }
         return status;
     }
 
@@ -256,7 +261,18 @@ bl_status_t bl_command_handle(bl_session_t *session, const bl_frame_t *request, 
             status = bl_session_finalize(session);
             if (status != BL_STATUS_OK)
             {
-                bl_command_build_error(request->command, request->sequence, BL_ERROR_FIRMWARE_CHECKSUM_INVALID, response);
+                if (status == BL_STATUS_CHECKSUM)
+                {
+                    bl_command_build_error(request->command, request->sequence, BL_ERROR_FIRMWARE_CHECKSUM_INVALID, response);
+                }
+                else if (status == BL_STATUS_NOT_SUPPORTED)
+                {
+                    bl_command_build_error(request->command, request->sequence, BL_ERROR_FIRMWARE_SIGNATURE_INVALID, response);
+                }
+                else
+                {
+                    bl_command_build_error(request->command, request->sequence, BL_ERROR_INTERNAL, response);
+                }
             }
             else
             {
@@ -266,8 +282,6 @@ bl_status_t bl_command_handle(bl_session_t *session, const bl_frame_t *request, 
 
         case BL_CMD_RESET:
             bl_command_build_status_response(BL_RSP_RESET, request->sequence, BL_ERROR_OK, response);
-            (void)bl_transport_send_frame(response);
-            platform_reset_mcu();
             status = BL_STATUS_OK;
             break;
 

@@ -1,8 +1,10 @@
 #include "bl_main.h"
 #include "bl_command.h"
+#include "bl_protocol.h"
 #include "bl_session.h"
 #include "bl_transport.h"
 #include "bl_uart_transport.h"
+#include "platform_reset.h"
 
 static bl_transport_t bl_main_transport;
 static bl_session_t bl_main_session;
@@ -41,4 +43,8 @@ void bl_main_process(void)
 
     (void)bl_command_handle(&bl_main_session, &request, &response);
     (void)bl_transport_send_frame(&response);
+    if ((request.command == BL_CMD_RESET) && (response.command == BL_RSP_RESET))
+    {
+        platform_reset_mcu();
+    }
 }

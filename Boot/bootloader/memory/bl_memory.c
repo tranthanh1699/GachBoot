@@ -1,6 +1,7 @@
 #include "bl_memory.h"
 #include "bl_flash.h"
 #include "bl_memory_map.h"
+#include <string.h>
 
 static bool bl_memory_range_is_valid(uint32_t address, uint16_t length)
 {
@@ -44,8 +45,7 @@ bl_status_t bl_memory_write(uint32_t address, const uint8_t *data, uint16_t leng
 
 bl_status_t bl_memory_verify(uint32_t address, const uint8_t *data, uint16_t length)
 {
-    uint8_t read_byte = 0u;
-    uint16_t index = 0u;
+    const uint8_t *flash_data = (const uint8_t *)(uintptr_t)address;
 
     if (data == (const uint8_t *)0)
     {
@@ -57,17 +57,9 @@ bl_status_t bl_memory_verify(uint32_t address, const uint8_t *data, uint16_t len
         return BL_STATUS_PARAM;
     }
 
-    for (index = 0u; index < length; index++)
+    if (memcmp(flash_data, data, (size_t)length) != 0)
     {
-        if (bl_flash_read(address + (uint32_t)index, &read_byte, 1u) != BL_STATUS_OK)
-        {
-            return BL_STATUS_IO;
-        }
-
-        if (read_byte != data[index])
-        {
-            return BL_STATUS_ERROR;
-        }
+        return BL_STATUS_ERROR;
     }
 
     return BL_STATUS_OK;

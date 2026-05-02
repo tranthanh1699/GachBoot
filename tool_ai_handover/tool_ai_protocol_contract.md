@@ -28,7 +28,7 @@ Field values:
 
 - SOF: `0xA5`
 - Protocol version: `0x01`
-- Maximum payload: `256` bytes
+- Maximum payload: `490` bytes by default. The tool must still use the `Max payload size` returned by `HELLO_RESPONSE`.
 - CRC16: CRC16-CCITT-FALSE over `Version`, `Command`, `Sequence`, `Length`, and `Payload`
 - CRC16 polynomial: `0x1021`
 - CRC16 init: `0xFFFF`
@@ -154,7 +154,8 @@ Request payload:
 | Data | N |
 
 The tool must calculate `N` so total DATA payload is no more than max payload.
-With a 10-byte DATA header and max payload 256, max binary data per frame is `246` bytes.
+With a 10-byte DATA header and max payload 490, max binary data per frame is `480` bytes.
+Use 32-byte aligned DATA sizes for all non-final blocks. The final block may be shorter.
 
 Response payload:
 
@@ -173,7 +174,7 @@ Response payload:
 |---|---:|
 | Status | 1 |
 
-Note: bootloader finalization is still under development. Tool must handle `ERROR_RESPONSE`.
+The bootloader verifies the firmware CRC32 over flash before returning OK. Tool must still handle `ERROR_RESPONSE`.
 
 ## RESET
 

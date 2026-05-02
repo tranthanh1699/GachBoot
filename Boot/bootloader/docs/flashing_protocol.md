@@ -29,7 +29,7 @@ CRC16 parameters:
 - no reflection
 - no final xor
 
-Maximum payload size is `256` bytes.
+Maximum payload size is `490` bytes. This keeps the maximum `DATA` body at `480` bytes after the 10-byte DATA header, which preserves STM32H7 32-byte flash write alignment.
 
 ## Commands
 
@@ -123,6 +123,7 @@ Payload:
 | Data | N |
 
 The bootloader accepts only the next expected block index and offset. Each accepted block is written and read back before the positive response.
+Each non-final DATA block must contain a 32-byte aligned data length. With the default 490-byte maximum payload, the recommended data size is 480 bytes per frame. The final DATA block may be shorter and is padded internally for STM32H7 flash-word programming.
 
 Response payload:
 
@@ -130,6 +131,18 @@ Response payload:
 |---|---:|
 | Status | 1 |
 | Block Index | 4 |
+
+## DOWNLOAD_END
+
+Request payload: empty.
+
+Response payload:
+
+| Field | Size |
+|---|---:|
+| Status | 1 |
+
+The bootloader verifies the full firmware CRC32 over flash before returning OK. If signature verification is enabled, the signature interface must also return OK.
 
 ## Example HELLO Frame
 
