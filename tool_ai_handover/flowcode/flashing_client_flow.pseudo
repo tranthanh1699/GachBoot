@@ -1,0 +1,97 @@
+# Flashing Client Flowcode
+
+function flash_firmware(port, baudrate, firmware_path):
+    transport.open(port, baudrate, timeout_ms=1000)
+
+    try:
+        firmware = load_binary_file(firmware_path)
+        firmware_size = length(firmware)
+        firmware_crc32 = crc32(firmware)
+
+        sequence = 0
+
+        hello_payload = u8(PROTOCOL_VERSION) + u32_le(0)
+        hello = request_response(command=HELLO, sequence=sequence, payload=hello_payload)
+        validate_response(hello, expected_command=HELLO_RESPONSE, expected_sequence=sequence)
+        boot_info = parse_hello_response(hello.payload)
+
+        if boot_info.protocol_version != PROTOCOL_VERSION:
+            fail "unsupported protocol version"
+
+        max_payload = boot_info.max_payload_size
+        max_data_per_frame = max_payload - 10
+        if max_data_per_frame <= 0:
+            fail "invalid bootloader max payload"
+
+        sequence = next_sequence(sequence)
+        rsp = request_response(START_SESSION, sequence, empty)
+        require_status_ok(rsp, START_SESSION_RESPONSE)
+
+        sequence = next_sequence(sequence)
+        rsp = request_response(ERASE, sequence, empty)
+        require_status_ok(rsp, ERASE_RESPONSE)
+
+        metadata = (
+            u32_le(firmware_size) +
+            u32_le(firmware_crc32) +
+            u32_le(boot_info.application_start_address) +
+            u8(0) +
+            u16_le(0)
+        )
+        sequence = next_sequence(sequence)
+        rsp = request_response(DOWNLOAD_START, sequence, metadata)
+        require_status_ok(rsp, DOWNLOAD_START_RESPONSE)
+
+        block_index = 0
+        offset = 0
+        while offset < firmware_size:
+            chunk = firmware[offset : offset + max_data_per_frame]
+            payload = (
+                u32_le(block_index) +
+                u32_le(offset) +
+                u16_le(length(chunk)) +
+                chunk
+            )
+
+            sequence = next_sequence(sequence)
+            rsp = request_response(DATA, sequence, payload)
+            require_data_response_ok(rsp, block_index)
+
+            offset = offset + length(chunk)
+            block_index = block_index + 1
+            update_progress(offset, firmware_size)
+
+        sequence = next_sequence(sequence)
+        rsp = request_response(DOWNLOAD_END, sequence, empty)
+        require_status_ok(rsp, DOWNLOAD_END_RESPONSE)
+
+        return success
+
+    except any_error as error:
+        try_abort_if_connected()
+        return failure(error)
+
+    finally:
+        transport.close()
+
+function request_response(command, sequence, payload):
+    frame = encode_frame(command, sequence, payload)
+    transport.write(frame)
+    raw = transport.read_frame_until_timeout()
+    response = decode_frame(raw)
+
+    if response.command == ERROR_RESPONSE:
+        error = parse_error_response(response.payload)
+        fail protocol_error(error.request_command, error.error_code)
+
+    if response.sequence != sequence:
+        fail "sequence mismatch"
+
+    return response
+
+function try_abort_if_connected():
+    if transport.is_open():
+        sequence = next_sequence(last_sequence)
+        frame = encode_frame(ABORT, sequence, empty)
+        transport.write(frame)
+        transport.read_frame_best_effort(timeout_ms=300)

@@ -1,5 +1,0 @@
-# No external dependencies required
-# SecurityUnlock uses only Python standard library
-
-# For building executable:
-pyinstaller>=5.0

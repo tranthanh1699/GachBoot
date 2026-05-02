@@ -37,25 +37,8 @@ add_executable(${CMAKE_PROJECT_NAME})
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
 
-# Add user component modules
-add_subdirectory(components/dev_app)
-add_subdirectory(components/dev_com)
-add_subdirectory(components/dev_crc)
-add_subdirectory(components/dev_com_if)
-add_subdirectory(components/dev_com_tp)
-add_subdirectory(components/dev_memstack)  # Memory Stack (Fls, Fee, MemIf, NvM)
-add_subdirectory(components/dev_flashblock)  # Flash Block Management
-add_subdirectory(components/dev_os)
-add_subdirectory(GenerateCode)
-# Add user service modules
-add_subdirectory(service/svc_app)
-add_subdirectory(service/svc_dcm)
-
-# Add generated code from ConfigTool
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/Tool/ConfigTool/GenCode/CMakeLists.txt)
-    add_subdirectory(Tool/ConfigTool/GenCode)
-    message(STATUS "Added ConfigTool generated code")
-endif()
+# Add lightweight bootloader modules
+add_subdirectory(bootloader)
 
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
@@ -85,19 +68,5 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
     stm32cubemx
 
     # Add user defined libraries
-    dev_app
-    dev_com
-    dev_crc
-    dev_com_if
-    dev_com_tp
-    dev_memstack  # Memory Stack (includes Fls, Fee, MemIf, NvM)
-    dev_flashblock  # Flash Block Management
-    dev_os
-    
-    # Add generated code library (headers and non-circular sources)
-    GenerateCode
-
-    # Add service libraries
-    svc_app
-    svc_dcm  # Includes Service_PBCfg.c and Routine_PBCfg.c from GenerateCode
+    bootloader
 )

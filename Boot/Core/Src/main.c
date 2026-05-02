@@ -25,8 +25,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-// #include "svc_app.h"
-#include "dev_os.h"
+#include "bl_main.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -98,8 +97,7 @@ int main(void)
   MX_USB_DEVICE_Init();
   MX_TIM17_Init();
   /* USER CODE BEGIN 2 */
-  // svc_app_init();
-  dev_os_init();
+  (void)bl_main_init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -109,7 +107,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    dev_os_process_bg_tasks();
+    bl_main_process();
   }
   /* USER CODE END 3 */
 }

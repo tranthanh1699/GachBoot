@@ -1,7 +1,0 @@
-#ifndef UDS_RID_CALLBACK_H
-#define UDS_RID_CALLBACK_H
-
-
-
-
-#endif // UDS_RID_CALLBACK_H
