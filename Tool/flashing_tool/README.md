@@ -1,53 +1,111 @@
 # GachBoot Flashing Tool
 
-A lightweight Python + Qt6 application for flashing application firmware over UART using the GachBoot protocol.
+A lightweight, modular Python + Qt6 application designed for flashing application firmware over UART. It implements the custom GachBoot protocol and supports features like RSA firmware signing and automatic Intel HEX to Binary conversion.
 
-## Features
+---
 
-- Serial port auto-detection
-- Handshake with bootloader (HELLO)
-- Automatic firmware chunking and CRC32 calculation
-- Real-time flashing progress and logs
-- Fail-safe abort handling
+## 1. Project Structure
 
-## Requirements
+The tool follows a layered architecture to separate protocol logic from UI and hardware transport.
 
-- Python 3.11+
-- PySide6
-- pyserial
-- pytest (for development)
-
-## Installation
-
-1. Create a virtual environment:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Linux/macOS
-   ```
-
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-## Usage
-
-Run the application:
-```bash
-python app/main.py
+```text
+flashing_tool/
+├── app/
+│   └── main.py              # Entry point. Initializes the Qt application.
+├── firmware/
+│   ├── firmware_image.py    # Loads .bin/.hex, calculates CRC32, and handles signing.
+│   ├── checksum.py          # CRC32 calculation logic.
+│   └── signer.py            # RSA-2048 signing implementation using the 'cryptography' library.
+├── protocol/
+│   ├── commands.py          # Enum of all supported Command IDs.
+│   ├── errors.py            # Enum of Protocol Error Codes.
+│   ├── frame.py             # Frame encoding (SOF, Version, Command, Seq, Len, Payload, CRC16).
+│   └── protocol_client.py   # Request/Response handler with timeout and sequence management.
+├── services/
+│   └── flash_service.py     # High-level orchestration of the flashing flow (HELLO -> ERASE -> DATA -> END).
+├── transport/
+│   ├── transport_base.py    # Abstract base class for all transports.
+│   ├── serial_transport.py  # Implementation using 'pyserial'.
+│   └── fake_transport.py    # Simulated transport used for unit and integration testing.
+├── ui/
+│   ├── main_window.py       # Main Qt layout; connects UI signals to the background flashing thread.
+│   ├── connection_panel.py  # Serial port selection and connect/disconnect controls.
+│   ├── firmware_panel.py    # File selection, RSA signing options, and flash button.
+│   ├── progress_panel.py    # Progress bar and status text.
+│   └── log_panel.py         # Scrollable text log for communication and debugging.
+├── tests/                   # Full test suite using 'pytest'.
+├── requirements.txt         # Project dependencies.
+└── ai_tool_handoff.md       # Technical handoff for AI-assisted development.
 ```
 
-1. Select the serial port of the target MCU.
-2. Select the firmware binary (.bin).
-3. Click **Connect** to perform handshake.
-4. Click **Flash** to start the update process.
+---
 
-## Architecture
+## 2. How to Use
 
-- `app/`: Application entry point.
-- `protocol/`: Frame encoding, decoding, and command definitions.
-- `transport/`: Serial and fake transport implementations.
-- `firmware/`: Firmware image handling and checksums.
-- `services/`: Flashing flow orchestration.
-- `ui/`: Qt6 widgets and main window.
-- `tests/`: Unit and integration tests.
+### Setup
+1.  **Create Virtual Environment**:
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # Windows: venv\Scripts\activate
+    ```
+2.  **Install Dependencies**:
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+### Running the Tool
+1.  Launch the application:
+    ```bash
+    python app/main.py
+    ```
+2.  **Connection**: Select your MCU's COM/TTY port and baudrate (default 115200). Click **Connect**. The tool sends a `HELLO` command; if successful, it displays the bootloader version.
+3.  **Firmware**: Browse for a `.bin` or `.hex` file.
+    - If you select a `.hex` file, it is automatically converted to binary in memory.
+4.  **Security (Optional)**: Check **Sign Firmware** and select your RSA-2048 private key (`.pem`). The tool will sign the binary and send the signature during the `DOWNLOAD_START` phase.
+5.  **Flash**: Click **Flash**. The tool will automatically ERASE the target area, send DATA blocks, and verify the result.
+
+---
+
+## 3. How to Modify & Customize
+
+### Adding a New Protocol Command
+1.  **Define Command ID**: Add your command to `protocol/commands.py`.
+2.  **Add Logic**:
+    - If it's a simple command, add a method to `services/flash_service.py` using `self.client.request_response(Command.YOUR_CMD, payload)`.
+    - Handle the response status or payload according to your needs.
+
+### Changing the Signature Algorithm
+- Modify `firmware/signer.py`.
+- Ensure the `sign()` method returns a byte string.
+- If the signature size changes, update `BL_SIGNATURE_MAX_SIZE` in the bootloader's `bl_security_config.h` and check if `BL_FRAME_MAX_PAYLOAD_SIZE` needs increasing.
+
+### Updating the UI
+- Each section of the window is a separate widget in `ui/`.
+- If you add a new panel, instantiate it in `ui/main_window.py` and add it to the layout.
+- **Critical**: Use the `FlashSignals` object in `MainWindow` to send data from the background flashing thread to UI widgets. Directly modifying widgets from a thread will cause crashes.
+
+### Implementing a New Transport (e.g., USB-HID, CAN)
+1.  Create a new class in `transport/` that inherits from `Transport` (see `transport_base.py`).
+2.  Implement `open()`, `close()`, `read()`, `write()`, and `is_open()`.
+3.  Update `ui/main_window.py` to instantiate your new transport instead of `SerialTransport`.
+
+---
+
+## 4. Development & Testing
+
+The tool uses `pytest` for validation.
+
+**Run All Tests**:
+```bash
+PYTHONPATH=. pytest tests/
+```
+
+**Testing with Fake Hardware**:
+The `tests/test_flash_service.py` uses `FakeTransport` to simulate a bootloader response. You can use this to test protocol flows without needing a physical device.
+
+---
+
+## 5. Protocol Constraints
+- **Max Payload**: The tool supports up to 1024 bytes per frame (to accommodate large RSA signatures). Ensure the MCU bootloader's buffer matches.
+- **SOF**: `0xA5`.
+- **Endianness**: Little-endian for all multibyte fields (Length, CRC16, CRC32, Addresses).
