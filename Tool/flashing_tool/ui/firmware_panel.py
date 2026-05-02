@@ -48,7 +48,7 @@ class FirmwarePanel(QGroupBox):
         self.key_browse_btn.setEnabled(is_checked)
 
     def _on_browse_clicked(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Open Firmware", "", "Binary Files (*.bin);;All Files (*)")
+        file_path, _ = QFileDialog.getOpenFileName(self, "Open Firmware", "", "Firmware Files (*.bin *.hex);;Binary Files (*.bin);;Hex Files (*.hex);;All Files (*)")
         if file_path:
             self.file_path_edit.setText(file_path)
 

@@ -29,7 +29,8 @@ Develop a Python + Qt6 flashing tool for a custom UART bootloader. The tool is n
 - Implemented **Milestone TOOL-2 (Firmware Model)**:
   - CRC32 calculation.
   - Firmware image loading and chunking.
-  - Unit tests for firmware model.
+  - **Intel HEX support**: Automatic conversion from .hex to binary using `intelhex`.
+  - Unit tests for firmware model including hex loading.
 - Implemented **Milestone TOOL-3 (Serial Transport)**:
   - Base `Transport` abstraction.
   - `SerialTransport` using `pyserial`.
@@ -120,7 +121,7 @@ Test command:
 cd Tool/flashing_tool && ./venv/bin/python -m pytest tests/
 
 Test result:
-PASS (9 tests collected)
+PASS (10 tests collected)
 ```
 
 ---

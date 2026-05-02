@@ -1,4 +1,6 @@
 from typing import Iterator, Optional
+import os
+from intelhex import IntelHex
 from .checksum import calculate_crc32
 from .signer import FirmwareSigner
 
@@ -13,8 +15,18 @@ class FirmwareImage:
 
     @classmethod
     def from_file(cls, file_path: str, signer: Optional[FirmwareSigner] = None) -> 'FirmwareImage':
-        with open(file_path, 'rb') as f:
-            return cls(f.read(), signer)
+        _, ext = os.path.splitext(file_path.lower())
+        
+        if ext == '.hex':
+            ih = IntelHex(file_path)
+            # convert to binary data
+            # Note: to_binarray() returns a bytearray of the used range
+            data = ih.tobinarray()
+        else:
+            with open(file_path, 'rb') as f:
+                data = f.read()
+                
+        return cls(bytes(data), signer)
 
     def get_chunks(self, max_data_per_frame: int) -> Iterator[tuple[int, int, bytes]]:
         """
