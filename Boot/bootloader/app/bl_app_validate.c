@@ -6,7 +6,7 @@ bool bl_app_validate_vector_table(uint32_t app_address)
     uint32_t initial_sp;
     uint32_t reset_handler;
     uint32_t sram_end = BL_SRAM_BASE_ADDR + BL_SRAM_SIZE;
-    uint32_t flash_end = BL_FLASH_BASE_ADDR + BL_FLASH_SIZE;
+    uint32_t app_end = BL_APP_START_ADDR + BL_APP_MAX_SIZE;
     const uint32_t *vector_table = (const uint32_t *)app_address;
 
     if ((app_address < BL_APP_START_ADDR) || (app_address >= (BL_APP_START_ADDR + BL_APP_MAX_SIZE)))
@@ -22,7 +22,7 @@ bool bl_app_validate_vector_table(uint32_t app_address)
         return false;
     }
 
-    if ((reset_handler < BL_APP_START_ADDR) || (reset_handler >= flash_end))
+    if ((reset_handler < BL_APP_START_ADDR) || (reset_handler >= app_end))
     {
         return false;
     }

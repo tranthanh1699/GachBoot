@@ -24,6 +24,7 @@ bl_status_t bl_app_jump_to_application(uint32_t app_address)
     HAL_DeInit();
     SCB->VTOR = app_address;
     __set_MSP(initial_sp);
+    __enable_irq();
     app_entry();
 
     return BL_STATUS_ERROR;
