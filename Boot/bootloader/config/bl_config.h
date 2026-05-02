@@ -16,6 +16,7 @@
 #define BL_VERSION_PATCH                 0u
 
 #define BL_UART_BAUDRATE                 115200u
+#define BL_UART_RX_BUFFER_SIZE           1024u
 #define BL_COMM_TIMEOUT_MS               1000u
 #define BL_FRAME_MAX_PAYLOAD_SIZE        490u
 #define BL_FRAME_MAX_SIZE                (1u + 1u + 1u + 1u + 2u + BL_FRAME_MAX_PAYLOAD_SIZE + 2u)

@@ -50,11 +50,12 @@ bootloader/
 
 1. `Core/Src/main.c` initializes STM32 HAL, clock, GPIO, USART1, USB, and TIM17.
 2. `bl_main_init()` initializes the bootloader session and UART transport.
-3. The main loop calls `bl_main_process()`.
-4. The transport receives UART frames using the custom protocol.
-5. The command layer handles `HELLO`, `START_SESSION`, `ERASE`, `DOWNLOAD_START`, `DATA`, `DOWNLOAD_END`, `ABORT`, and `RESET`.
-6. Flashing data is written to the configured application flash area.
-7. `DOWNLOAD_END` verifies the firmware CRC32 before reporting success.
+3. UART RX interrupts feed bytes into the bootloader RX ring buffer.
+4. The main loop calls `bl_main_process()`.
+5. The transport reads buffered UART bytes and assembles custom protocol frames.
+6. The command layer handles `HELLO`, `START_SESSION`, `ERASE`, `DOWNLOAD_START`, `DATA`, `DOWNLOAD_END`, `ABORT`, and `RESET`.
+7. Flashing data is written to the configured application flash area.
+8. `DOWNLOAD_END` verifies the firmware CRC32 before reporting success.
 
 ## UART Protocol
 
@@ -68,6 +69,54 @@ No parity
 1 stop bit
 No flow control
 ```
+
+### UART RX Interrupt API
+
+The bootloader transport does not call `HAL_UART_Receive()` in polling mode. UART RX bytes should be pushed into a fixed-size ring buffer from the UART interrupt path.
+
+Public API:
+
+```c
+#include "platform_uart.h"
+
+bl_status_t platform_uart_rx_isr_push_byte(uint8_t byte);
+void platform_uart_rx_buffer_reset(void);
+uint32_t platform_uart_rx_get_overflow_count(void);
+```
+
+Expected usage:
+
+- Configure USART1 RX interrupt in STM32CubeIDE/CubeMX or user code.
+- For every received byte, call `platform_uart_rx_isr_push_byte(byte)`.
+- Keep the ISR short. Do not parse frames, write flash, log, or block inside the interrupt.
+- `bl_main_process()` consumes bytes from the ring buffer in the main loop.
+- If `platform_uart_rx_get_overflow_count()` increases, the tool is sending faster than the firmware can consume or the buffer is too small.
+- Call `platform_uart_rx_buffer_reset()` only before enabling UART RX interrupts or after RX is disabled.
+
+Example using a HAL receive-complete callback:
+
+```c
+#include "platform_uart.h"
+#include "usart.h"
+
+static uint8_t boot_uart_rx_byte;
+
+void boot_uart_start_rx_interrupt(void)
+{
+    (void)HAL_UART_Receive_IT(&huart1, &boot_uart_rx_byte, 1u);
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+    if (huart == &huart1)
+    {
+        (void)platform_uart_rx_isr_push_byte(boot_uart_rx_byte);
+        (void)HAL_UART_Receive_IT(&huart1, &boot_uart_rx_byte, 1u);
+    }
+}
+```
+
+If you use a custom `USART1_IRQHandler()` path instead of HAL callbacks, call `platform_uart_rx_isr_push_byte(received_byte)` after reading the RX data register and clearing the interrupt flag according to the STM32H7 reference manual.
 
 Protocol documentation:
 
@@ -153,6 +202,14 @@ Keep protocol settings synchronized in:
 ```text
 bootloader/config/bl_config.h
 ```
+
+RX buffering is configured by:
+
+```c
+#define BL_UART_RX_BUFFER_SIZE 1024u
+```
+
+Use a buffer larger than one complete protocol frame. The default frame maximum is derived from `BL_FRAME_MAX_PAYLOAD_SIZE`.
 
 ### Change Memory Layout
 
