@@ -57,9 +57,14 @@ class MainWindow(QMainWindow):
             if self.transport and self.transport.is_open():
                 self.transport.close()
                 self.conn_panel.set_connected(False)
+                self.log_panel.clear()
+                self.progress_panel.reset()
                 self.log_panel.log("Disconnected.")
                 return
 
+            self.log_panel.clear()
+            self.progress_panel.reset()
+            
             self.transport = SerialTransport(port, baudrate)
             self.transport.open()
             self.client = ProtocolClient(self.transport)
@@ -77,7 +82,7 @@ class MainWindow(QMainWindow):
                 self.transport.close()
             self.conn_panel.set_connected(False)
 
-    def _on_flash(self, file_path, key_path):
+    def _on_flash(self, file_path):
         if not self.service:
             QMessageBox.warning(self, "Flash Error", "Not connected to target.")
             return
@@ -86,8 +91,7 @@ class MainWindow(QMainWindow):
 
         def flash_thread():
             try:
-                signer = FirmwareSigner(key_path) if key_path else None
-                fw = FirmwareImage.from_file(file_path, signer)
+                fw = FirmwareImage.from_file(file_path)
                 
                 log_msg = f"Starting flash: {file_path} ({fw.size} bytes)"
                 if fw.base_address is not None:

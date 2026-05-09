@@ -16,3 +16,6 @@ class LogPanel(QGroupBox):
         timestamp = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
         self.log_edit.append(f"[{timestamp}] {message}")
         self.log_edit.verticalScrollBar().setValue(self.log_edit.verticalScrollBar().maximum())
+
+    def clear(self):
+        self.log_edit.clear()
