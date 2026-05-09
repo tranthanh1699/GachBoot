@@ -1,6 +1,7 @@
 #include "bl_session.h"
 #include "bl_config.h"
 #include "bl_hw_config.h"
+#include "bl_memory.h"
 #include "bl_memory_map.h"
 #include "bl_signature.h"
 
@@ -291,6 +292,11 @@ bl_status_t bl_session_finalize(bl_session_t *session)
         {
             return signature_status;
         }
+    }
+
+    if (bl_memory_mark_application_valid() != BL_STATUS_OK)
+    {
+        return BL_STATUS_IO;
     }
 
     session->state = BL_SESSION_STATE_READY;

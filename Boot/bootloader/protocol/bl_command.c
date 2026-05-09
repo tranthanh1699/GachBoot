@@ -242,6 +242,11 @@ bl_status_t bl_command_handle(bl_session_t *session, const bl_frame_t *request, 
                 bl_command_build_error(request->command, request->sequence, BL_ERROR_FLASH_ERASE_FAILED, response);
                 status = BL_STATUS_IO;
             }
+            else if (bl_memory_invalidate_application_marker() != BL_STATUS_OK)
+            {
+                bl_command_build_error(request->command, request->sequence, BL_ERROR_FLASH_ERASE_FAILED, response);
+                status = BL_STATUS_IO;
+            }
             else
             {
                 bl_command_build_status_response(BL_RSP_ERASE, request->sequence, BL_ERROR_OK, response);
@@ -268,6 +273,10 @@ bl_status_t bl_command_handle(bl_session_t *session, const bl_frame_t *request, 
                 else if (status == BL_STATUS_NOT_SUPPORTED)
                 {
                     bl_command_build_error(request->command, request->sequence, BL_ERROR_FIRMWARE_SIGNATURE_INVALID, response);
+                }
+                else if (status == BL_STATUS_IO)
+                {
+                    bl_command_build_error(request->command, request->sequence, BL_ERROR_FLASH_WRITE_FAILED, response);
                 }
                 else
                 {

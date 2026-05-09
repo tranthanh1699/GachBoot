@@ -7,6 +7,7 @@ static uint8_t platform_uart_rx_buffer[BL_UART_RX_BUFFER_SIZE];
 static volatile uint16_t platform_uart_rx_head;
 static volatile uint16_t platform_uart_rx_tail;
 static volatile uint32_t platform_uart_rx_overflow_count;
+static uint8_t platform_uart_rx_byte;
 
 static uint16_t platform_uart_next_index(uint16_t index)
 {
@@ -23,6 +24,12 @@ static uint16_t platform_uart_next_index(uint16_t index)
 bl_status_t platform_uart_init(void)
 {
     platform_uart_rx_buffer_reset();
+
+    if (HAL_UART_Receive_IT(&huart1, &platform_uart_rx_byte, 1u) != HAL_OK)
+    {
+        return BL_STATUS_IO;
+    }
+
     return BL_STATUS_OK;
 }
 
@@ -100,4 +107,21 @@ void platform_uart_rx_buffer_reset(void)
 uint32_t platform_uart_rx_get_overflow_count(void)
 {
     return platform_uart_rx_overflow_count;
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+    if (huart == &huart1)
+    {
+        (void)platform_uart_rx_isr_push_byte(platform_uart_rx_byte);
+        (void)HAL_UART_Receive_IT(&huart1, &platform_uart_rx_byte, 1u);
+    }
+}
+
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+    if (huart == &huart1)
+    {
+        (void)HAL_UART_Receive_IT(&huart1, &platform_uart_rx_byte, 1u);
+    }
 }

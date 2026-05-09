@@ -1,7 +1,7 @@
 #ifndef BL_HW_CONFIG_H
 #define BL_HW_CONFIG_H
 
-#define BL_PLATFORM_UART_TIMEOUT_MS      10u
+#define BL_PLATFORM_UART_TIMEOUT_MS      100u
 #define BL_PLATFORM_FLASH_WRITE_ALIGN    32u
 
 #endif /* BL_HW_CONFIG_H */

@@ -4,6 +4,7 @@
 #include "stm32h7xx_hal.h"
 
 #define BL_FLASH_ERASE_ERROR_NONE        0xFFFFFFFFu
+#define BL_FLASH_ERASED_WORD             0xFFFFFFFFu
 
 static bool platform_flash_range_is_valid(uint32_t address, uint32_t length)
 {
@@ -141,6 +142,76 @@ bl_status_t platform_flash_erase_app_area(void)
     }
 
     return status;
+}
+
+bl_status_t platform_flash_invalidate_app_marker(void)
+{
+    bl_status_t status;
+    uint32_t metadata_sector_start = BL_APP_METADATA_ADDR - (BL_APP_METADATA_ADDR % FLASH_SECTOR_SIZE);
+    uint32_t metadata_sector_end = metadata_sector_start + FLASH_SECTOR_SIZE;
+
+    if ((BL_APP_METADATA_ADDR % BL_PLATFORM_FLASH_WRITE_ALIGN) != 0u)
+    {
+        return BL_STATUS_PARAM;
+    }
+
+    if (metadata_sector_end < metadata_sector_start)
+    {
+        return BL_STATUS_PARAM;
+    }
+
+    if (HAL_FLASH_Unlock() != HAL_OK)
+    {
+        return BL_STATUS_IO;
+    }
+
+    status = platform_flash_erase_bank_range(metadata_sector_start, metadata_sector_end);
+
+    if (HAL_FLASH_Lock() != HAL_OK)
+    {
+        return BL_STATUS_IO;
+    }
+
+    return status;
+}
+
+bl_status_t platform_flash_mark_app_valid(void)
+{
+    uint32_t index = 0u;
+    uint32_t marker_word[BL_PLATFORM_FLASH_WRITE_ALIGN / sizeof(uint32_t)];
+    bl_status_t status;
+
+    status = platform_flash_invalidate_app_marker();
+    if (status != BL_STATUS_OK)
+    {
+        return status;
+    }
+
+    for (index = 0u; index < (BL_PLATFORM_FLASH_WRITE_ALIGN / sizeof(uint32_t)); index++)
+    {
+        marker_word[index] = BL_FLASH_ERASED_WORD;
+    }
+
+    marker_word[0] = BL_APP_VALID_MARKER;
+
+    if (HAL_FLASH_Unlock() != HAL_OK)
+    {
+        return BL_STATUS_IO;
+    }
+
+    if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_FLASHWORD, BL_APP_METADATA_ADDR,
+                          (uint32_t)((uintptr_t)marker_word)) != HAL_OK)
+    {
+        (void)HAL_FLASH_Lock();
+        return BL_STATUS_IO;
+    }
+
+    if (HAL_FLASH_Lock() != HAL_OK)
+    {
+        return BL_STATUS_IO;
+    }
+
+    return BL_STATUS_OK;
 }
 
 bl_status_t platform_flash_write(uint32_t address, const uint8_t *data, uint16_t length)

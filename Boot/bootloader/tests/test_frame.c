@@ -10,6 +10,12 @@ static void test_crc16_reference(void)
     assert(bl_checksum_crc16_ccitt_false(data, (uint16_t)sizeof(data)) == 0x29B1u);
 }
 
+static void test_crc32_reference(void)
+{
+    const uint8_t data[] = { '1', '2', '3', '4', '5', '6', '7', '8', '9' };
+    assert(bl_checksum_crc32(data, (uint32_t)sizeof(data)) == 0xCBF43926u);
+}
+
 static void test_frame_round_trip(void)
 {
     bl_frame_t tx = {0};
@@ -58,6 +64,7 @@ static void test_frame_rejects_bad_crc(void)
 int main(void)
 {
     test_crc16_reference();
+    test_crc32_reference();
     test_frame_round_trip();
     test_frame_rejects_bad_crc();
     return 0;

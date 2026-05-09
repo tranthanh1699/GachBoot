@@ -28,6 +28,16 @@ bl_status_t bl_memory_erase_application(void)
     return bl_flash_erase_app_area();
 }
 
+bl_status_t bl_memory_invalidate_application_marker(void)
+{
+    return bl_flash_invalidate_app_marker();
+}
+
+bl_status_t bl_memory_mark_application_valid(void)
+{
+    return bl_flash_mark_app_valid();
+}
+
 bl_status_t bl_memory_write(uint32_t address, const uint8_t *data, uint16_t length)
 {
     if (data == (const uint8_t *)0)
