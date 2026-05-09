@@ -51,11 +51,13 @@ Boards may change these macros to select another pin or active level.
 8. Bootloader erases the metadata sector, clearing any previous valid marker.
 9. Tool sends `DOWNLOAD_START`.
 10. Bootloader validates firmware size, target range, checksum mode, and signature metadata.
+    - Development bootloader: signature metadata is accepted but not required.
+    - Release bootloader: a 256-byte RSA signature is required.
 11. Tool sends sequential `DATA` frames.
 12. Bootloader checks frame CRC16, block index, offset, application range, write result, and readback.
 13. Tool sends `DOWNLOAD_END`.
 14. Bootloader verifies full CRC32.
-15. If enabled, bootloader verifies the signature.
+15. Release bootloader verifies the RSA-2048/SHA-256 signature. Development bootloader skips this step.
 16. Bootloader writes the application valid marker.
 17. Tool sends `RESET`.
 
@@ -77,7 +79,8 @@ After a successful download, the boot path is:
 4. Bootloader checks that `bytes_received == firmware_size`.
 5. Bootloader calculates CRC32 over flash at `target_address`.
 6. Bootloader compares calculated CRC32 with the `DOWNLOAD_START` metadata.
-7. If signature verification is enabled, bootloader verifies the signature.
+7. Release bootloader verifies the signature over the app binary in flash.
+   Development bootloader skips signature verification.
 8. Bootloader erases the metadata sector and writes `BL_APP_VALID_MARKER`.
 9. Bootloader sends `DOWNLOAD_END_RESPONSE`.
 10. Tool sends `RESET`.
@@ -134,4 +137,4 @@ Implemented:
 
 Stubbed until hardware validation:
 
-- real signature verification
+- none

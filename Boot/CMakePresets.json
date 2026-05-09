@@ -14,14 +14,17 @@
             "name": "Debug",
             "inherits": "default",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
+                "CMAKE_BUILD_TYPE": "Debug",
+                "BL_BOOTLOADER_VARIANT": "Development"
             }
         },
         {
             "name": "Release",
             "inherits": "default",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
+                "CMAKE_BUILD_TYPE": "Release",
+                "BL_BOOTLOADER_VARIANT": "Release",
+                "BL_PUBLIC_KEY_PEM": "${sourceDir}/../RSA_Key/public_key.pem"
             }
         }
     ],

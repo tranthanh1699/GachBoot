@@ -49,7 +49,6 @@ bool bl_app_validate_vector_table(uint32_t app_address)
 {
     uint32_t initial_sp;
     uint32_t reset_handler;
-    uint32_t app_end = BL_APP_START_ADDR + BL_APP_MAX_SIZE;
     const uint32_t *vector_table = (const uint32_t *)(uintptr_t)app_address;
 
     if (bl_app_address_is_in_range(app_address, BL_APP_START_ADDR, BL_APP_MAX_SIZE, false) == false)

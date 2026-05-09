@@ -7,7 +7,9 @@
 #define BL_LOG_BACKEND_UART              0u
 #define BL_LOG_BACKEND_USB               0u
 
+#ifndef BL_ENABLE_SIGNATURE_VERIFY
 #define BL_ENABLE_SIGNATURE_VERIFY       0u
+#endif
 #define BL_ENABLE_CHECKSUM_VERIFY        1u
 
 #define BL_PROTOCOL_VERSION              0x01u

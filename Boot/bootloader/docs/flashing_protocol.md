@@ -42,6 +42,52 @@ Firmware CRC32 parameters:
 - final xor: `0xFFFFFFFF`
 - check value for ASCII `123456789`: `0xCBF43926`
 
+## Signed Firmware Package
+
+The host signing step may produce one binary package:
+
+```text
+[Header App] + [App Binary] + [Header Signature] + [Signature]
+```
+
+The package headers are little-endian and are not C native-packed:
+
+| Field | Size | Description |
+|---|---:|---|
+| Section ID | 2 | `0xA501` for app, `0x5A02` for signature |
+| Size | 4 | section data size |
+| CRC32 | 4 | CRC32 over section data only |
+
+Package layout:
+
+| Region | Size |
+|---|---:|
+| App header | 10 |
+| App binary | N |
+| Signature header | 10 |
+| RSA-2048 signature | 256 |
+
+The app header CRC32 covers only the app binary. The signature header CRC32
+covers only the signature bytes. The bootloader does not program either package
+header to flash.
+
+The flashing tool parses and validates this package on the PC, then maps it onto
+the UART protocol:
+
+- `DOWNLOAD_START.Firmware Size` = app binary size
+- `DOWNLOAD_START.Firmware CRC32` = app binary CRC32
+- `DOWNLOAD_START.Signature Enabled` = `1`
+- `DOWNLOAD_START.Signature Length` = `256`
+- `DOWNLOAD_START.Signature Data` = RSA signature bytes
+- `DATA` frames = app binary bytes only
+
+Signature algorithm:
+
+- RSA-2048
+- exponent `65537`
+- SHA-256 digest over the app binary only
+- PKCS#1 v1.5 encoded signature
+
 ## Commands
 
 | Command | ID | Response |
@@ -152,6 +198,9 @@ Payload:
 | Signature Data | N |
 
 The bootloader rejects metadata if the target range is outside the configured application area.
+Release bootloaders also reject `DOWNLOAD_START` if the signature is missing or
+not exactly 256 bytes. Development bootloaders accept the metadata but do not
+verify the signature.
 
 ## DATA
 
@@ -184,7 +233,9 @@ Response payload:
 |---|---:|
 | Status | 1 |
 
-The bootloader verifies the full firmware CRC32 over flash before returning OK. If signature verification is enabled, the signature interface must also return OK.
+The bootloader verifies the full app CRC32 over flash before returning OK. In a
+Release bootloader, RSA/SHA-256 signature verification must also return OK.
+Development bootloaders skip signature verification.
 After successful CRC/signature validation, the bootloader writes the application valid marker in the metadata area.
 
 The flashing tool must not include the valid marker in the application image.

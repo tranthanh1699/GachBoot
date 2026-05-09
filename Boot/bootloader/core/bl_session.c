@@ -162,12 +162,13 @@ bl_status_t bl_session_set_metadata(bl_session_t *session, uint32_t firmware_siz
         return BL_STATUS_PARAM;
     }
 
-#if (BL_ENABLE_SIGNATURE_VERIFY == 0u)
-    if (signature_enabled != 0u)
+    if (bl_signature_is_required() == true)
     {
-        return BL_STATUS_NOT_SUPPORTED;
+        if ((signature_enabled != 1u) || (signature_length != BL_SIGNATURE_MAX_SIZE))
+        {
+            return BL_STATUS_NOT_SUPPORTED;
+        }
     }
-#endif
 
     if ((signature_length > 0u) && (signature == (const uint8_t *)0))
     {
@@ -284,7 +285,7 @@ bl_status_t bl_session_finalize(bl_session_t *session)
         return BL_STATUS_CHECKSUM;
     }
 
-    if (session->signature_enabled != 0u)
+    if (bl_signature_is_required() == true)
     {
         signature_status = bl_signature_verify(session->target_address, session->firmware_size,
                                                session->signature, session->signature_length);

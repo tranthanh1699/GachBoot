@@ -13,7 +13,7 @@ flashing_tool/
 ├── app/
 │   └── main.py              # Entry point. Initializes the Qt application.
 ├── firmware/
-│   ├── firmware_image.py    # Loads .bin/.hex, calculates CRC32, and handles signing.
+│   ├── firmware_image.py    # Loads .bin/.hex/.ihex/.ihx, calculates CRC32, and handles signing.
 │   ├── checksum.py          # CRC32 calculation logic.
 │   └── signer.py            # RSA-2048 signing implementation using the 'cryptography' library.
 ├── protocol/
@@ -59,14 +59,62 @@ flashing_tool/
     python app/main.py
     ```
 2.  **Connection**: Select your MCU's COM/TTY port and baudrate (default 115200). Click **Connect**. The tool sends a `HELLO` command; if successful, it displays the bootloader version.
-3.  **Firmware**: Browse for a `.bin` or `.hex` file.
-    - If you select a `.hex` file, it is automatically converted to binary in memory.
-4.  **Security (Optional)**: Check **Sign Firmware** and select your RSA-2048 private key (`.pem`). The tool will sign the binary and send the signature during the `DOWNLOAD_START` phase.
+3.  **Firmware**: Browse for a raw `.bin`, `.hex`, `.ihex`, `.ihx`, or signed package `.bin` file.
+    - If you select a HEX file, the tool automatically extracts the **Base Address** from the file.
+    - If you select a BIN file, the tool uses the default `app_start` address provided by the bootloader.
+    - If you select a signed package, the tool validates the package CRCs and sends only the app bytes in `DATA`.
+4.  **Security**: For Release bootloaders, flash a signed package or check **Sign Firmware** and select your RSA-2048 private key (`.pem`). The tool sends the signature during the `DOWNLOAD_START` phase.
 5.  **Flash**: Click **Flash**. The tool will automatically ERASE the target area, send DATA blocks, and verify the result.
+
+### CLI Shortcuts
+You can pre-fill the firmware path by passing it as a command-line argument:
+```bash
+python app/main.py path/to/your/firmware.hex
+```
 
 ---
 
-## 3. How to Modify & Customize
+## 3. Automation Scripts
+
+The tool includes a bash script for automating firmware signing and key generation without launching the GUI.
+
+### Generate RSA-2048 Keys
+```bash
+./sign_firmware.sh keygen --priv my_private_key.pem --pub my_public_key.pem
+```
+
+### Sign Firmware Package
+Creates a signed package:
+
+```text
+[10-byte AppHeader] [App Binary] [10-byte SignatureHeader] [256-byte Signature]
+```
+
+The app CRC32 covers only the app binary. The signature CRC32 covers only the signature bytes.
+
+```bash
+python scripts/sign_firmware.py \
+  --input app.bin \
+  --private-key private_key.pem \
+  --output app_signed_package.bin \
+  --verbose
+```
+
+Inspect a package:
+
+```bash
+python scripts/sign_firmware.py --inspect app_signed_package.bin
+```
+
+Legacy form is still accepted and now writes a signed package:
+
+```bash
+python scripts/sign_firmware.py sign <firmware.bin|.hex> <private_key.pem> --output app_signed_package.bin
+```
+
+---
+
+## 4. How to Modify & Customize
 
 ### Adding a New Protocol Command
 1.  **Define Command ID**: Add your command to `protocol/commands.py`.
