@@ -80,7 +80,7 @@ The tool includes a bash script for automating firmware signing and key generati
 
 ### Generate RSA-2048 Keys
 ```bash
-./sign_firmware.sh keygen --priv my_private_key.pem --pub my_public_key.pem
+python scripts/sign_firmware.py keygen --priv my_private_key.pem --pub my_public_key.pem
 ```
 
 ### Sign Firmware Package

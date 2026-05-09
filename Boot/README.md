@@ -260,21 +260,20 @@ bootloader/config/bl_config.h
 
 ### Enable Signature Verification
 
-Signature verification is intentionally not implemented as fake security.
+The bootloader supports RSA-2048 SHA-256 PKCS#1 v1.5 signature verification. Verification is performed in `DOWNLOAD_END` before marking the application as valid.
 
 Configuration:
 
-```text
-bootloader/config/bl_security_config.h
-bootloader/security/bl_signature.c
+- `bootloader/config/bl_security_config.h`: Enable/disable signature check.
+- `bootloader/security/bl_signature.c`: RSA and SHA-256 implementation.
+- `bootloader/tools/rsa_public_key_from_pem.py`: Script to generate the public key C header from a PEM file.
+
+To integrate a public key:
+```sh
+python bootloader/tools/rsa_public_key_from_pem.py public_key.pem > bootloader/config/bl_pubkey.h
 ```
+Then ensure `bl_security_config.h` points to this header.
 
-When real verification is added:
-
-- define the selected algorithm
-- store public verification material safely
-- reject firmware when verification fails
-- document the signature format in `bootloader/docs/flashing_protocol.md`
 
 ## Porting To Another MCU
 
@@ -296,11 +295,9 @@ Do not add MCU register access to `core/`, `protocol/`, `transport/`, or `securi
 
 ## Current Limitations
 
-- Application metadata currently stores only the valid marker word.
-- Signature verification is still a real extension point, not implemented crypto.
-- Hardware flash erase/write must be validated on the target board.
-- USB CDC is initialized by CubeMX but is not the active bootloader transport.
-- Full embedded build depends on local ARM GCC and Ninja availability.
+- Hardware flash erase/write and multi-bank support are implemented but should be validated on specific H7 variants.
+- USB CDC is initialized but not used as a transport.
+- Application metadata currently stores only the valid marker and entry point information.
 
 ## Development Rules
 

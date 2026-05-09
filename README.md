@@ -6,6 +6,7 @@ The project is split into two main parts:
 
 - `Boot/`: STM32H743 bootloader firmware in C.
 - `Tool/flashing_tool/`: PC flashing tool in Python + Qt6.
+- `Tool/firmware_signing_tool/`: Standalone firmware signing and package creation tool.
 
 The current design replaces the old AUTOSAR-style diagnostic stack with a smaller protocol-first bootloader architecture.
 
@@ -14,7 +15,9 @@ The current design replaces the old AUTOSAR-style diagnostic stack with a smalle
 ```text
 GachBoot/
 ├── Boot/                    STM32H743 bootloader firmware
-├── Tool/flashing_tool/      Python + Qt6 flashing tool
+├── Tool/
+│   ├── flashing_tool/       Python + Qt6 flashing tool
+│   └── firmware_signing_tool/ Standalone signing and package tool
 ├── tool_ai_handover/        Protocol and workflow handover for tool development
 └── README.md                Project overview and usage guide
 ```
@@ -392,38 +395,26 @@ Boot/bootloader/config/bl_config.h
 
 ### Enable Signature Verification
 
-Signature verification is intentionally an extension point. Do not implement fake security.
+The bootloader supports RSA-2048 SHA-256 PKCS#1 v1.5 signature verification. Verification is performed on the final `DOWNLOAD_END` command.
 
 Boot firmware:
 
-```text
-Boot/bootloader/config/bl_security_config.h
-Boot/bootloader/security/bl_signature.c
-```
+- `Boot/bootloader/config/bl_security_config.h`: Security settings.
+- `Boot/bootloader/security/bl_signature.c`: RSA/SHA-256 implementation.
+- `Boot/bootloader/tools/rsa_public_key_from_pem.py`: Public key header generator.
 
 Flashing tool:
 
-```text
-Tool/flashing_tool/firmware/signer.py
-Tool/flashing_tool/firmware/firmware_image.py
-```
+- `Tool/flashing_tool/firmware/signer.py`: RSA-2048 signing using `cryptography` library.
+- `Tool/flashing_tool/scripts/sign_firmware.py`: Integrated package signing and keygen script.
+- `Tool/firmware_signing_tool/firmware_sign_tool.py`: Standalone signing script.
 
-When real signing is added:
-
-- define the selected algorithm
-- keep signature size compatible with the protocol frame size or define a multi-frame signature transfer
-- store public verification material safely on the target
-- reject firmware when verification fails
-- update protocol documentation
 
 ## Current Limitations
 
-- Application valid-marker write is not finalized.
-- Signature verification is not production crypto yet.
-- Hardware flash erase/write must be validated on target hardware.
-- USB CDC is initialized by CubeMX but is not the active bootloader transport.
+- USB CDC is initialized by CubeMX but is not the active bootloader transport (USART1 is primary).
 - Full embedded build depends on local ARM GCC and Ninja availability.
-- The flashing tool must stay synchronized with the bootloader's reported max payload and command behavior.
+- Multi-bank flash support is implemented but requires validation on high-density STM32H7 parts.
 
 ## Development Rules
 

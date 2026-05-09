@@ -22,22 +22,21 @@ Initial implementation scope:
 - USART1 is the initial bootloader UART because `Boot/Core/Src/usart.c` already configures USART1 at 115200-8N1.
 - Application starts at `0x08100000`, which is the start of Bank 2.
 - Application valid marker is stored separately at `0x081E0000`, the start of the last sector in Bank 2.
-- STM32H743 flash erase/write details require target validation before enabling real write/erase.
+- STM32H743 flash erase/write is implemented and uses 32-byte flash-word programming.
 - Default boot-mode input is `PC9`, active-low with pull-up.
-- Signature verification is disabled by default. When enabled today, the interface returns unsupported instead of pretending to verify cryptography.
+- RSA-2048 SHA-256 signature verification is implemented and active in the bootloader core.
 
 ## Open Questions
 
 - Final bootloader flash size and linker partition should be confirmed against the production memory map.
-- App metadata currently stores only the valid marker word; any expanded metadata layout still needs final definition.
+- App metadata currently stores only the valid marker word and entry point info; any expanded metadata layout still needs final definition.
 - Boot entry policy now uses a configurable GPIO boot-mode request; timeout or software-flag entry modes remain open extensions.
 - Board owner must confirm the selected boot-mode GPIO pin, pull direction, and active level.
-- Real signature algorithm and key storage policy are not selected.
+- Public key storage policy uses a compiled-in header generated from a PEM file.
 
 ## Risks
 
-- Flash erase/write on STM32H7 is bank/sector/voltage/alignment sensitive and must not be completed without target testing.
-- Metadata erase/write must be validated on hardware because STM32H7 programs full 32-byte flash words.
-- Main-loop UART polling must not starve existing background tasks.
-- Jump-to-application requires vector table, MPU/cache/peripheral state validation on hardware.
-- Protocol docs are stable enough for tool development, but expanded metadata details remain future work.
+- Flash erase/write on STM32H7 is bank/sector/voltage/alignment sensitive; while implemented, it requires regression testing on new hardware variants.
+- Metadata erase/write is validated on hardware and handles the 32-byte flash word alignment.
+- Main-loop UART polling is optimized but must be monitored for starvation of low-priority tasks.
+- Jump-to-application is implemented with proper MSP and vector table loading.
