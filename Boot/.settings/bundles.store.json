@@ -23,6 +23,10 @@
     {
       "name": "stlink-server",
       "version": "2.1.1+st.7"
+    },
+    {
+      "name": "jlink-gdbserver",
+      "version": "9.14.1+st.1"
     }
   ]
 }
