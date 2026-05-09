@@ -29,7 +29,9 @@ Develop a Python + Qt6 flashing tool for a custom UART bootloader. The tool is n
 - Implemented **Milestone TOOL-2 (Firmware Model)**:
   - CRC32 calculation.
   - Firmware image loading and chunking.
-  - **Intel HEX support**: Automatic conversion from .hex to binary using `intelhex`.
+  - **Intel HEX support**: Automatic conversion from .hex, .ihex, .ihx to binary using `intelhex`. Automatically extracts and uses the base address from the HEX file as the target flash address.
+  - Support for passing firmware file path as a CLI argument to the GUI.
+  - **Automation Scripts**: Added `sign_firmware.sh` and `scripts/sign_firmware.py` for headless key generation and firmware signing.
   - Unit tests for firmware model including hex loading.
 - Implemented **Milestone TOOL-3 (Serial Transport)**:
   - Base `Transport` abstraction.

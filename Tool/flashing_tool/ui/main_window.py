@@ -88,7 +88,11 @@ class MainWindow(QMainWindow):
             try:
                 signer = FirmwareSigner(key_path) if key_path else None
                 fw = FirmwareImage.from_file(file_path, signer)
-                self.flash_signals.log.emit(f"Starting flash: {file_path} ({fw.size} bytes)")
+                
+                log_msg = f"Starting flash: {file_path} ({fw.size} bytes)"
+                if fw.base_address is not None:
+                    log_msg += f" at address 0x{fw.base_address:08X}"
+                self.flash_signals.log.emit(log_msg)
                 
                 def update_progress(current, total):
                     self.flash_signals.progress.emit(current, total)

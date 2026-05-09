@@ -11,7 +11,7 @@ class FirmwarePanel(QGroupBox):
         # Firmware selection row
         self.fw_layout = QHBoxLayout()
         self.file_path_edit = QLineEdit()
-        self.file_path_edit.setPlaceholderText("Select firmware binary...")
+        self.file_path_edit.setPlaceholderText("Select firmware (.bin, .hex, .ihex, .ihx)...")
         self.browse_btn = QPushButton("Browse")
         self.browse_btn.clicked.connect(self._on_browse_clicked)
         self.fw_layout.addWidget(self.file_path_edit)
@@ -48,7 +48,13 @@ class FirmwarePanel(QGroupBox):
         self.key_browse_btn.setEnabled(is_checked)
 
     def _on_browse_clicked(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Open Firmware", "", "Firmware Files (*.bin *.hex);;Binary Files (*.bin);;Hex Files (*.hex);;All Files (*)")
+        file_filter = (
+            "Firmware Files (*.bin *.hex *.ihex *.ihx);;"
+            "Binary Files (*.bin);;"
+            "Hex Files (*.hex *.ihex *.ihx);;"
+            "All Files (*)"
+        )
+        file_path, _ = QFileDialog.getOpenFileName(self, "Open Firmware", "", file_filter)
         if file_path:
             self.file_path_edit.setText(file_path)
 

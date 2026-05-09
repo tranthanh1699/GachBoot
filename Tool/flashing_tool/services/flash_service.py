@@ -44,6 +44,10 @@ class FlashService:
         if not self.boot_info:
             raise ValueError("Must call hello() before download_start()")
         
+        # Use firmware's base address if available (e.g. from HEX file),
+        # otherwise use the bootloader's default app_start address.
+        target_address = firmware.base_address if firmware.base_address is not None else self.boot_info.app_start
+        
         sig_enabled = 1 if firmware.signature else 0
         sig_len = len(firmware.signature) if firmware.signature else 0
         
@@ -51,7 +55,7 @@ class FlashService:
         payload = struct.pack("<I I I B H", 
                               firmware.size, 
                               firmware.crc32, 
-                              self.boot_info.app_start,
+                              target_address,
                               sig_enabled,
                               sig_len)
         
