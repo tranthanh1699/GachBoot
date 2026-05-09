@@ -4,7 +4,47 @@
 |---|---:|---:|
 | Bootloader | `0x08000000` | `0x00020000` |
 | Application | `0x08020000` | `0x001C0000` |
-| Metadata | `0x081FF000` | pending final layout |
+| Metadata marker address | `0x081FF000` | first word of metadata sector |
+
+## Application Region
+
+The application must be linked at `0x08020000`.
+
+The application image must not be shifted to make room for the valid marker.
+The valid marker is outside the application image and is owned by the
+bootloader.
+
+The bootloader validates the application vector table at `BL_APP_START_ADDR`
+before jumping:
+
+- initial stack pointer must be inside a configured RAM region
+- reset handler must be inside the application flash region
+- reset handler must be a Thumb address
+
+## Metadata Marker
+
+Current metadata content:
+
+| Offset | Size | Value | Meaning |
+|---:|---:|---|---|
+| `0x0000` | 4 bytes | `BL_APP_VALID_MARKER` / `0x47424C56` | application passed bootloader validation |
+
+`BL_APP_METADATA_ADDR` is `0x081FF000`.
+
+The STM32H7 flash program operation writes a 32-byte flash word. The bootloader
+therefore writes the marker as a 32-byte aligned flash word:
+
+- word 0: `0x47424C56`
+- remaining words: erased value `0xFFFFFFFF`
+
+The metadata sector is erased during the `ERASE` command before a new download.
+If download, verification, signature verification, timeout recovery, or abort
+fails, the marker remains erased and the bootloader will not auto-jump to the
+application.
+
+For normal UART flashing, only the bootloader writes this marker. For external
+factory flashing that bypasses the bootloader protocol, program and verify the
+application first, then program the marker separately.
 
 The memory service refuses writes outside the application range.
 

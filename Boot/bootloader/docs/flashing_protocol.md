@@ -7,6 +7,9 @@
 - Parity: none
 - Stop bits: `1`
 - Flow control: none
+- Bootloader transmit timeout: `BL_PLATFORM_UART_TIMEOUT_MS`
+  - default: `100 ms`
+  - chosen to allow full-size protocol frames at 115200 baud
 
 All fields are little-endian unless stated otherwise.
 
@@ -30,6 +33,14 @@ CRC16 parameters:
 - no final xor
 
 Maximum payload size is `490` bytes. This keeps the maximum `DATA` body at `480` bytes after the 10-byte DATA header, which preserves STM32H7 32-byte flash write alignment.
+
+Firmware CRC32 parameters:
+
+- standard CRC-32/IEEE reflected algorithm
+- polynomial: `0xEDB88320`
+- initial value: `0xFFFFFFFF`
+- final xor: `0xFFFFFFFF`
+- check value for ASCII `123456789`: `0xCBF43926`
 
 ## Commands
 
@@ -143,6 +154,12 @@ Response payload:
 | Status | 1 |
 
 The bootloader verifies the full firmware CRC32 over flash before returning OK. If signature verification is enabled, the signature interface must also return OK.
+After successful CRC/signature validation, the bootloader writes the application valid marker in the metadata area.
+
+The flashing tool must not include the valid marker in the application image.
+For external factory flashing that bypasses this protocol, the factory process
+must program the application image, verify it, then program the valid marker
+separately according to `memory_map.md`.
 
 ## Example HELLO Frame
 

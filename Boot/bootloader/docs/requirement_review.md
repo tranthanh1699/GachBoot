@@ -13,13 +13,17 @@ Initial implementation scope:
 - CRC32 firmware checksum contract
 - session and abort handling
 - portable UART, flash, reset, app-validation interfaces
+- GPIO-controlled boot entry
+- bootloader-owned application valid marker
 - buildable module skeleton for later hardware flash integration
 
 ## Assumptions
 
 - USART1 is the initial bootloader UART because `Boot/Core/Src/usart.c` already configures USART1 at 115200-8N1.
 - Application starts at `0x08020000`, reserving 128 KiB for the bootloader.
+- Application valid marker is stored separately at `0x081FF000`.
 - STM32H743 flash erase/write details require target validation before enabling real write/erase.
+- Default boot-mode input is `PC13`, active-low with pull-up.
 - Signature verification is disabled by default. When enabled today, the interface returns unsupported instead of pretending to verify cryptography.
 
 ## Open Questions
@@ -27,11 +31,13 @@ Initial implementation scope:
 - Final bootloader flash size and linker partition should be confirmed against the production memory map.
 - App metadata currently stores only the valid marker word; any expanded metadata layout still needs final definition.
 - Boot entry policy now uses a configurable GPIO boot-mode request; timeout or software-flag entry modes remain open extensions.
+- Board owner must confirm the selected boot-mode GPIO pin, pull direction, and active level.
 - Real signature algorithm and key storage policy are not selected.
 
 ## Risks
 
 - Flash erase/write on STM32H7 is bank/sector/voltage/alignment sensitive and must not be completed without target testing.
+- Metadata erase/write must be validated on hardware because STM32H7 programs full 32-byte flash words.
 - Main-loop UART polling must not starve existing background tasks.
 - Jump-to-application requires vector table, MPU/cache/peripheral state validation on hardware.
 - Protocol docs are stable enough for tool development, but expanded metadata details remain future work.
