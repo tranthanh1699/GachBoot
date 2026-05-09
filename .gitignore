@@ -1,4 +1,4 @@
-# Build output and generated firmware artifacts
+o# Build output and generated firmware artifacts
 build/
 cmake-build-*/
 CMakeFiles/
@@ -36,3 +36,5 @@ venv/
 codex_bootloader_skills/
 AGENTS.md
 CLAUDE.md
+RSA_Key/
+*.pem
