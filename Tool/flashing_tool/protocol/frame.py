@@ -6,6 +6,7 @@ SOF = 0xA5
 PROTOCOL_VERSION = 0x01
 CRC16_POLY = 0x1021
 CRC16_INIT = 0xFFFF
+MAX_PAYLOAD_SIZE = 490
 
 class Frame(NamedTuple):
     version: int
@@ -26,8 +27,8 @@ def crc16_ccitt_false(data: bytes) -> int:
     return crc
 
 def encode_frame(command: Command, sequence: int, payload: bytes = b"") -> bytes:
-    if len(payload) > 1024:
-        raise ValueError("Payload too large (max 1024 bytes)")
+    if len(payload) > MAX_PAYLOAD_SIZE:
+        raise ValueError(f"Payload too large (max {MAX_PAYLOAD_SIZE} bytes)")
     
     # Body consists of Version, Command ID, Sequence, and Length
     length_le = struct.pack("<H", len(payload))

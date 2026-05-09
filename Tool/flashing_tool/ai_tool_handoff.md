@@ -5,7 +5,7 @@
 - Area: Flashing Tool
 - AI Role: Senior Python Tool Developer
 - Current Milestone: TOOL-6 Hardware Validation & Refinement
-- Last Updated: 2026-05-02
+- Last Updated: 2026-05-09
 - Updated By: AI session
 
 ---
@@ -23,7 +23,7 @@ Develop a Python + Qt6 flashing tool for a custom UART bootloader. The tool is n
 - Set up `venv` and `requirements.txt`.
 - Implemented **Milestone TOOL-1 (Protocol Core)**:
   - CRC16-CCITT-FALSE.
-  - Frame encode/decode (increased max payload to 1024).
+  - Frame encode/decode with the bootloader's 490-byte maximum payload.
   - Command and Error enums.
   - Unit tests for frame codec.
 - Implemented **Milestone TOOL-2 (Firmware Model)**:
@@ -51,9 +51,10 @@ Develop a Python + Qt6 flashing tool for a custom UART bootloader. The tool is n
   - `FirmwareSigner` implementation with RSA-2048.
   - `DOWNLOAD_START` updated to send RSA signature bytes (256 bytes).
 - **Bootloader Integration Fixes**:
-  - Increased `BL_FRAME_MAX_PAYLOAD_SIZE` to 512 in bootloader to support signed metadata.
+  - Synced tool frame payload limit to `BL_FRAME_MAX_PAYLOAD_SIZE` (`490`) in the bootloader.
   - Increased `BL_SIGNATURE_MAX_SIZE` to 256 in bootloader.
   - Implemented `DOWNLOAD_END` finalize/verification in bootloader.
+  - Added command-specific tool response timeouts for synchronous flash operations.
 
 ---
 
@@ -79,7 +80,9 @@ Develop a Python + Qt6 flashing tool for a custom UART bootloader. The tool is n
 - DATA header size: 10 bytes (Block index 4, Offset 4, Len 2).
 - Progress calculation: Based on acknowledged blocks.
 - Threading: Flashing runs in a background thread; UI updates must use signals.
-- Max Payload: Increased to 1024 (Tool) / 512 (Bootloader) to accommodate RSA signatures.
+- Max Payload: 490 bytes for both tool and bootloader.
+- DATA chunking: `max_payload - 10` rounded down to the 32-byte flash write alignment. With the default 490-byte payload, DATA carries 480 firmware bytes per frame.
+- Response timeouts: command-specific; `ERASE` uses 30000 ms and `DOWNLOAD_END` uses 10000 ms.
 
 ---
 
@@ -129,7 +132,7 @@ PASS (10 tests collected)
 ## 10. Known Issues and Risks
 
 - Real hardware validation may require timing adjustments for UART.
-- Flash erase on STM32H7 can be slow; communication timeout might need tuning.
+- Flash erase on STM32H7 is handled with a long command-specific timeout, but the 30000 ms default still needs hardware validation.
 
 ---
 

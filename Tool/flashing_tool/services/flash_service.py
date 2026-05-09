@@ -6,6 +6,9 @@ from protocol.errors import ErrorCode
 from protocol.protocol_client import ProtocolClient, ProtocolError
 from firmware.firmware_image import FirmwareImage
 
+DATA_HEADER_SIZE = 10
+FLASH_WRITE_ALIGN = 32
+
 class BootloaderInfo:
     def __init__(self, payload: bytes):
         # Expected length 18
@@ -99,8 +102,11 @@ class FlashService:
             self.erase()
             self.download_start(firmware)
             
-            # Max binary data per frame = max_payload - 10 (DATA header)
-            max_chunk = self.boot_info.max_payload - 10
+            # Non-final DATA blocks must preserve STM32H7 flash-word alignment.
+            max_data_per_frame = self.boot_info.max_payload - DATA_HEADER_SIZE
+            max_chunk = max_data_per_frame - (max_data_per_frame % FLASH_WRITE_ALIGN)
+            if max_chunk <= 0:
+                raise ValueError("Bootloader max payload is too small for aligned DATA frames")
             
             for block_index, offset, chunk in firmware.get_chunks(max_chunk):
                 self.send_data(block_index, offset, chunk)

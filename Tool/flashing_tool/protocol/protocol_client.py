@@ -5,6 +5,19 @@ from .frame import encode_frame, decode_frame, Frame, SOF
 from .commands import Command
 from .errors import ErrorCode
 
+DEFAULT_RESPONSE_TIMEOUT_MS = 1000
+
+RESPONSE_TIMEOUTS_MS = {
+    Command.HELLO: 1000,
+    Command.START_SESSION: 1000,
+    Command.ERASE: 30000,
+    Command.DOWNLOAD_START: 1000,
+    Command.DATA: 3000,
+    Command.DOWNLOAD_END: 10000,
+    Command.ABORT: 1000,
+    Command.RESET: 1000,
+}
+
 class ProtocolError(Exception):
     def __init__(self, command: Command, error_code: ErrorCode):
         self.command = command
@@ -15,7 +28,7 @@ class ProtocolClient:
     def __init__(self, transport: Transport):
         self.transport = transport
         self.sequence = 0
-        self.timeout_ms = 1000
+        self.timeout_ms = DEFAULT_RESPONSE_TIMEOUT_MS
 
     def _next_sequence(self) -> int:
         self.sequence = (self.sequence + 1) & 0xFF
@@ -24,23 +37,24 @@ class ProtocolClient:
     def request_response(self, command: Command, payload: bytes = b"") -> Frame:
         seq = self._next_sequence()
         tx_frame = encode_frame(command, seq, payload)
+        timeout_ms = RESPONSE_TIMEOUTS_MS.get(command, self.timeout_ms)
         
         self.transport.write(tx_frame)
         
         # Read until SOF
-        sof_byte = self.transport.read_until_sof(SOF, self.timeout_ms)
+        sof_byte = self.transport.read_until_sof(SOF, timeout_ms)
         if not sof_byte:
             raise TimeoutError(f"Timeout waiting for SOF of {command.name} response")
         
         # Read header (Version, Command, Sequence, Length) = 5 bytes
-        header = self.transport.read(5, self.timeout_ms)
+        header = self.transport.read(5, timeout_ms)
         if len(header) < 5:
             raise TimeoutError(f"Timeout waiting for header of {command.name} response")
         
         payload_length = struct.unpack("<H", header[3:5])[0]
         
         # Read payload + CRC = payload_length + 2 bytes
-        rest = self.transport.read(payload_length + 2, self.timeout_ms)
+        rest = self.transport.read(payload_length + 2, timeout_ms)
         if len(rest) < payload_length + 2:
             raise TimeoutError(f"Timeout waiting for payload/CRC of {command.name} response")
         

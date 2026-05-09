@@ -48,3 +48,48 @@ def test_flash_happy_path():
     assert len(progress_calls) == 1
     assert progress_calls[0] == (10, 10)
     assert transport.is_open()
+
+def test_flash_uses_aligned_non_final_data_chunks():
+    transport = FakeTransport()
+    client = ProtocolClient(transport)
+    service = FlashService(client)
+
+    hello_payload = struct.pack("<BBBB I H I I", 1, 1, 2, 3, 0, 256, 0x08008000, 0x78000)
+    transport.to_read += encode_frame(Command.HELLO_RESPONSE, 1, hello_payload)
+    transport.to_read += encode_frame(Command.START_SESSION_RESPONSE, 2, bytes([ErrorCode.OK]))
+    transport.to_read += encode_frame(Command.ERASE_RESPONSE, 3, bytes([ErrorCode.OK]))
+    transport.to_read += encode_frame(Command.DOWNLOAD_START_RESPONSE, 4, bytes([ErrorCode.OK]))
+    transport.to_read += encode_frame(Command.DATA_RESPONSE, 5, bytes([ErrorCode.OK]) + struct.pack("<I", 0))
+    transport.to_read += encode_frame(Command.DATA_RESPONSE, 6, bytes([ErrorCode.OK]) + struct.pack("<I", 1))
+    transport.to_read += encode_frame(Command.DOWNLOAD_END_RESPONSE, 7, bytes([ErrorCode.OK]))
+    transport.open()
+
+    fw = FirmwareImage(bytes(range(100)) * 3)
+    progress_calls = []
+
+    service.flash_firmware(fw, progress_callback=lambda current, total: progress_calls.append((current, total)))
+
+    assert progress_calls == [(224, 300), (300, 300)]
+
+def test_protocol_client_uses_command_specific_timeout():
+    class TimeoutRecordingTransport(FakeTransport):
+        def __init__(self):
+            super().__init__()
+            self.timeouts = []
+
+        def read(self, size: int, timeout_ms: int) -> bytes:
+            self.timeouts.append(timeout_ms)
+            return super().read(size, timeout_ms)
+
+        def read_until_sof(self, sof: int, timeout_ms: int) -> bytes:
+            self.timeouts.append(timeout_ms)
+            return super().read_until_sof(sof, timeout_ms)
+
+    transport = TimeoutRecordingTransport()
+    client = ProtocolClient(transport)
+    transport.to_read += encode_frame(Command.ERASE_RESPONSE, 1, bytes([ErrorCode.OK]))
+    transport.open()
+
+    client.request_response(Command.ERASE)
+
+    assert transport.timeouts == [30000, 30000, 30000]

@@ -72,6 +72,7 @@ flashing_tool/
 1.  **Define Command ID**: Add your command to `protocol/commands.py`.
 2.  **Add Logic**:
     - If it's a simple command, add a method to `services/flash_service.py` using `self.client.request_response(Command.YOUR_CMD, payload)`.
+    - If the command can take longer than the default response timeout, add its timeout to `protocol/protocol_client.py`.
     - Handle the response status or payload according to your needs.
 
 ### Changing the Signature Algorithm
@@ -106,6 +107,8 @@ The `tests/test_flash_service.py` uses `FakeTransport` to simulate a bootloader 
 ---
 
 ## 5. Protocol Constraints
-- **Max Payload**: The tool supports up to 1024 bytes per frame (to accommodate large RSA signatures). Ensure the MCU bootloader's buffer matches.
+- **Max Payload**: The tool and bootloader support up to 490 payload bytes per frame.
+- **DATA payload**: DATA frames use a 10-byte command payload header, so the recommended binary chunk size is 480 bytes.
+- **Response Timeouts**: Use command-specific response timeouts. `ERASE` waits up to 30000 ms and `DOWNLOAD_END` waits up to 10000 ms because the bootloader handles flash operations synchronously.
 - **SOF**: `0xA5`.
 - **Endianness**: Little-endian for all multibyte fields (Length, CRC16, CRC32, Addresses).

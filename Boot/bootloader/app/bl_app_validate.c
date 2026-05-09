@@ -1,7 +1,7 @@
 #include "bl_app_validate.h"
 #include "bl_memory_map.h"
 
-static bool bl_app_address_is_in_range(uint32_t address, uint32_t start_address, uint32_t size)
+static bool bl_app_address_is_in_range(uint32_t address, uint32_t start_address, uint32_t size, bool allow_end)
 {
     uint32_t end_address = start_address + size;
 
@@ -10,27 +10,34 @@ static bool bl_app_address_is_in_range(uint32_t address, uint32_t start_address,
         return false;
     }
 
-    return ((address >= start_address) && (address < end_address));
+    if (allow_end)
+    {
+        return ((address >= start_address) && (address <= end_address));
+    }
+    else
+    {
+        return ((address >= start_address) && (address < end_address));
+    }
 }
 
 static bool bl_app_stack_pointer_is_valid(uint32_t stack_pointer)
 {
-    if (bl_app_address_is_in_range(stack_pointer, BL_RAM_DTCM_START_ADDR, BL_RAM_DTCM_SIZE) == true)
+    if (bl_app_address_is_in_range(stack_pointer, BL_RAM_DTCM_START_ADDR, BL_RAM_DTCM_SIZE, true) == true)
     {
         return true;
     }
 
-    if (bl_app_address_is_in_range(stack_pointer, BL_RAM_AXI_START_ADDR, BL_RAM_AXI_SIZE) == true)
+    if (bl_app_address_is_in_range(stack_pointer, BL_RAM_AXI_START_ADDR, BL_RAM_AXI_SIZE, true) == true)
     {
         return true;
     }
 
-    if (bl_app_address_is_in_range(stack_pointer, BL_RAM_SRAM123_START_ADDR, BL_RAM_SRAM123_SIZE) == true)
+    if (bl_app_address_is_in_range(stack_pointer, BL_RAM_SRAM123_START_ADDR, BL_RAM_SRAM123_SIZE, true) == true)
     {
         return true;
     }
 
-    if (bl_app_address_is_in_range(stack_pointer, BL_RAM_SRAM4_START_ADDR, BL_RAM_SRAM4_SIZE) == true)
+    if (bl_app_address_is_in_range(stack_pointer, BL_RAM_SRAM4_START_ADDR, BL_RAM_SRAM4_SIZE, true) == true)
     {
         return true;
     }
@@ -45,7 +52,7 @@ bool bl_app_validate_vector_table(uint32_t app_address)
     uint32_t app_end = BL_APP_START_ADDR + BL_APP_MAX_SIZE;
     const uint32_t *vector_table = (const uint32_t *)(uintptr_t)app_address;
 
-    if ((app_address < BL_APP_START_ADDR) || (app_address >= (BL_APP_START_ADDR + BL_APP_MAX_SIZE)))
+    if (bl_app_address_is_in_range(app_address, BL_APP_START_ADDR, BL_APP_MAX_SIZE, false) == false)
     {
         return false;
     }
@@ -58,7 +65,7 @@ bool bl_app_validate_vector_table(uint32_t app_address)
         return false;
     }
 
-    if ((reset_handler < BL_APP_START_ADDR) || (reset_handler >= app_end))
+    if (bl_app_address_is_in_range(reset_handler, BL_APP_START_ADDR, BL_APP_MAX_SIZE, false) == false)
     {
         return false;
     }

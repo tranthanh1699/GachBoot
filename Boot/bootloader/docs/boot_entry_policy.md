@@ -21,7 +21,7 @@ The default boot-mode GPIO configuration is defined in
 
 ```c
 #define BL_BOOT_MODE_GPIO_PORT           GPIOC
-#define BL_BOOT_MODE_GPIO_PIN            GPIO_PIN_13
+#define BL_BOOT_MODE_GPIO_PIN            GPIO_PIN_9
 #define BL_BOOT_MODE_GPIO_PULL           GPIO_PULLUP
 #define BL_BOOT_MODE_ACTIVE_STATE        GPIO_PIN_RESET
 ```
