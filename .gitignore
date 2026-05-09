@@ -1,8 +1,38 @@
-build
-.gitnexus
-.claude
-codex_bootloader_skills
+# Build output and generated firmware artifacts
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+*.elf
+*.hex
+*.bin
+*.map
+*.o
+*.obj
+*.d
+*.su
+
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Local IDE/editor metadata
+.clangd
+.vscode/
+.idea/
+*.log
+*.tmp
+*.bak
+
+# Local agent/tool metadata
+.codex
+.gitnexus/
+.claude/
+codex_bootloader_skills/
 AGENTS.md
 CLAUDE.md
-Boot/.clangd
-__pycache__
