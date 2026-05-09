@@ -56,6 +56,37 @@ Firmware CRC32 parameters:
 | ABORT | `0x08` | `0x88` |
 | ERROR_RESPONSE | | `0x7F` |
 
+## Tool Response Timeouts
+
+The PC flashing tool must use command-specific response timeouts.
+
+The bootloader command handler is synchronous. For long flash operations, the
+bootloader does not send an intermediate progress frame; it sends the command
+response only after the operation completes.
+
+Recommended minimum response timeouts:
+
+| Command | Minimum timeout | Reason |
+|---|---:|---|
+| `HELLO` | `1000 ms` | quick protocol negotiation |
+| `START_SESSION` | `1000 ms` | local state reset only |
+| `ERASE` | `30000 ms` | erases application flash and metadata sector |
+| `DOWNLOAD_START` | `1000 ms` | metadata validation only |
+| `DATA` | `3000 ms` | flash write plus readback verify for one block |
+| `DOWNLOAD_END` | `10000 ms` | full-image CRC32, optional signature check, marker write |
+| `ABORT` | `1000 ms` | local state reset only |
+| `RESET` | `1000 ms` | response is sent before MCU reset |
+
+If the tool reports a timeout such as `Timeout waiting for SOF of ERASE
+response`, the most likely cause is that the tool used a short generic timeout
+while the target was still erasing flash. The tool should not retry or reset the
+target immediately on an `ERASE` response timeout unless the configured
+long-operation timeout has elapsed.
+
+The timeout values above are minimums. Increase them for slower clock settings,
+larger application regions, lower supply voltage flash timing, or additional
+verification work.
+
 ## Error Codes
 
 | Code | Meaning |

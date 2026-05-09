@@ -62,6 +62,11 @@ Boards may change these macros to select another pin or active level.
 The application image does not contain the valid marker. The bootloader owns the
 marker and writes it only after firmware validation succeeds.
 
+`ERASE` is a long-running synchronous command. The bootloader sends the
+`ERASE_RESPONSE` only after flash erase and metadata invalidation complete. The
+flashing tool must use a long `ERASE` response timeout and continue waiting for
+the response SOF while the target is erasing.
+
 ## Timeout Recovery
 
 If a partial frame times out:
