@@ -8,6 +8,17 @@ from protocol.errors import ErrorCode
 from firmware.firmware_image import FirmwareImage
 from services.flash_service import FlashService
 
+def written_commands(transport: FakeTransport) -> list[Command]:
+    commands: list[Command] = []
+    offset = 0
+    while offset < len(transport.written):
+        payload_length = struct.unpack("<H", transport.written[offset + 4:offset + 6])[0]
+        frame_length = 8 + payload_length
+        frame = transport.written[offset:offset + frame_length]
+        commands.append(Command(frame[2]))
+        offset += frame_length
+    return commands
+
 def test_flash_happy_path():
     transport = FakeTransport()
     client = ProtocolClient(transport)
@@ -34,6 +45,9 @@ def test_flash_happy_path():
     
     # 6. DOWNLOAD_END_RESPONSE
     transport.to_read += encode_frame(Command.DOWNLOAD_END_RESPONSE, 6, bytes([ErrorCode.OK]))
+
+    # 7. RESET_RESPONSE
+    transport.to_read += encode_frame(Command.RESET_RESPONSE, 7, bytes([ErrorCode.OK]))
     
     transport.open()
     
@@ -47,6 +61,15 @@ def test_flash_happy_path():
     
     assert len(progress_calls) == 1
     assert progress_calls[0] == (10, 10)
+    assert written_commands(transport) == [
+        Command.HELLO,
+        Command.START_SESSION,
+        Command.ERASE,
+        Command.DOWNLOAD_START,
+        Command.DATA,
+        Command.DOWNLOAD_END,
+        Command.RESET,
+    ]
     assert transport.is_open()
 
 def test_flash_uses_aligned_non_final_data_chunks():
@@ -62,6 +85,7 @@ def test_flash_uses_aligned_non_final_data_chunks():
     transport.to_read += encode_frame(Command.DATA_RESPONSE, 5, bytes([ErrorCode.OK]) + struct.pack("<I", 0))
     transport.to_read += encode_frame(Command.DATA_RESPONSE, 6, bytes([ErrorCode.OK]) + struct.pack("<I", 1))
     transport.to_read += encode_frame(Command.DOWNLOAD_END_RESPONSE, 7, bytes([ErrorCode.OK]))
+    transport.to_read += encode_frame(Command.RESET_RESPONSE, 8, bytes([ErrorCode.OK]))
     transport.open()
 
     fw = FirmwareImage(bytes(range(100)) * 3)

@@ -14,6 +14,10 @@ class ProgressPanel(QGroupBox):
         self.layout.addWidget(self.progress_bar)
         self.layout.addWidget(self.status_label)
 
+    def reset(self):
+        self.progress_bar.setValue(0)
+        self.status_label.setText("Status: Idle")
+
     def set_progress(self, current: int, total: int):
         if total > 0:
             percent = int((current / total) * 100)

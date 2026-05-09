@@ -82,6 +82,8 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Flash Error", "Not connected to target.")
             return
 
+        self.progress_panel.reset()
+
         def flash_thread():
             try:
                 signer = FirmwareSigner(key_path) if key_path else None

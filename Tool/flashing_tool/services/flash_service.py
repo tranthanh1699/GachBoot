@@ -114,6 +114,7 @@ class FlashService:
                     progress_callback(offset + len(chunk), firmware.size)
             
             self.download_end()
+            self.reset()
         except Exception as e:
             self.abort()
             raise e
