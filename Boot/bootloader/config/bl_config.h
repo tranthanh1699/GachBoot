@@ -29,4 +29,7 @@
 #define BL_CAP_ABORT                     0x00000004u
 #define BL_CAP_RESET                     0x00000008u
 
+#define BL_IS_APP_USE_CACHEABLE          0                   // Set to 1 if the application is allowed to use cacheable memory regions, 0 otherwise
+#define BL_APP_NVIC_REGISTER_COUNT       8u
+
 #endif /* BL_CONFIG_H */

@@ -1,10 +1,10 @@
+#include "bl_config.h"
 #include "bl_app_jump.h"
 #include "bl_app_validate.h"
 #include "stm32h7xx_hal.h"
 
 typedef void (*bl_app_entry_t)(void);
 
-#define BL_APP_NVIC_REGISTER_COUNT       8u
 
 static void bl_app_prepare_hardware_for_jump(void)
 {
@@ -20,10 +20,14 @@ static void bl_app_prepare_hardware_for_jump(void)
         NVIC->ICPR[index] = 0xFFFFFFFFu;
     }
 
+    /* Disable MPU */
     HAL_MPU_Disable();
 
+    /* Flush and disable Caches if they were enabled */
+#if (BL_IS_APP_USE_CACHEABLE == 1)
     SCB_DisableICache();
     SCB_DisableDCache();
+#endif
 }
 
 bl_status_t bl_app_jump_to_application(uint32_t app_address)
@@ -39,8 +43,9 @@ bl_status_t bl_app_jump_to_application(uint32_t app_address)
 
     app_stack = *(volatile uint32_t *)app_address;
     app_reset_handler = *(volatile uint32_t *)(app_address + 4U);
-    app_entry = (bl_app_entry_t)(uintptr_t)app_reset_handler;
+    app_entry = (bl_app_entry_t)app_reset_handler;
 
+    /* Transition sequence */
     __disable_irq();
     HAL_RCC_DeInit();
     HAL_DeInit();
@@ -51,7 +56,9 @@ bl_status_t bl_app_jump_to_application(uint32_t app_address)
     __DSB();
     __ISB();
 
-    __enable_irq();
+    /* Jump to application Reset_Handler.
+     * We do NOT call __enable_irq() here. The application's startup code
+     * will enable interrupts when it's ready. */
     app_entry();
 
     return BL_STATUS_ERROR;
