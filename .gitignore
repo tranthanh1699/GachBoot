@@ -5,3 +5,4 @@ codex_bootloader_skills
 AGENTS.md
 CLAUDE.md
 Boot/.clangd
+__pycache__
