@@ -3,12 +3,12 @@
 | Region | Start | Size |
 |---|---:|---:|
 | Bootloader | `0x08000000` | `0x00020000` |
-| Application | `0x08020000` | `0x001C0000` |
-| Metadata marker address | `0x081FF000` | first word of metadata sector |
+| Application | `0x08100000` | `0x000E0000` |
+| Metadata marker address | `0x081E0000` | first word of metadata sector |
 
 ## Application Region
 
-The application must be linked at `0x08020000`.
+The application must be linked at `0x08100000`.
 
 The application image must not be shifted to make room for the valid marker.
 The valid marker is outside the application image and is owned by the
@@ -29,7 +29,7 @@ Current metadata content:
 |---:|---:|---|---|
 | `0x0000` | 4 bytes | `BL_APP_VALID_MARKER` / `0x47424C56` | application passed bootloader validation |
 
-`BL_APP_METADATA_ADDR` is `0x081FF000`.
+`BL_APP_METADATA_ADDR` is `0x081E0000`.
 
 The STM32H7 flash program operation writes a 32-byte flash word. The bootloader
 therefore writes the marker as a 32-byte aligned flash word:

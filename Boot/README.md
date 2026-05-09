@@ -62,7 +62,7 @@ Default boot-mode GPIO configuration:
 
 ```c
 #define BL_BOOT_MODE_GPIO_PORT           GPIOC
-#define BL_BOOT_MODE_GPIO_PIN            GPIO_PIN_13
+#define BL_BOOT_MODE_GPIO_PIN            GPIO_PIN_9
 #define BL_BOOT_MODE_GPIO_PULL           GPIO_PULLUP
 #define BL_BOOT_MODE_ACTIVE_STATE        GPIO_PIN_RESET
 ```
@@ -156,9 +156,9 @@ Current default:
 ```text
 Bootloader start: 0x08000000
 Bootloader size : 0x00020000
-App start       : 0x08020000
-App max size    : 0x001C0000
-Metadata addr   : 0x081FF000
+App start       : 0x08100000
+App max size    : 0x000E0000
+Metadata addr   : 0x081E0000
 ```
 
 Valid stack pointer ranges include STM32H743 DTCM, AXI SRAM, SRAM1/2/3, and SRAM4.

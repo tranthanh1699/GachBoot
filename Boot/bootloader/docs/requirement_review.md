@@ -20,10 +20,10 @@ Initial implementation scope:
 ## Assumptions
 
 - USART1 is the initial bootloader UART because `Boot/Core/Src/usart.c` already configures USART1 at 115200-8N1.
-- Application starts at `0x08020000`, reserving 128 KiB for the bootloader.
-- Application valid marker is stored separately at `0x081FF000`.
+- Application starts at `0x08100000`, which is the start of Bank 2.
+- Application valid marker is stored separately at `0x081E0000`, the start of the last sector in Bank 2.
 - STM32H743 flash erase/write details require target validation before enabling real write/erase.
-- Default boot-mode input is `PC13`, active-low with pull-up.
+- Default boot-mode input is `PC9`, active-low with pull-up.
 - Signature verification is disabled by default. When enabled today, the interface returns unsupported instead of pretending to verify cryptography.
 
 ## Open Questions
