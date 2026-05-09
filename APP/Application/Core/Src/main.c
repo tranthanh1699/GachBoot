@@ -66,19 +66,19 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
   /* USER CODE END 1 */
-
+  
   /* MPU Configuration--------------------------------------------------------*/
   MPU_Config();
-
+  
   /* MCU Configuration--------------------------------------------------------*/
-
+  
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
-
+  
   /* USER CODE BEGIN Init */
-
+  SCB->VTOR = 0x08100000U; /* Vector Table Relocation in Internal FLASH. */
+  __enable_irq(); /* Enable global interrupts. */
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -102,7 +102,7 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
     HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13); 
-    HAL_Delay(500); // Delay for 500 ms
+    HAL_Delay(100); // Delay for 500 ms
   }
   /* USER CODE END 3 */
 }

@@ -67,6 +67,33 @@ marker and writes it only after firmware validation succeeds.
 flashing tool must use a long `ERASE` response timeout and continue waiting for
 the response SOF while the target is erasing.
 
+## Verify And Jump Flow
+
+After a successful download, the boot path is:
+
+1. Tool sends all `DATA` frames.
+2. Bootloader writes each block to flash and verifies the block by readback.
+3. Tool sends `DOWNLOAD_END`.
+4. Bootloader checks that `bytes_received == firmware_size`.
+5. Bootloader calculates CRC32 over flash at `target_address`.
+6. Bootloader compares calculated CRC32 with the `DOWNLOAD_START` metadata.
+7. If signature verification is enabled, bootloader verifies the signature.
+8. Bootloader erases the metadata sector and writes `BL_APP_VALID_MARKER`.
+9. Bootloader sends `DOWNLOAD_END_RESPONSE`.
+10. Tool sends `RESET`.
+11. Bootloader resets the MCU.
+12. On startup, bootloader reads the boot-mode GPIO.
+13. If boot-mode GPIO is asserted, bootloader waits for flashing.
+14. If boot-mode GPIO is not asserted, bootloader checks the valid marker.
+15. If the marker is present, bootloader validates the application vector table.
+16. If validation succeeds, bootloader jumps to `BL_APP_START_ADDR`.
+17. If any validation fails, bootloader waits for flashing.
+
+Before branching to the application reset handler, the bootloader disables
+SysTick, disables and clears NVIC interrupt state, resets HAL/RCC state, sets
+`SCB->VTOR` to the application vector table, sets MSP to the application stack
+pointer, re-enables global interrupts, then calls the application reset handler.
+
 ## Timeout Recovery
 
 If a partial frame times out:
