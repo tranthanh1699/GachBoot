@@ -70,3 +70,15 @@ bool bl_app_validate_vector_table(uint32_t app_address)
 
     return true;
 }
+
+bool bl_app_validate_application(uint32_t app_address)
+{
+    const uint32_t *metadata = (const uint32_t *)(uintptr_t)BL_APP_METADATA_ADDR;
+
+    if (metadata[0] != BL_APP_VALID_MARKER)
+    {
+        return false;
+    }
+
+    return bl_app_validate_vector_table(app_address);
+}

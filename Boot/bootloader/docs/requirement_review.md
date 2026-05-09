@@ -25,8 +25,8 @@ Initial implementation scope:
 ## Open Questions
 
 - Final bootloader flash size and linker partition should be confirmed against the production memory map.
-- App metadata layout and valid-marker write location need final definition before BL-6.
-- Boot entry policy is not yet final: always stay in bootloader, wait for timeout then jump, or use a GPIO/software flag.
+- App metadata currently stores only the valid marker word; any expanded metadata layout still needs final definition.
+- Boot entry policy now uses a configurable GPIO boot-mode request; timeout or software-flag entry modes remain open extensions.
 - Real signature algorithm and key storage policy are not selected.
 
 ## Risks
@@ -34,4 +34,4 @@ Initial implementation scope:
 - Flash erase/write on STM32H7 is bank/sector/voltage/alignment sensitive and must not be completed without target testing.
 - Main-loop UART polling must not starve existing background tasks.
 - Jump-to-application requires vector table, MPU/cache/peripheral state validation on hardware.
-- Protocol docs are stable enough for tool development, but BL-6 metadata valid-marker details remain future work.
+- Protocol docs are stable enough for tool development, but expanded metadata details remain future work.

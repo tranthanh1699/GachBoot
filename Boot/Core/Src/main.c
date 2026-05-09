@@ -25,6 +25,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "bl_boot.h"
 #include "bl_main.h"
 /* USER CODE END Includes */
 
@@ -93,12 +94,16 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  /* USER CODE BEGIN 2 */
+  (void)bl_boot_init();
+  (void)bl_boot_jump_to_application_if_allowed();
+  /* USER CODE END 2 */
   MX_USART1_UART_Init();
   MX_USB_DEVICE_Init();
   MX_TIM17_Init();
-  /* USER CODE BEGIN 2 */
+  /* USER CODE BEGIN 3 */
   (void)bl_main_init();
-  /* USER CODE END 2 */
+  /* USER CODE END 3 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
@@ -106,10 +111,10 @@ int main(void)
   {
     /* USER CODE END WHILE */
 
-    /* USER CODE BEGIN 3 */
+    /* USER CODE BEGIN 4 */
     bl_main_process();
   }
-  /* USER CODE END 3 */
+  /* USER CODE END 4 */
 }
 
 /**

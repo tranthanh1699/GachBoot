@@ -1,12 +1,14 @@
 add_library(bootloader STATIC
     app/bl_app_jump.c
     app/bl_app_validate.c
+    core/bl_boot.c
     core/bl_main.c
     core/bl_session.c
     core/bl_state_machine.c
     log/bl_log.c
     memory/bl_flash.c
     memory/bl_memory.c
+    platform/platform_boot_mode.c
     platform/platform_flash.c
     platform/platform_reset.c
     platform/platform_uart.c

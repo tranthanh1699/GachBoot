@@ -48,14 +48,26 @@ bootloader/
 
 ## Runtime Flow
 
-1. `Core/Src/main.c` initializes STM32 HAL, clock, GPIO, USART1, USB, and TIM17.
-2. `bl_main_init()` initializes the bootloader session and UART transport.
-3. UART RX interrupts feed bytes into the bootloader RX ring buffer.
-4. The main loop calls `bl_main_process()`.
-5. The transport reads buffered UART bytes and assembles custom protocol frames.
-6. The command layer handles `HELLO`, `START_SESSION`, `ERASE`, `DOWNLOAD_START`, `DATA`, `DOWNLOAD_END`, `ABORT`, and `RESET`.
-7. Flashing data is written to the configured application flash area.
-8. `DOWNLOAD_END` verifies the firmware CRC32 before reporting success.
+1. `Core/Src/main.c` initializes STM32 HAL, clock, and GPIO.
+2. `bl_boot_init()` configures the boot-mode GPIO from `bootloader/config/bl_hw_config.h`.
+3. If the boot-mode GPIO is asserted, the firmware stays in the bootloader.
+4. If the boot-mode GPIO is not asserted and the application marker plus vector table are valid, the firmware jumps to the application.
+5. If the application is missing, unmarked, unavailable, or invalid, the firmware initializes USART1, USB, TIM17, and the bootloader protocol.
+6. UART RX interrupts feed bytes into the bootloader RX ring buffer.
+7. The main loop calls `bl_main_process()`.
+8. The command layer handles `HELLO`, `START_SESSION`, `ERASE`, `DOWNLOAD_START`, `DATA`, `DOWNLOAD_END`, `ABORT`, and `RESET`.
+9. `DOWNLOAD_END` verifies the firmware CRC32 and writes the application valid marker before reporting success.
+
+Default boot-mode GPIO configuration:
+
+```c
+#define BL_BOOT_MODE_GPIO_PORT           GPIOC
+#define BL_BOOT_MODE_GPIO_PIN            GPIO_PIN_13
+#define BL_BOOT_MODE_GPIO_PULL           GPIO_PULLUP
+#define BL_BOOT_MODE_ACTIVE_STATE        GPIO_PIN_RESET
+```
+
+Change these macros for a different board or active-high button.
 
 ## UART Protocol
 
@@ -273,6 +285,7 @@ Port these files first:
 ```text
 bootloader/config/bl_memory_map.h
 bootloader/config/bl_hw_config.h
+bootloader/platform/platform_boot_mode.c
 bootloader/platform/platform_uart.c
 bootloader/platform/platform_flash.c
 bootloader/platform/platform_reset.c
@@ -283,7 +296,7 @@ Do not add MCU register access to `core/`, `protocol/`, `transport/`, or `securi
 
 ## Current Limitations
 
-- Application valid-marker write is not finalized.
+- Application metadata currently stores only the valid marker word.
 - Signature verification is still a real extension point, not implemented crypto.
 - Hardware flash erase/write must be validated on the target board.
 - USB CDC is initialized by CubeMX but is not the active bootloader transport.

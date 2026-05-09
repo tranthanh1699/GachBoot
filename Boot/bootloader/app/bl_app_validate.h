@@ -4,5 +4,6 @@
 #include "bl_types.h"
 
 bool bl_app_validate_vector_table(uint32_t app_address);
+bool bl_app_validate_application(uint32_t app_address);
 
 #endif /* BL_APP_VALIDATE_H */

@@ -65,6 +65,4 @@ Implemented:
 
 Stubbed until hardware validation:
 
-- valid-marker write
 - real signature verification
-- final boot decision policy
