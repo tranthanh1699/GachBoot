@@ -69,7 +69,7 @@ Boot/bootloader/
 5. The transport reads buffered UART bytes and assembles protocol frames.
 6. The command layer handles `HELLO`, `START_SESSION`, `ERASE`, `DOWNLOAD_START`, `DATA`, `DOWNLOAD_END`, `ABORT`, and `RESET`.
 7. Flashing data is written to the configured application flash area.
-8. `DOWNLOAD_END` verifies firmware CRC32 before reporting success.
+8. `DOWNLOAD_END` finalizes the streaming SHA-256 hash, verifies the RSA signature, and verifies the firmware CRC32 before reporting success.
 
 ### Boot UART
 
