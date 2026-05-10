@@ -1,6 +1,9 @@
 #ifndef BL_MEMORY_MAP_H
 #define BL_MEMORY_MAP_H
 
+#include <stdint.h>
+
+
 #define BL_FLASH_BASE_ADDR               0x08000000u        // Base address of the flash memory
 #define BL_FLASH_SIZE                    0x00200000u        // Total size of the flash memory (2 MB)
 #define BL_RAM_DTCM_START_ADDR           0x20000000u        // Start address of DTCM RAM
@@ -19,13 +22,18 @@
 #define BL_APP_MAX_SIZE                  (128 * 1024u * 7)  // Maximum size of the application (7 banks of 128 KB each)
 #define BL_APP_METADATA_ADDR             0x081E0000u        // Address of the application metadata located at the end of bank 7
 
-#define BL_APP_METADATA_CRC_ADDR         BL_APP_METADATA_ADDR
-#define BL_APP_VALID_MARKER_ADDR         (BL_APP_METADATA_ADDR + 0x20u)
-#define BL_APP_SIGNATURE_ADDR            (BL_APP_METADATA_ADDR + 0x40u)
-#define BL_APP_METADATA_CRC_SIZE         4u
+
+#define BL_APP_VALID_MARKER              0x47424C56u
+
 #define BL_APP_VALID_MARKER_SIZE         4u
 #define BL_APP_METADATA_SIGNATURE_SIZE   256u
 
-#define BL_APP_VALID_MARKER              0x47424C56u
+typedef struct {
+    uint32_t crc;
+    uint32_t app_size;
+    uint32_t valid_marker;
+    uint8_t signature[BL_APP_METADATA_SIGNATURE_SIZE];
+} bl_app_metadata_t;
+
 
 #endif /* BL_MEMORY_MAP_H */

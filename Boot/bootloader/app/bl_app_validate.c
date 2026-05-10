@@ -24,25 +24,14 @@ static uint32_t bl_app_metadata_crc32_update_byte(uint32_t crc, uint8_t data)
     return crc;
 }
 
-static uint32_t bl_app_metadata_crc32_calculate(uint32_t marker, const uint8_t *signature)
+static uint32_t bl_app_metadata_crc32_calculate(const uint8_t *data, uint32_t length)
 {
     uint32_t crc = BL_APP_METADATA_CRC32_INIT_VALUE;
     uint32_t index = 0u;
-    uint8_t marker_bytes[BL_APP_VALID_MARKER_SIZE];
 
-    marker_bytes[0] = (uint8_t)(marker & 0xFFu);
-    marker_bytes[1] = (uint8_t)((marker >> 8u) & 0xFFu);
-    marker_bytes[2] = (uint8_t)((marker >> 16u) & 0xFFu);
-    marker_bytes[3] = (uint8_t)((marker >> 24u) & 0xFFu);
-
-    for (index = 0u; index < BL_APP_VALID_MARKER_SIZE; index++)
+    for (index = 0u; index < length; index++)
     {
-        crc = bl_app_metadata_crc32_update_byte(crc, marker_bytes[index]);
-    }
-
-    for (index = 0u; index < BL_APP_METADATA_SIGNATURE_SIZE; index++)
-    {
-        crc = bl_app_metadata_crc32_update_byte(crc, signature[index]);
+        crc = bl_app_metadata_crc32_update_byte(crc, data[index]);
     }
 
     return ~crc;
@@ -126,18 +115,16 @@ bool bl_app_validate_vector_table(uint32_t app_address)
 
 bool bl_app_validate_application(uint32_t app_address)
 {
-    const uint32_t *metadata_crc = (const uint32_t *)(uintptr_t)BL_APP_METADATA_CRC_ADDR;
-    const uint32_t *metadata_marker = (const uint32_t *)(uintptr_t)BL_APP_VALID_MARKER_ADDR;
-    const uint8_t *metadata_signature = (const uint8_t *)(uintptr_t)BL_APP_SIGNATURE_ADDR;
+    const bl_app_metadata_t *metadata = (const bl_app_metadata_t *)(uintptr_t)BL_APP_METADATA_ADDR;
     uint32_t calculated_crc = 0u;
 
-    if (metadata_marker[0] != BL_APP_VALID_MARKER)
+    if (metadata->valid_marker != BL_APP_VALID_MARKER)
     {
         return false;
     }
 
-    calculated_crc = bl_app_metadata_crc32_calculate(metadata_marker[0], metadata_signature);
-    if (metadata_crc[0] != calculated_crc)
+    calculated_crc = bl_app_metadata_crc32_calculate((const uint8_t *)&metadata->app_size, sizeof(bl_app_metadata_t) - sizeof(uint32_t));
+    if (metadata->crc != calculated_crc)
     {
         return false;
     }

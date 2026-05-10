@@ -11,9 +11,9 @@ bl_status_t bl_flash_invalidate_app_marker(void)
     return platform_flash_invalidate_app_marker();
 }
 
-bl_status_t bl_flash_mark_app_valid(const uint8_t *signature, uint16_t signature_length)
+bl_status_t bl_flash_mark_app_valid(uint32_t app_size, const uint8_t *signature, uint16_t signature_length)
 {
-    return platform_flash_mark_app_valid(signature, signature_length);
+    return platform_flash_mark_app_valid(app_size, signature, signature_length);
 }
 
 bl_status_t bl_flash_write(uint32_t address, const uint8_t *data, uint16_t length)

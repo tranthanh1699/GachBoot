@@ -107,25 +107,14 @@ static uint32_t platform_flash_crc32_update_byte(uint32_t crc, uint8_t data)
     return crc;
 }
 
-static uint32_t platform_flash_metadata_crc32(const uint8_t *signature, uint16_t signature_length)
+static uint32_t platform_flash_metadata_crc32(const uint8_t *data, uint32_t length)
 {
     uint32_t crc = BL_METADATA_CRC32_INIT_VALUE;
-    uint8_t marker_bytes[BL_APP_VALID_MARKER_SIZE];
-    uint16_t index = 0u;
+    uint32_t index = 0u;
 
-    marker_bytes[0] = (uint8_t)(BL_APP_VALID_MARKER & 0xFFu);
-    marker_bytes[1] = (uint8_t)((BL_APP_VALID_MARKER >> 8u) & 0xFFu);
-    marker_bytes[2] = (uint8_t)((BL_APP_VALID_MARKER >> 16u) & 0xFFu);
-    marker_bytes[3] = (uint8_t)((BL_APP_VALID_MARKER >> 24u) & 0xFFu);
-
-    for (index = 0u; index < BL_APP_VALID_MARKER_SIZE; index++)
+    for (index = 0u; index < length; index++)
     {
-        crc = platform_flash_crc32_update_byte(crc, marker_bytes[index]);
-    }
-
-    for (index = 0u; index < signature_length; index++)
-    {
-        crc = platform_flash_crc32_update_byte(crc, signature[index]);
+        crc = platform_flash_crc32_update_byte(crc, data[index]);
     }
 
     return ~crc;
@@ -231,15 +220,13 @@ bl_status_t platform_flash_invalidate_app_marker(void)
     return status;
 }
 
-bl_status_t platform_flash_mark_app_valid(const uint8_t *signature, uint16_t signature_length)
+bl_status_t platform_flash_mark_app_valid(uint32_t app_size, const uint8_t *signature, uint16_t signature_length)
 {
-    uint32_t index = 0u;
-    uint32_t crc_word[BL_PLATFORM_FLASH_WRITE_ALIGN / sizeof(uint32_t)];
-    uint32_t marker_word[BL_PLATFORM_FLASH_WRITE_ALIGN / sizeof(uint32_t)];
-    uint32_t signature_word[BL_PLATFORM_FLASH_WRITE_ALIGN / sizeof(uint32_t)];
-    uint32_t signature_offset = 0u;
     uint32_t metadata_crc = 0u;
     bl_status_t status;
+    uint32_t flash_buffer[288 / sizeof(uint32_t)];
+    bl_app_metadata_t *metadata = (bl_app_metadata_t *)flash_buffer;
+    uint32_t offset = 0u;
 
     if ((signature_length > BL_APP_METADATA_SIGNATURE_SIZE) ||
         ((signature_length > 0u) && (signature == (const uint8_t *)0)))
@@ -253,65 +240,44 @@ bl_status_t platform_flash_mark_app_valid(const uint8_t *signature, uint16_t sig
         return status;
     }
 
-    for (index = 0u; index < (BL_PLATFORM_FLASH_WRITE_ALIGN / sizeof(uint32_t)); index++)
+    for (uint32_t i = 0u; i < (sizeof(flash_buffer) / sizeof(uint32_t)); i++)
     {
-        crc_word[index] = BL_FLASH_ERASED_WORD;
-        marker_word[index] = BL_FLASH_ERASED_WORD;
+        flash_buffer[i] = BL_FLASH_ERASED_WORD;
     }
 
-    metadata_crc = platform_flash_metadata_crc32(signature, signature_length);
-    crc_word[0] = metadata_crc;
-    marker_word[0] = BL_APP_VALID_MARKER;
+    metadata->app_size = app_size;
+    metadata->valid_marker = BL_APP_VALID_MARKER;
+    for (uint32_t i = 0u; i < BL_APP_METADATA_SIGNATURE_SIZE; i++)
+    {
+        if (i < signature_length) {
+            metadata->signature[i] = signature[i];
+        } else {
+            metadata->signature[i] = 0xFF;
+        }
+    }
+
+    // Calculate CRC over everything except the crc field itself
+    // CRC runs over app_size, valid_marker, and signature.
+    metadata_crc = platform_flash_metadata_crc32(
+        (const uint8_t *)&metadata->app_size,
+        sizeof(bl_app_metadata_t) - sizeof(uint32_t)
+    );
+    metadata->crc = metadata_crc;
 
     if (HAL_FLASH_Unlock() != HAL_OK)
     {
         return BL_STATUS_IO;
     }
 
-    while (signature_offset < BL_APP_METADATA_SIGNATURE_SIZE)
+    while (offset < sizeof(flash_buffer))
     {
-        uint32_t byte_index = 0u;
-
-        for (index = 0u; index < (BL_PLATFORM_FLASH_WRITE_ALIGN / sizeof(uint32_t)); index++)
-        {
-            signature_word[index] = BL_FLASH_ERASED_WORD;
-        }
-
-        for (byte_index = 0u; byte_index < BL_PLATFORM_FLASH_WRITE_ALIGN; byte_index++)
-        {
-            uint32_t source_index = signature_offset + byte_index;
-
-            if (source_index < (uint32_t)signature_length)
-            {
-                uint32_t word_index = byte_index / sizeof(uint32_t);
-                uint32_t shift = (byte_index % sizeof(uint32_t)) * 8u;
-                signature_word[word_index] &= ~(0xFFu << shift);
-                signature_word[word_index] |= ((uint32_t)signature[source_index] << shift);
-            }
-        }
-
-        status = platform_flash_program_flashword(BL_APP_SIGNATURE_ADDR + signature_offset, signature_word);
+        status = platform_flash_program_flashword(BL_APP_METADATA_ADDR + offset, &flash_buffer[offset / sizeof(uint32_t)]);
         if (status != BL_STATUS_OK)
         {
             (void)HAL_FLASH_Lock();
             return status;
         }
-
-        signature_offset += BL_PLATFORM_FLASH_WRITE_ALIGN;
-    }
-
-    status = platform_flash_program_flashword(BL_APP_METADATA_CRC_ADDR, crc_word);
-    if (status != BL_STATUS_OK)
-    {
-        (void)HAL_FLASH_Lock();
-        return status;
-    }
-
-    status = platform_flash_program_flashword(BL_APP_VALID_MARKER_ADDR, marker_word);
-    if (status != BL_STATUS_OK)
-    {
-        (void)HAL_FLASH_Lock();
-        return status;
+        offset += BL_PLATFORM_FLASH_WRITE_ALIGN;
     }
 
     if (HAL_FLASH_Lock() != HAL_OK)

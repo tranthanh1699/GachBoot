@@ -583,7 +583,7 @@ bl_status_t bl_session_finalize(bl_session_t *session)
         }
     }
 
-    if (bl_memory_mark_application_valid(session->signature, session->signature_length) != BL_STATUS_OK)
+    if (bl_memory_mark_application_valid(session->app_size, session->signature, session->signature_length) != BL_STATUS_OK)
     {
         return BL_STATUS_IO;
     }

@@ -434,6 +434,14 @@ static bool bl_rsa_verify_sha256(const bl_rsa_public_key_t *key, const uint8_t *
 
 #endif /* BL_ENABLE_SIGNATURE_VERIFY != 0u */
 
+#if (BL_ENABLE_SIGNATURE_VERIFY == 0u)
+void bl_sha256_init(bl_sha256_ctx_t *ctx) { (void)ctx; }
+void bl_sha256_update(bl_sha256_ctx_t *ctx, const uint8_t *data, uint32_t length) { (void)ctx; (void)data; (void)length; }
+void bl_sha256_final(bl_sha256_ctx_t *ctx, uint8_t *digest) { (void)ctx; if (digest) digest[0] = 0; }
+#endif
+
+
+
 bool bl_signature_is_required(void)
 {
 #if (BL_ENABLE_SIGNATURE_VERIFY == 0u)
