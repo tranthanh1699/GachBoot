@@ -41,8 +41,8 @@ user explicitly requests it.
 Behavior in Release build without secure boot:
 
 - `BL_ENABLE_SECURE_BOOT=0u`
-- `BL_ENABLE_SIGNATURE_VERIFY=0u`
-- no public key is required
+- `BL_ENABLE_SIGNATURE_VERIFY=1u`
+- public key is required for update package verification
 - metadata CRC, valid marker, app-size, and vector-table checks still run
 
 To build a secure Release bootloader:
@@ -78,7 +78,7 @@ make release SECURE_BOOT=ON PUBLIC_KEY_PEM=/path/to/public_key.pem
 Generated release key header:
 
 ```text
-build/Release/bl_rsa_public_key_generated.h
+bootloader/config/bl_build_config.h
 ```
 
 ## How To Add Or Replace The Bootloader Public Key
@@ -134,24 +134,15 @@ The public key must be RSA-2048 with public exponent `65537`.
 
 ## CMake Integration
 
-The current CMake project implements the release flow in
-`bootloader/CMakeLists.txt`.
+The CMake project now relies on the generated `bl_build_config.h` header file. 
+Macros are no longer passed via command-line definitions.
 
-Secure Release builds require:
-
-```cmake
-target_compile_definitions(bootloader PRIVATE
-    BL_ENABLE_SECURE_BOOT=1u
-    BL_ENABLE_SIGNATURE_VERIFY=1u
-    BL_RSA_PUBLIC_KEY_HEADER="${CMAKE_BINARY_DIR}/bl_rsa_public_key_generated.h"
-)
-```
-
-Development and non-secure Release builds compile with:
+`bootloader/CMakeLists.txt` verifies the header existence:
 
 ```cmake
-BL_ENABLE_SECURE_BOOT=0u
-BL_ENABLE_SIGNATURE_VERIFY=0u
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/config/bl_build_config.h")
+    message(FATAL_ERROR "bl_build_config.h not found. Run make dev or make release first.")
+endif()
 ```
 
 ## Notes

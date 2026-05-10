@@ -373,3 +373,19 @@ If verification OK:
 Else:
     reject image
 ```
+
+---
+
+# Bootloader Flash Metadata Layout
+
+The STM32 bootloader stores application validity state in a contiguous structure 
+at the end of flash (`BL_APP_METADATA_ADDR`).
+
+```c
+typedef struct {
+    uint32_t crc;           // CRC32 over app_size, valid_marker, and signature
+    uint32_t app_size;      // Size of the application image
+    uint32_t valid_marker;  // 0x47424C56
+    uint8_t signature[256]; // RSA-2048 signature
+} bl_app_metadata_t;
+```

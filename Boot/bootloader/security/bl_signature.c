@@ -13,9 +13,7 @@
 
 #if (BL_ENABLE_SIGNATURE_VERIFY != 0u)
 
-#if defined(BL_RSA_PUBLIC_KEY_HEADER)
-#include BL_RSA_PUBLIC_KEY_HEADER
-#endif
+
 
 #define BL_RSA_2048_BYTES                256u
 #define BL_RSA_2048_WORDS                64u

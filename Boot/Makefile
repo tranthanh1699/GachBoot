@@ -15,11 +15,13 @@ endif
 .PHONY: dev release clean
 
 dev:
+	python3 bootloader/tools/generate_build_config.py --variant Development --secure-boot OFF --out bootloader/config/bl_build_config.h
 	PATH="$(BOOT_BUILD_PATH)" cmake --preset Debug
 	PATH="$(BOOT_BUILD_PATH)" cmake --build --preset Debug
 
 release:
-	PATH="$(BOOT_BUILD_PATH)" cmake --preset Release -DBL_ENABLE_SECURE_BOOT=$(SECURE_BOOT) -DBL_PUBLIC_KEY_PEM="$(PUBLIC_KEY_PEM)"
+	python3 bootloader/tools/generate_build_config.py --variant Release --secure-boot $(SECURE_BOOT) --pem "$(PUBLIC_KEY_PEM)" --out bootloader/config/bl_build_config.h
+	PATH="$(BOOT_BUILD_PATH)" cmake --preset Release
 	PATH="$(BOOT_BUILD_PATH)" cmake --build --preset Release
 
 clean:

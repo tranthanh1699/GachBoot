@@ -7,45 +7,7 @@
 #define BL_LOG_BACKEND_UART              0u
 #define BL_LOG_BACKEND_USB               0u
 
-#ifndef BOOTLOADER_DEV
-#define BOOTLOADER_DEV                   0u
-#endif
-
-#ifndef BOOTLOADER_RELEASE
-#define BOOTLOADER_RELEASE               0u
-#endif
-
-#if ((BOOTLOADER_DEV != 0u) && (BOOTLOADER_RELEASE != 0u))
-#error "Only one bootloader variant may be selected"
-#endif
-
-#if ((BOOTLOADER_DEV == 0u) && (BOOTLOADER_RELEASE == 0u))
-#error "Select BOOTLOADER_DEV or BOOTLOADER_RELEASE"
-#endif
-
-#ifndef BL_ENABLE_SECURE_BOOT
-#define BL_ENABLE_SECURE_BOOT            0u
-#endif
-
-#ifndef BL_ENABLE_SIGNATURE_VERIFY
-#define BL_ENABLE_SIGNATURE_VERIFY       0u
-#endif
-
-#if ((BOOTLOADER_DEV != 0u) && (BL_ENABLE_SECURE_BOOT != 0u))
-#error "Secure boot is only supported in Release builds"
-#endif
-
-#if ((BL_ENABLE_SECURE_BOOT != 0u) && (BOOTLOADER_RELEASE == 0u))
-#error "Secure boot requires BOOTLOADER_RELEASE"
-#endif
-
-#if ((BL_ENABLE_SECURE_BOOT != 0u) && (BL_ENABLE_SIGNATURE_VERIFY == 0u))
-#error "Secure boot requires signature verification"
-#endif
-
-#if ((BL_ENABLE_SIGNATURE_VERIFY != 0u) && ((BOOTLOADER_RELEASE == 0u) || (BL_ENABLE_SECURE_BOOT == 0u)))
-#error "Signature verification requires Release build with secure boot enabled"
-#endif
+#include "bl_build_config.h"
 
 #define BL_ENABLE_CHECKSUM_VERIFY        1u
 

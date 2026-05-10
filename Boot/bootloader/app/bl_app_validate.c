@@ -1,4 +1,5 @@
 #include "bl_app_validate.h"
+#include "bl_config.h"
 #include "bl_memory_map.h"
 #include "bl_signature.h"
 
@@ -140,7 +141,7 @@ bool bl_app_validate_application(uint32_t app_address)
         return false;
     }
 
-    if (bl_signature_is_required() == true)
+    if (BL_ENABLE_SECURE_BOOT != 0u)
     {
         return (bl_signature_verify(BL_APP_START_ADDR, metadata->app_size,
                                     metadata->signature, BL_APP_METADATA_SIGNATURE_SIZE) == BL_STATUS_OK);

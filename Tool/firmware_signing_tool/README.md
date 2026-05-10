@@ -87,6 +87,20 @@ inspect: $(OUTPUT)
 	$(FW_TOOL) --inspect $(OUTPUT)
 ```
 
+## Flash Metadata structure
+
+After a successful flash, the bootloader stores the following structure in the 
+metadata sector:
+
+```c
+typedef struct {
+    uint32_t crc;
+    uint32_t app_size;
+    uint32_t valid_marker;
+    uint8_t signature[256];
+} bl_app_metadata_t;
+```
+
 ## Example Bootloader Parsing (C Pseudocode)
 
 ```c

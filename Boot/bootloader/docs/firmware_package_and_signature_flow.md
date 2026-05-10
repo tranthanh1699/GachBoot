@@ -70,13 +70,18 @@ programmed into the application flash area.
 7. `DOWNLOAD_END` calculates CRC32 over the app bytes.
 8. Release bootloader verifies the streaming RSA-2048/SHA-256 signature calculated incrementally during flash programming.
 9. Development bootloader skips signature verification.
-10. If validation succeeds, bootloader writes metadata:
+10. If validation succeeds, bootloader writes the consolidated metadata structure:
 
-```text
-BL_APP_METADATA_CRC_ADDR     : CRC32(valid marker + signature)
-BL_APP_VALID_MARKER_ADDR     : BL_APP_VALID_MARKER
-BL_APP_SIGNATURE_ADDR        : 256-byte signature
+```c
+typedef struct {
+    uint32_t crc;           // CRC32 of app_size, valid_marker, and signature
+    uint32_t app_size;      // Actual size of the application firmware
+    uint32_t valid_marker;  // BL_APP_VALID_MARKER (0x47424C56)
+    uint8_t signature[256]; // RSA-2048 signature
+} bl_app_metadata_t;
 ```
+
+The metadata is written to `BL_APP_METADATA_ADDR` (0x081E0000).
 
 The valid marker is programmed last. If reset or power loss occurs during
 metadata programming, the application remains invalid unless the marker write

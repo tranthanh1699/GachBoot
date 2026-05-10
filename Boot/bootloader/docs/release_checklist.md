@@ -19,7 +19,7 @@ make release SECURE_BOOT=ON
 # OR
 make release SECURE_BOOT=ON PUBLIC_KEY_PEM=/path/to/public_key.pem
 ```
-During the build, the python script `bootloader/tools/rsa_public_key_from_pem.py` translates the PEM file into a generated C-header (`bl_rsa_public_key_generated.h`) that the bootloader compiles in.
+During the build, the `make` command calls `bootloader/tools/generate_build_config.py` to generate `bootloader/config/bl_build_config.h` containing both the build macros and the public key.
 
 ### 3. Flash the Release Bootloader
 Flash the compiled Release bootloader image (`Boot/build/Release/bootloader.elf` or `.bin`/`.hex`) to the STM32H7.
@@ -46,7 +46,7 @@ The secure Release bootloader will execute the following security checks:
 2. Computes the SHA-256 hash incrementally directly from the received `DATA` blocks, writing to flash at the same time.
 3. Finalizes the hash at `DOWNLOAD_END`.
 4. Verifies the SHA-256 digest against the provided RSA signature.
-5. If valid, writes the Valid Application Marker to flash.
+5. If valid, writes the consolidated metadata structure (CRC, app_size, marker, signature) to flash.
 
 
 ### Release Without Secure Boot

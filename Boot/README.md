@@ -211,7 +211,8 @@ make release
 Release build behavior:
 
 - optimized Release firmware is built
-- secure boot is disabled unless explicitly requested with `SECURE_BOOT=ON`
+- signature verification is always enabled for update packages
+- secure boot (verification on every reset) is disabled unless requested with `SECURE_BOOT=ON`
 - UART flashing, metadata CRC, valid marker, app-size, and vector-table checks still run
 
 ### Release bootloader with secure boot

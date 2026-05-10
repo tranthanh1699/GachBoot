@@ -68,7 +68,7 @@ Boards may change these macros to select another pin or active level.
 13. Tool sends `DOWNLOAD_END`.
 14. Bootloader verifies app CRC32 from `AppHeader` and signature CRC32 from `SignatureHeader`.
 15. Release bootloader verifies the RSA-2048/SHA-256 signature. Development bootloader skips this step.
-16. Bootloader stores metadata as CRC32, valid marker, and signature.
+16. Bootloader stores consolidated metadata: CRC32, app_size, valid marker, and signature.
 17. Tool sends `RESET`.
 
 The application image does not contain the valid marker. The bootloader owns the
@@ -91,8 +91,8 @@ After a successful download, the boot path is:
 6. Bootloader compares calculated CRC32 with `AppHeader.crc32`.
 7. Release bootloader verifies the streaming RSA-2048/SHA-256 signature calculated incrementally during flash programming.
    Development bootloader skips signature verification.
-8. Bootloader erases the metadata sector, writes the signature, writes
-   `CRC32(valid marker + signature)`, and writes `BL_APP_VALID_MARKER` last.
+8. Bootloader erases the metadata sector and writes the contiguous metadata structure
+   containing CRC32, app_size, valid marker, and RSA signature.
 9. Bootloader sends `DOWNLOAD_END_RESPONSE`.
 10. Tool sends `RESET`.
 11. Bootloader resets the MCU.
