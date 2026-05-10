@@ -124,16 +124,26 @@ bool bl_app_validate_application(uint32_t app_address)
         return false;
     }
 
+    if ((metadata->app_size == 0u) || (metadata->app_size > BL_APP_MAX_SIZE))
+    {
+        return false;
+    }
+
     calculated_crc = bl_app_metadata_crc32_calculate((const uint8_t *)&metadata->app_size, sizeof(bl_app_metadata_t) - sizeof(uint32_t));
     if (metadata->crc != calculated_crc)
     {
         return false;
     }
 
-    if (bl_app_validate_vector_table(app_address) == false) { return false; }
+    if (bl_app_validate_vector_table(app_address) == false)
+    {
+        return false;
+    }
 
-    if (bl_signature_is_required() == true) {
-        return (bl_signature_verify(BL_APP_START_ADDR, metadata->app_size, metadata->signature, BL_APP_METADATA_SIGNATURE_SIZE) == BL_STATUS_OK);
+    if (bl_signature_is_required() == true)
+    {
+        return (bl_signature_verify(BL_APP_START_ADDR, metadata->app_size,
+                                    metadata->signature, BL_APP_METADATA_SIGNATURE_SIZE) == BL_STATUS_OK);
     }
 
     return true;

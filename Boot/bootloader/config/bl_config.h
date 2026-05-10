@@ -23,14 +23,30 @@
 #error "Select BOOTLOADER_DEV or BOOTLOADER_RELEASE"
 #endif
 
-#if (BOOTLOADER_RELEASE != 0u)
-#undef BL_ENABLE_SIGNATURE_VERIFY
-#define BL_ENABLE_SIGNATURE_VERIFY       1u
-#else
+#ifndef BL_ENABLE_SECURE_BOOT
+#define BL_ENABLE_SECURE_BOOT            0u
+#endif
+
 #ifndef BL_ENABLE_SIGNATURE_VERIFY
 #define BL_ENABLE_SIGNATURE_VERIFY       0u
 #endif
+
+#if ((BOOTLOADER_DEV != 0u) && (BL_ENABLE_SECURE_BOOT != 0u))
+#error "Secure boot is only supported in Release builds"
 #endif
+
+#if ((BL_ENABLE_SECURE_BOOT != 0u) && (BOOTLOADER_RELEASE == 0u))
+#error "Secure boot requires BOOTLOADER_RELEASE"
+#endif
+
+#if ((BL_ENABLE_SECURE_BOOT != 0u) && (BL_ENABLE_SIGNATURE_VERIFY == 0u))
+#error "Secure boot requires signature verification"
+#endif
+
+#if ((BL_ENABLE_SIGNATURE_VERIFY != 0u) && ((BOOTLOADER_RELEASE == 0u) || (BL_ENABLE_SECURE_BOOT == 0u)))
+#error "Signature verification requires Release build with secure boot enabled"
+#endif
+
 #define BL_ENABLE_CHECKSUM_VERIFY        1u
 
 #define BL_PROTOCOL_VERSION              0x01u

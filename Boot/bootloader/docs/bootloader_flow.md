@@ -19,10 +19,10 @@ transport:
 3. Read the boot-mode input.
 4. If the input is asserted, remain in the bootloader and wait for flashing.
 5. If the input is not asserted, validate the installed application.
-   - For **Release** builds, the bootloader performs a full RSA-2048 / SHA-256
-     signature verification of the application image in flash.
-   - For **Development** builds, only the application marker and vector table
-     are verified.
+   - For **Release + Secure Boot** builds, the bootloader performs a full
+     RSA-2048 / SHA-256 signature verification of the application image in flash.
+   - For **Development** or **Release without Secure Boot**, only the metadata,
+     marker, app size, and vector table are verified.
 6. If the application is valid, jump to `BL_APP_START_ADDR`.
 7. If the application is missing, unavailable, unmarked, or invalid, remain in
    the bootloader and wait for flashing.
@@ -30,12 +30,12 @@ transport:
 > **Note on Boot Latency**: RSA-2048 signature verification on a large firmware
 > image (e.g. 1MB) can take several hundred milliseconds depending on the CPU
 > clock speed. This delay is expected and is a trade-off for mandatory boot
-> security in Release builds.
+> security when `SECURE_BOOT=ON`.
 
 Application validation requires:
 
 - valid metadata structure at `BL_APP_METADATA_ADDR` (CRC and marker check)
-- valid RSA-2048 signature of the image (Release only)
+- valid RSA-2048 signature of the image (Release + Secure Boot only)
 - valid application vector table at `BL_APP_START_ADDR`
 
 The default boot-mode input is active-low:
@@ -99,8 +99,8 @@ After a successful download, the boot path is:
 12. On startup, bootloader reads the boot-mode GPIO.
 13. If boot-mode GPIO is asserted, bootloader waits for flashing.
 14. If boot-mode GPIO is not asserted, bootloader checks the valid marker and metadata.
-15. For **Release** builds, the bootloader performs a full RSA-2048 signature
-    verification of the application image.
+15. For **Release + Secure Boot** builds, the bootloader performs a full
+    RSA-2048 signature verification of the application image.
 16. Bootloader validates the application vector table.
 17. If validation succeeds, bootloader jumps to `BL_APP_START_ADDR`.
 18. If any validation fails, bootloader waits for flashing.
@@ -148,7 +148,7 @@ Implemented:
 - GPIO boot-entry policy
 - UART transport receive state machine
 - Safe frame reception with dynamic bounds-checked buffers
-- Mandatory RSA signature verification on every boot (Release only)
+- Mandatory RSA signature verification on every boot (Release + Secure Boot only)
 
 Stubbed until hardware validation:
 

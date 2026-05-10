@@ -210,17 +210,28 @@ make release
 
 Release build behavior:
 
-- signature verification is enabled
-- the build injects an RSA-2048 public key into the firmware
-- **mandatory signature verification** is performed on every boot and reset
-  before jumping to the application
-- the bootloader computes SHA-256 incrementally while valid application bytes
-  are received and written during `DATA`
-- `DOWNLOAD_END` finalizes the digest and verifies the RSA signature before the
-  valid marker is written
+- optimized Release firmware is built
+- secure boot is disabled unless explicitly requested with `SECURE_BOOT=ON`
+- UART flashing, metadata CRC, valid marker, app-size, and vector-table checks still run
 
-> **Performance Note**: Release bootloader adds several hundred milliseconds
-> of boot latency due to mandatory full-image RSA signature verification.
+### Release bootloader with secure boot
+
+Use:
+
+```sh
+make release SECURE_BOOT=ON PUBLIC_KEY_PEM=../RSA_Key/public_key.pem
+```
+
+Secure boot behavior:
+
+- the build injects an RSA-2048 public key into the firmware
+- `BL_ENABLE_SECURE_BOOT=1u` and `BL_ENABLE_SIGNATURE_VERIFY=1u`
+- mandatory signature verification is performed on every boot and reset before jumping to the application
+- the bootloader computes SHA-256 incrementally while valid application bytes are received and written during `DATA`
+- `DOWNLOAD_END` finalizes the digest and verifies the RSA signature before the valid marker is written
+- if boot-time hash/signature verification fails, the bootloader does not jump and remains available for flashing
+
+> **Performance Note**: Secure boot adds boot latency due to full-image RSA signature verification.
 
 Public key details and override examples are documented in:
 
@@ -234,7 +245,7 @@ Release bootloader images do not parse PEM files on target. Instead, the host
 build converts a PEM public key into generated C constants that are compiled
 into `bootloader/security/bl_signature.c`.
 
-Default key path used by the release build:
+Default key path used by the secure Release build:
 
 ```text
 ../RSA_Key/public_key.pem
@@ -243,10 +254,10 @@ Default key path used by the release build:
 Override it when needed:
 
 ```sh
-make release PUBLIC_KEY_PEM=/path/to/public_key.pem
+make release SECURE_BOOT=ON PUBLIC_KEY_PEM=/path/to/public_key.pem
 ```
 
-If you replace the public key, you must rebuild and reflash the Release
+If you replace the public key, you must rebuild and reflash the secure Release
 bootloader, and all firmware packages must be signed by the matching private
 key.
 

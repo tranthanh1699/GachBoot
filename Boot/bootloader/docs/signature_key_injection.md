@@ -35,18 +35,33 @@ Behavior in Development build:
 make release
 ```
 
-This builds a release bootloader with signature verification enabled. The build
-converts the PEM public key into a generated C header before compiling
-`bl_signature.c`.
+This builds an optimized Release bootloader. Secure boot is disabled unless the
+user explicitly requests it.
 
-Behavior in Release build:
+Behavior in Release build without secure boot:
 
+- `BL_ENABLE_SECURE_BOOT=0u`
+- `BL_ENABLE_SIGNATURE_VERIFY=0u`
+- no public key is required
+- metadata CRC, valid marker, app-size, and vector-table checks still run
+
+To build a secure Release bootloader:
+
+```sh
+make release SECURE_BOOT=ON PUBLIC_KEY_PEM=../RSA_Key/public_key.pem
+```
+
+Behavior in Release build with secure boot:
+
+- `BL_ENABLE_SECURE_BOOT=1u`
 - `BL_ENABLE_SIGNATURE_VERIFY=1u`
-- RSA-2048 / SHA-256 signature verification is required.
+- RSA-2048 / SHA-256 signature verification is required on every boot
 - The SHA-256 digest is built incrementally while valid application bytes are
   received and written during `DATA` processing.
 - `DOWNLOAD_END` finalizes the digest and verifies the signature before marking
   the application valid.
+- On normal startup, the bootloader re-hashes the installed application using
+  `app_size` from metadata and verifies the stored signature before jumping.
 
 Default release key path:
 
@@ -57,7 +72,7 @@ Default release key path:
 Override the key path:
 
 ```sh
-make release PUBLIC_KEY_PEM=/path/to/public_key.pem
+make release SECURE_BOOT=ON PUBLIC_KEY_PEM=/path/to/public_key.pem
 ```
 
 Generated release key header:
@@ -78,11 +93,11 @@ build/Release/bl_rsa_public_key_generated.h
    or pass a custom path when building release:
 
 ```sh
-make release PUBLIC_KEY_PEM=/absolute/or/relative/path/to/public_key.pem
+make release SECURE_BOOT=ON PUBLIC_KEY_PEM=/absolute/or/relative/path/to/public_key.pem
 ```
 
-3. Run the release build. The host build converts the PEM file into generated C
-   constants and injects them into the bootloader build.
+3. Run the secure release build with `SECURE_BOOT=ON`. The host build converts
+   the PEM file into generated C constants and injects them into the bootloader build.
 4. Flash the resulting Release bootloader image to the target.
 5. Sign firmware packages using the matching private key.
 
@@ -122,18 +137,20 @@ The public key must be RSA-2048 with public exponent `65537`.
 The current CMake project implements the release flow in
 `bootloader/CMakeLists.txt`.
 
-Release builds require:
+Secure Release builds require:
 
 ```cmake
 target_compile_definitions(bootloader PRIVATE
+    BL_ENABLE_SECURE_BOOT=1u
     BL_ENABLE_SIGNATURE_VERIFY=1u
     BL_RSA_PUBLIC_KEY_HEADER="${CMAKE_BINARY_DIR}/bl_rsa_public_key_generated.h"
 )
 ```
 
-Development builds compile with:
+Development and non-secure Release builds compile with:
 
 ```cmake
+BL_ENABLE_SECURE_BOOT=0u
 BL_ENABLE_SIGNATURE_VERIFY=0u
 ```
 
