@@ -212,10 +212,15 @@ Release build behavior:
 
 - signature verification is enabled
 - the build injects an RSA-2048 public key into the firmware
+- **mandatory signature verification** is performed on every boot and reset
+  before jumping to the application
 - the bootloader computes SHA-256 incrementally while valid application bytes
   are received and written during `DATA`
 - `DOWNLOAD_END` finalizes the digest and verifies the RSA signature before the
   valid marker is written
+
+> **Performance Note**: Release bootloader adds several hundred milliseconds
+> of boot latency due to mandatory full-image RSA signature verification.
 
 Public key details and override examples are documented in:
 
@@ -300,7 +305,9 @@ Make sure the linker script does not place bootloader code inside the applicatio
 
 ### Change Flash Write Rules
 
-STM32H7 flash writes require 32-byte flash-word alignment. The bootloader enforces aligned non-final DATA chunks and pads the final flash write internally.
+STM32H7 flash writes require 32-byte flash-word alignment. The bootloader 
+uses `BL_PLATFORM_FLASH_WRITE_ALIGN` to define internal buffer sizes 
+for memory safety.
 
 Relevant files:
 

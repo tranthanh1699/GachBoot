@@ -23,8 +23,13 @@
 #error "Select BOOTLOADER_DEV or BOOTLOADER_RELEASE"
 #endif
 
+#if (BOOTLOADER_RELEASE != 0u)
+#undef BL_ENABLE_SIGNATURE_VERIFY
+#define BL_ENABLE_SIGNATURE_VERIFY       1u
+#else
 #ifndef BL_ENABLE_SIGNATURE_VERIFY
 #define BL_ENABLE_SIGNATURE_VERIFY       0u
+#endif
 #endif
 #define BL_ENABLE_CHECKSUM_VERIFY        1u
 

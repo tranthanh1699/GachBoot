@@ -4,6 +4,7 @@
 #include "bl_security_config.h"
 #include "bl_types.h"
 #include "bl_signature.h"
+#include "bl_hw_config.h"
 
 typedef enum
 {
@@ -34,7 +35,7 @@ typedef struct
     uint8_t signature_enabled;
     uint8_t package_header[10];
     uint8_t signature_header[10];
-    uint8_t write_buffer[32];
+    uint8_t write_buffer[BL_PLATFORM_FLASH_WRITE_ALIGN];
     uint8_t signature[BL_SIGNATURE_MAX_SIZE];
     bool app_header_valid;
     bool signature_header_valid;

@@ -1,5 +1,6 @@
 #include "bl_app_validate.h"
 #include "bl_memory_map.h"
+#include "bl_signature.h"
 
 #define BL_APP_METADATA_CRC32_INIT_VALUE 0xFFFFFFFFu
 #define BL_APP_METADATA_CRC32_POLY       0xEDB88320u
@@ -129,5 +130,11 @@ bool bl_app_validate_application(uint32_t app_address)
         return false;
     }
 
-    return bl_app_validate_vector_table(app_address);
+    if (bl_app_validate_vector_table(app_address) == false) { return false; }
+
+    if (bl_signature_is_required() == true) {
+        return (bl_signature_verify(BL_APP_START_ADDR, metadata->app_size, metadata->signature, BL_APP_METADATA_SIGNATURE_SIZE) == BL_STATUS_OK);
+    }
+
+    return true;
 }

@@ -24,6 +24,7 @@ During the build, the python script `bootloader/tools/rsa_public_key_from_pem.py
 ### 3. Flash the Release Bootloader
 Flash the compiled Release bootloader image (`Boot/build/Release/bootloader.elf` or `.bin`/`.hex`) to the STM32H7.
 - **Note**: The Release bootloader will *reject* unsigned firmware and development firmware.
+- **Boot Warning**: Every system reset will now trigger a full RSA-2048 verification. This adds a noticeable delay (latency) to the boot process before the application starts.
 
 ### 4. Create and Sign the Firmware Package
 Build your application firmware normally, then use the standalone Firmware Signing Tool to wrap your application in the signed package format. 
