@@ -40,7 +40,7 @@ signature bytes only.
 
 ## Tool Flow
 
-1. Load raw `.bin`, `.hex`, `.ihex`, or `.ihx`, or load a signed package.
+1. Load a signed package `.bin`.
 2. If signing, sign the app binary only with RSA-2048/SHA-256/PKCS#1 v1.5.
 3. Build the package as `[AppHeader][App Binary][SignatureHeader][Signature]`.
 4. Before flashing a package, validate app CRC32, signature section ID, signature
@@ -48,27 +48,42 @@ signature bytes only.
 5. Send `HELLO`.
 6. Send `START_SESSION`.
 7. Send `ERASE` and wait with the long erase timeout.
-8. Send `DOWNLOAD_START` with app size, app CRC32, target address, and signature.
-9. Send `DATA` frames containing only app binary bytes.
+8. Send `DOWNLOAD_START` with package size, package CRC32, target address, and
+   signature-enabled flag.
+9. Send `DATA` frames containing the complete signed package bytes.
 10. Send `DOWNLOAD_END`.
 11. Send `RESET` after `DOWNLOAD_END_RESPONSE` is OK.
 
-The package headers are never sent in `DATA` frames and are never programmed into
-application flash.
+The package headers and signature are sent to the bootloader, but are not
+programmed into the application flash area.
 
 ## Bootloader Flow
 
 1. `ERASE` clears the application flash and invalidates metadata.
-2. `DOWNLOAD_START` stores expected app size, app CRC32, target address, and
-   signature metadata in the session.
-3. `DATA` writes app bytes to flash and verifies each block by readback.
-4. `DOWNLOAD_END` checks total received bytes.
-5. `DOWNLOAD_END` calculates CRC32 over the app bytes in flash.
-6. Release bootloader verifies RSA-2048/SHA-256 signature over the app bytes in
+2. `DOWNLOAD_START` stores expected package size, package CRC32, target address,
+   and signature-enabled flag in the session.
+3. `DATA` bytes are parsed as `[AppHeader][App][SignatureHeader][Signature]`.
+4. The bootloader validates section IDs, sizes, and signature CRC32.
+5. The bootloader writes only app bytes to application flash and verifies
+   programmed data by readback.
+6. `DOWNLOAD_END` checks total received package bytes.
+7. `DOWNLOAD_END` calculates CRC32 over the app bytes in flash.
+8. Release bootloader verifies RSA-2048/SHA-256 signature over the app bytes in
    flash.
-7. Development bootloader skips signature verification.
-8. If validation succeeds, bootloader writes `BL_APP_VALID_MARKER`.
-9. Tool sends `RESET`; after reset, boot GPIO and app validation decide whether
+9. Development bootloader skips signature verification.
+10. If validation succeeds, bootloader writes metadata:
+
+```text
+BL_APP_METADATA_CRC_ADDR     : CRC32(valid marker + signature)
+BL_APP_VALID_MARKER_ADDR     : BL_APP_VALID_MARKER
+BL_APP_SIGNATURE_ADDR        : 256-byte signature
+```
+
+The valid marker is programmed last. If reset or power loss occurs during
+metadata programming, the application remains invalid unless the marker write
+completed.
+
+11. Tool sends `RESET`; after reset, boot GPIO and app validation decide whether
    to stay in bootloader or jump to the application.
 
 ## Build Variants
@@ -80,6 +95,7 @@ make dev
 ```
 
 - `BL_ENABLE_SIGNATURE_VERIFY=0u`
+- `BOOTLOADER_DEV=1u`
 - signature is not required
 - signature is not checked
 
@@ -90,6 +106,7 @@ make release PUBLIC_KEY_PEM=../RSA_Key/public_key.pem
 ```
 
 - `BL_ENABLE_SIGNATURE_VERIFY=1u`
+- `BOOTLOADER_RELEASE=1u`
 - a 256-byte signature is required
 - the public key is converted into `bl_rsa_public_key_generated.h`
 - signature verification failure prevents valid-marker write

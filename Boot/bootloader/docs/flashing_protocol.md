@@ -69,17 +69,17 @@ Package layout:
 
 The app header CRC32 covers only the app binary. The signature header CRC32
 covers only the signature bytes. The bootloader does not program either package
-header to flash.
+header or the signature into the application flash area.
 
-The flashing tool parses and validates this package on the PC, then maps it onto
-the UART protocol:
+The flashing tool validates this package on the PC, then sends the whole package
+to the bootloader:
 
-- `DOWNLOAD_START.Firmware Size` = app binary size
-- `DOWNLOAD_START.Firmware CRC32` = app binary CRC32
+- `DOWNLOAD_START.Firmware Size` = signed package size
+- `DOWNLOAD_START.Firmware CRC32` = signed package CRC32, reserved for transport/package diagnostics
 - `DOWNLOAD_START.Signature Enabled` = `1`
-- `DOWNLOAD_START.Signature Length` = `256`
-- `DOWNLOAD_START.Signature Data` = RSA signature bytes
-- `DATA` frames = app binary bytes only
+- `DOWNLOAD_START.Signature Length` = `0`
+- `DOWNLOAD_START.Signature Data` = empty
+- `DATA` frames = complete signed package bytes
 
 Signature algorithm:
 
@@ -198,9 +198,10 @@ Payload:
 | Signature Data | N |
 
 The bootloader rejects metadata if the target range is outside the configured application area.
-Release bootloaders also reject `DOWNLOAD_START` if the signature is missing or
-not exactly 256 bytes. Development bootloaders accept the metadata but do not
-verify the signature.
+Release bootloaders reject `DOWNLOAD_START` if `Signature Enabled` is not `1`.
+The actual 256-byte signature is parsed from the package stream, not from this
+payload. Development bootloaders accept the metadata but do not verify the
+signature.
 
 ## DATA
 
@@ -213,8 +214,10 @@ Payload:
 | Data Length | 2 |
 | Data | N |
 
-The bootloader accepts only the next expected block index and offset. Each accepted block is written and read back before the positive response.
-Each non-final DATA block must contain a 32-byte aligned data length. With the default 490-byte maximum payload, the recommended data size is 480 bytes per frame. The final DATA block may be shorter and is padded internally for STM32H7 flash-word programming.
+The bootloader accepts only the next expected block index and package offset.
+`DATA` contains the signed package stream. The bootloader parses the app header,
+writes only app bytes to flash, buffers app bytes internally for STM32H7
+32-byte flash-word programming, and verifies programmed app data by readback.
 
 Response payload:
 
@@ -233,10 +236,17 @@ Response payload:
 |---|---:|
 | Status | 1 |
 
-The bootloader verifies the full app CRC32 over flash before returning OK. In a
-Release bootloader, RSA/SHA-256 signature verification must also return OK.
+The bootloader verifies the app CRC32 from `AppHeader` over flash before
+returning OK. It also verifies the signature CRC32 from `SignatureHeader`.
+In a Release bootloader, RSA/SHA-256 signature verification must also return OK.
 Development bootloaders skip signature verification.
-After successful CRC/signature validation, the bootloader writes the application valid marker in the metadata area.
+After successful CRC/signature validation, the bootloader writes metadata:
+
+```text
+CRC32(valid marker + signature)
+Valid marker
+Signature
+```
 
 The flashing tool must not include the valid marker in the application image.
 For external factory flashing that bypasses this protocol, the factory process

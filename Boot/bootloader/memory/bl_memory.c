@@ -33,9 +33,9 @@ bl_status_t bl_memory_invalidate_application_marker(void)
     return bl_flash_invalidate_app_marker();
 }
 
-bl_status_t bl_memory_mark_application_valid(void)
+bl_status_t bl_memory_mark_application_valid(const uint8_t *signature, uint16_t signature_length)
 {
-    return bl_flash_mark_app_valid();
+    return bl_flash_mark_app_valid(signature, signature_length);
 }
 
 bl_status_t bl_memory_write(uint32_t address, const uint8_t *data, uint16_t length)

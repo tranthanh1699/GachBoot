@@ -15,6 +15,7 @@ class FirmwareImage:
         data: bytes,
         base_address: Optional[int] = None,
         signature: Optional[bytes] = None,
+        package_data: Optional[bytes] = None,
     ):
         self.data = data
         self.size = len(data)
@@ -22,6 +23,9 @@ class FirmwareImage:
         self.signature = signature
         self.base_address = base_address
         self.signature_crc32 = calculate_crc32(self.signature) if self.signature else None
+        self.package_data = package_data
+        self.package_size = len(package_data) if package_data is not None else len(data)
+        self.package_crc32 = calculate_crc32(package_data) if package_data is not None else self.crc32
 
     @classmethod
     def from_file(cls, file_path: str) -> 'FirmwareImage':
@@ -32,13 +36,13 @@ class FirmwareImage:
 
         with open(file_path, 'rb') as f:
             data = f.read()
-        
+
         package = cls._try_parse_signed_package(bytes(data))
         if package is None:
             raise ValueError("Invalid firmware structure. File must be a signed package [Header App] + [App] + [Header Sig] + [Sig].")
-        
+
         app_data, signature = package
-        return cls(app_data, signature=signature)
+        return cls(app_data, signature=signature, package_data=bytes(data))
 
     @staticmethod
     def _read_section_header(data: bytes, offset: int) -> tuple[int, int, int]:
@@ -59,7 +63,7 @@ class FirmwareImage:
             sig_header_offset = SECTION_HEADER_SIZE + app_size
             sig_offset = sig_header_offset + SECTION_HEADER_SIZE
             expected_size = sig_offset + SIGNATURE_SIZE
-            
+
             if len(data) != expected_size:
                 return None
 
@@ -92,10 +96,11 @@ class FirmwareImage:
         """
         Yields (block_index, offset, data_chunk)
         """
+        source = self.package_data if self.package_data is not None else self.data
         offset = 0
         block_index = 0
-        while offset < self.size:
-            chunk = self.data[offset : offset + max_data_per_frame]
+        while offset < len(source):
+            chunk = source[offset : offset + max_data_per_frame]
             yield block_index, offset, chunk
             offset += len(chunk)
             block_index += 1

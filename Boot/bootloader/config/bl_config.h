@@ -7,6 +7,22 @@
 #define BL_LOG_BACKEND_UART              0u
 #define BL_LOG_BACKEND_USB               0u
 
+#ifndef BOOTLOADER_DEV
+#define BOOTLOADER_DEV                   0u
+#endif
+
+#ifndef BOOTLOADER_RELEASE
+#define BOOTLOADER_RELEASE               0u
+#endif
+
+#if ((BOOTLOADER_DEV != 0u) && (BOOTLOADER_RELEASE != 0u))
+#error "Only one bootloader variant may be selected"
+#endif
+
+#if ((BOOTLOADER_DEV == 0u) && (BOOTLOADER_RELEASE == 0u))
+#error "Select BOOTLOADER_DEV or BOOTLOADER_RELEASE"
+#endif
+
 #ifndef BL_ENABLE_SIGNATURE_VERIFY
 #define BL_ENABLE_SIGNATURE_VERIFY       0u
 #endif

@@ -106,7 +106,7 @@ def test_flash_uses_aligned_non_final_data_chunks():
 
     assert progress_calls == [(224, 300), (300, 300)]
 
-def test_flash_sends_package_signature_in_download_start(tmp_path):
+def test_flash_sends_package_bytes_to_bootloader(tmp_path):
     transport = FakeTransport()
     client = ProtocolClient(transport)
     service = FlashService(client)
@@ -122,20 +122,25 @@ def test_flash_sends_package_signature_in_download_start(tmp_path):
     transport.open()
 
     signature = bytes(range(256))
+    package = FirmwareImage(b"app", signature=signature).to_signed_package()
     package_file = tmp_path / "app_signed_package.bin"
-    package_file.write_bytes(FirmwareImage(b"app", signature=signature).to_signed_package())
+    package_file.write_bytes(package)
 
     fw = FirmwareImage.from_file(str(package_file))
     service.flash_firmware(fw)
 
     frame = find_written_frame(transport, Command.DOWNLOAD_START)
     payload = frame[6:-2]
-    firmware_size, _, _, sig_enabled, sig_len = struct.unpack("<I I I B H", payload[:15])
+    package_size, _, _, sig_enabled, sig_len = struct.unpack("<I I I B H", payload[:15])
 
-    assert firmware_size == 3
+    assert package_size == len(package)
     assert sig_enabled == 1
-    assert sig_len == 256
-    assert payload[15:] == signature
+    assert sig_len == 0
+    assert payload[15:] == b""
+
+    data_frame = find_written_frame(transport, Command.DATA)
+    data_payload = data_frame[6:-2]
+    assert data_payload[10:] == package
 
 def test_protocol_client_uses_command_specific_timeout():
     class TimeoutRecordingTransport(FakeTransport):

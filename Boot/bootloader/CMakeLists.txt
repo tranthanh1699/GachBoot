@@ -66,6 +66,8 @@ if(BL_BOOTLOADER_VARIANT STREQUAL "Release")
     add_dependencies(bootloader bootloader_public_key)
 
     target_compile_definitions(bootloader PRIVATE
+        BOOTLOADER_RELEASE=1u
+        BOOTLOADER_DEV=0u
         BL_ENABLE_SIGNATURE_VERIFY=1u
         BL_RSA_PUBLIC_KEY_HEADER="${BL_GENERATED_PUBLIC_KEY_HEADER}"
     )
@@ -75,6 +77,8 @@ if(BL_BOOTLOADER_VARIANT STREQUAL "Release")
     )
 else()
     target_compile_definitions(bootloader PRIVATE
+        BOOTLOADER_DEV=1u
+        BOOTLOADER_RELEASE=0u
         BL_ENABLE_SIGNATURE_VERIFY=0u
     )
 endif()

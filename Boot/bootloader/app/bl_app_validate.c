@@ -1,6 +1,53 @@
 #include "bl_app_validate.h"
 #include "bl_memory_map.h"
 
+#define BL_APP_METADATA_CRC32_INIT_VALUE 0xFFFFFFFFu
+#define BL_APP_METADATA_CRC32_POLY       0xEDB88320u
+
+static uint32_t bl_app_metadata_crc32_update_byte(uint32_t crc, uint8_t data)
+{
+    uint8_t bit_index = 0u;
+
+    crc ^= (uint32_t)data;
+    for (bit_index = 0u; bit_index < 8u; bit_index++)
+    {
+        if ((crc & 1u) != 0u)
+        {
+            crc = (crc >> 1u) ^ BL_APP_METADATA_CRC32_POLY;
+        }
+        else
+        {
+            crc >>= 1u;
+        }
+    }
+
+    return crc;
+}
+
+static uint32_t bl_app_metadata_crc32_calculate(uint32_t marker, const uint8_t *signature)
+{
+    uint32_t crc = BL_APP_METADATA_CRC32_INIT_VALUE;
+    uint32_t index = 0u;
+    uint8_t marker_bytes[BL_APP_VALID_MARKER_SIZE];
+
+    marker_bytes[0] = (uint8_t)(marker & 0xFFu);
+    marker_bytes[1] = (uint8_t)((marker >> 8u) & 0xFFu);
+    marker_bytes[2] = (uint8_t)((marker >> 16u) & 0xFFu);
+    marker_bytes[3] = (uint8_t)((marker >> 24u) & 0xFFu);
+
+    for (index = 0u; index < BL_APP_VALID_MARKER_SIZE; index++)
+    {
+        crc = bl_app_metadata_crc32_update_byte(crc, marker_bytes[index]);
+    }
+
+    for (index = 0u; index < BL_APP_METADATA_SIGNATURE_SIZE; index++)
+    {
+        crc = bl_app_metadata_crc32_update_byte(crc, signature[index]);
+    }
+
+    return ~crc;
+}
+
 static bool bl_app_address_is_in_range(uint32_t address, uint32_t start_address, uint32_t size, bool allow_end)
 {
     uint32_t end_address = start_address + size;
@@ -79,9 +126,18 @@ bool bl_app_validate_vector_table(uint32_t app_address)
 
 bool bl_app_validate_application(uint32_t app_address)
 {
-    const uint32_t *metadata = (const uint32_t *)(uintptr_t)BL_APP_METADATA_ADDR;
+    const uint32_t *metadata_crc = (const uint32_t *)(uintptr_t)BL_APP_METADATA_CRC_ADDR;
+    const uint32_t *metadata_marker = (const uint32_t *)(uintptr_t)BL_APP_VALID_MARKER_ADDR;
+    const uint8_t *metadata_signature = (const uint8_t *)(uintptr_t)BL_APP_SIGNATURE_ADDR;
+    uint32_t calculated_crc = 0u;
 
-    if (metadata[0] != BL_APP_VALID_MARKER)
+    if (metadata_marker[0] != BL_APP_VALID_MARKER)
+    {
+        return false;
+    }
+
+    calculated_crc = bl_app_metadata_crc32_calculate(metadata_marker[0], metadata_signature);
+    if (metadata_crc[0] != calculated_crc)
     {
         return false;
     }

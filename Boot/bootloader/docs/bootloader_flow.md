@@ -50,15 +50,15 @@ Boards may change these macros to select another pin or active level.
 7. Bootloader erases the application area.
 8. Bootloader erases the metadata sector, clearing any previous valid marker.
 9. Tool sends `DOWNLOAD_START`.
-10. Bootloader validates firmware size, target range, checksum mode, and signature metadata.
+10. Bootloader validates package size, target range, checksum mode, and signature mode.
     - Development bootloader: signature metadata is accepted but not required.
-    - Release bootloader: a 256-byte RSA signature is required.
-11. Tool sends sequential `DATA` frames.
-12. Bootloader checks frame CRC16, block index, offset, application range, write result, and readback.
+    - Release bootloader: signature mode must be enabled.
+11. Tool sends sequential `DATA` frames containing the signed package stream.
+12. Bootloader parses `AppHeader`, writes only app bytes to flash, parses `SignatureHeader` and signature, checks frame CRC16, block index, offset, application range, write result, and readback.
 13. Tool sends `DOWNLOAD_END`.
-14. Bootloader verifies full CRC32.
+14. Bootloader verifies app CRC32 from `AppHeader` and signature CRC32 from `SignatureHeader`.
 15. Release bootloader verifies the RSA-2048/SHA-256 signature. Development bootloader skips this step.
-16. Bootloader writes the application valid marker.
+16. Bootloader stores metadata as CRC32, valid marker, and signature.
 17. Tool sends `RESET`.
 
 The application image does not contain the valid marker. The bootloader owns the
@@ -76,12 +76,13 @@ After a successful download, the boot path is:
 1. Tool sends all `DATA` frames.
 2. Bootloader writes each block to flash and verifies the block by readback.
 3. Tool sends `DOWNLOAD_END`.
-4. Bootloader checks that `bytes_received == firmware_size`.
-5. Bootloader calculates CRC32 over flash at `target_address`.
-6. Bootloader compares calculated CRC32 with the `DOWNLOAD_START` metadata.
+4. Bootloader checks that received package bytes match `DOWNLOAD_START` package size.
+5. Bootloader calculates CRC32 over app bytes in flash.
+6. Bootloader compares calculated CRC32 with `AppHeader.crc32`.
 7. Release bootloader verifies the signature over the app binary in flash.
    Development bootloader skips signature verification.
-8. Bootloader erases the metadata sector and writes `BL_APP_VALID_MARKER`.
+8. Bootloader erases the metadata sector, writes the signature, writes
+   `CRC32(valid marker + signature)`, and writes `BL_APP_VALID_MARKER` last.
 9. Bootloader sends `DOWNLOAD_END_RESPONSE`.
 10. Tool sends `RESET`.
 11. Bootloader resets the MCU.

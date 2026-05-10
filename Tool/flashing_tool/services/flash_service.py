@@ -12,7 +12,7 @@ FLASH_WRITE_ALIGN = 32
 class BootloaderInfo:
     def __init__(self, payload: bytes):
         # Expected length 18
-        (self.protocol_version, self.major, self.minor, self.patch, 
+        (self.protocol_version, self.major, self.minor, self.patch,
          self.capabilities, self.max_payload, self.app_start, self.app_max_size) = \
             struct.unpack("<BBBB I H I I", payload)
 
@@ -43,25 +43,22 @@ class FlashService:
     def download_start(self, firmware: FirmwareImage):
         if not self.boot_info:
             raise ValueError("Must call hello() before download_start()")
-        
+
         # Use firmware's base address if available (e.g. from HEX file),
         # otherwise use the bootloader's default app_start address.
         target_address = firmware.base_address if firmware.base_address is not None else self.boot_info.app_start
-        
+
         sig_enabled = 1 if firmware.signature else 0
-        sig_len = len(firmware.signature) if firmware.signature else 0
-        
-        # Firmware size: 4, CRC32: 4, Target: 4, SigEnabled: 1, SigLen: 2
-        payload = struct.pack("<I I I B H", 
-                              firmware.size, 
-                              firmware.crc32, 
+        sig_len = 0
+
+        # Package size: 4, Package CRC32: 4, Target: 4, SigEnabled: 1, SigLen: 2
+        payload = struct.pack("<I I I B H",
+                              firmware.package_size,
+                              firmware.package_crc32,
                               target_address,
                               sig_enabled,
                               sig_len)
-        
-        if firmware.signature:
-            payload += firmware.signature
-            
+
         rsp = self.client.request_response(Command.DOWNLOAD_START, payload)
         status = rsp.payload[0]
         if status != ErrorCode.OK:
@@ -74,7 +71,7 @@ class FlashService:
         rsp = self.client.request_response(Command.DATA, payload)
         status = rsp.payload[0]
         ack_index = struct.unpack("<I", rsp.payload[1:5])[0]
-        
+
         if status != ErrorCode.OK:
             raise ProtocolError(Command.DATA, ErrorCode(status))
         if ack_index != block_index:
@@ -105,18 +102,18 @@ class FlashService:
             self.start_session()
             self.erase()
             self.download_start(firmware)
-            
+
             # Non-final DATA blocks must preserve STM32H7 flash-word alignment.
             max_data_per_frame = self.boot_info.max_payload - DATA_HEADER_SIZE
             max_chunk = max_data_per_frame - (max_data_per_frame % FLASH_WRITE_ALIGN)
             if max_chunk <= 0:
                 raise ValueError("Bootloader max payload is too small for aligned DATA frames")
-            
+
             for block_index, offset, chunk in firmware.get_chunks(max_chunk):
                 self.send_data(block_index, offset, chunk)
                 if progress_callback:
-                    progress_callback(offset + len(chunk), firmware.size)
-            
+                    progress_callback(offset + len(chunk), firmware.package_size)
+
             self.download_end()
             self.reset()
         except Exception as e:

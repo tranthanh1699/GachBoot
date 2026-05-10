@@ -148,7 +148,6 @@ static bl_status_t bl_command_handle_data(bl_session_t *session, const bl_frame_
     uint32_t block_index;
     uint32_t target_offset;
     uint16_t data_length;
-    uint32_t write_address;
     bl_status_t status;
 
     if (request->length < 10u)
@@ -167,32 +166,17 @@ static bl_status_t bl_command_handle_data(bl_session_t *session, const bl_frame_
         return BL_STATUS_ERROR;
     }
 
-    status = bl_session_validate_block(session, block_index, target_offset, data_length);
+    status = bl_session_process_block(session, block_index, target_offset, &request->payload[10], data_length);
     if (status != BL_STATUS_OK)
     {
-        bl_command_build_error(request->command, request->sequence, BL_ERROR_INVALID_SEQUENCE, response);
-        return status;
-    }
-
-    write_address = session->target_address + target_offset;
-    status = bl_memory_write(write_address, &request->payload[10], data_length);
-    if (status != BL_STATUS_OK)
-    {
-        bl_command_build_error(request->command, request->sequence, BL_ERROR_FLASH_WRITE_FAILED, response);
-        return status;
-    }
-
-    status = bl_memory_verify(write_address, &request->payload[10], data_length);
-    if (status != BL_STATUS_OK)
-    {
-        bl_command_build_error(request->command, request->sequence, BL_ERROR_FLASH_VERIFY_FAILED, response);
-        return status;
-    }
-
-    status = bl_session_commit_block(session, data_length);
-    if (status != BL_STATUS_OK)
-    {
-        bl_command_build_error(request->command, request->sequence, BL_ERROR_INTERNAL, response);
+        if (status == BL_STATUS_IO)
+        {
+            bl_command_build_error(request->command, request->sequence, BL_ERROR_FLASH_WRITE_FAILED, response);
+        }
+        else
+        {
+            bl_command_build_error(request->command, request->sequence, BL_ERROR_INVALID_SEQUENCE, response);
+        }
         return status;
     }
 

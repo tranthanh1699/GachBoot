@@ -19,6 +19,13 @@
 #define BL_APP_MAX_SIZE                  (128 * 1024u * 7)  // Maximum size of the application (7 banks of 128 KB each)
 #define BL_APP_METADATA_ADDR             0x081E0000u        // Address of the application metadata located at the end of bank 7
 
+#define BL_APP_METADATA_CRC_ADDR         BL_APP_METADATA_ADDR
+#define BL_APP_VALID_MARKER_ADDR         (BL_APP_METADATA_ADDR + 0x20u)
+#define BL_APP_SIGNATURE_ADDR            (BL_APP_METADATA_ADDR + 0x40u)
+#define BL_APP_METADATA_CRC_SIZE         4u
+#define BL_APP_VALID_MARKER_SIZE         4u
+#define BL_APP_METADATA_SIGNATURE_SIZE   256u
+
 #define BL_APP_VALID_MARKER              0x47424C56u
 
 #endif /* BL_MEMORY_MAP_H */
