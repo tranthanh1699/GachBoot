@@ -45,13 +45,6 @@
     0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u           \
 }
 
-typedef struct
-{
-    uint64_t bit_count;
-    uint32_t state[8];
-    uint8_t buffer[BL_SHA256_BLOCK_SIZE];
-    uint32_t buffer_length;
-} bl_sha256_ctx_t;
 
 typedef struct
 {
@@ -187,7 +180,7 @@ static void bl_sha256_transform(bl_sha256_ctx_t *ctx, const uint8_t *block)
     ctx->state[7] += h;
 }
 
-static void bl_sha256_init(bl_sha256_ctx_t *ctx)
+void bl_sha256_init(bl_sha256_ctx_t *ctx)
 {
     uint32_t index = 0u;
 
@@ -205,7 +198,7 @@ static void bl_sha256_init(bl_sha256_ctx_t *ctx)
     }
 }
 
-static void bl_sha256_update(bl_sha256_ctx_t *ctx, const uint8_t *data, uint32_t length)
+void bl_sha256_update(bl_sha256_ctx_t *ctx, const uint8_t *data, uint32_t length)
 {
     uint32_t index = 0u;
 
@@ -225,7 +218,7 @@ static void bl_sha256_update(bl_sha256_ctx_t *ctx, const uint8_t *data, uint32_t
     }
 }
 
-static void bl_sha256_final(bl_sha256_ctx_t *ctx, uint8_t *digest)
+void bl_sha256_final(bl_sha256_ctx_t *ctx, uint8_t *digest)
 {
     uint32_t index = 0u;
 
@@ -482,6 +475,38 @@ bl_status_t bl_signature_verify(uint32_t firmware_address, uint32_t firmware_siz
     bl_sha256_init(&sha_ctx);
     bl_sha256_update(&sha_ctx, firmware, firmware_size);
     bl_sha256_final(&sha_ctx, digest);
+
+    if (bl_rsa_verify_sha256(&bl_rsa_public_key, signature, digest) == false)
+    {
+        return BL_STATUS_ERROR;
+    }
+
+    return BL_STATUS_OK;
+#endif
+}
+
+bl_status_t bl_signature_verify_digest(const uint8_t *digest, const uint8_t *signature, uint16_t signature_length)
+{
+#if (BL_ENABLE_SIGNATURE_VERIFY == 0u)
+    (void)digest;
+    (void)signature;
+    (void)signature_length;
+    return BL_STATUS_OK;
+#else
+    if ((digest == (const uint8_t *)0) || (signature == (const uint8_t *)0))
+    {
+        return BL_STATUS_PARAM;
+    }
+
+    if (signature_length != BL_RSA_2048_BYTES)
+    {
+        return BL_STATUS_PARAM;
+    }
+
+    if (bl_rsa_key_is_configured(&bl_rsa_public_key) == false)
+    {
+        return BL_STATUS_NOT_SUPPORTED;
+    }
 
     if (bl_rsa_verify_sha256(&bl_rsa_public_key, signature, digest) == false)
     {

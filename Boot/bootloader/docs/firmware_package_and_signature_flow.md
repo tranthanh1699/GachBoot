@@ -67,9 +67,8 @@ programmed into the application flash area.
 5. The bootloader writes only app bytes to application flash and verifies
    programmed data by readback.
 6. `DOWNLOAD_END` checks total received package bytes.
-7. `DOWNLOAD_END` calculates CRC32 over the app bytes in flash.
-8. Release bootloader verifies RSA-2048/SHA-256 signature over the app bytes in
-   flash.
+7. `DOWNLOAD_END` calculates CRC32 over the app bytes.
+8. Release bootloader verifies the streaming RSA-2048/SHA-256 signature calculated incrementally during flash programming.
 9. Development bootloader skips signature verification.
 10. If validation succeeds, bootloader writes metadata:
 

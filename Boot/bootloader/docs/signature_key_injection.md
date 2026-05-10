@@ -5,25 +5,48 @@ during the build and inject the generated macros into `bl_signature.c`.
 
 ## Project Build Targets
 
-The repository root `Makefile` provides two bootloader build modes:
+The repository root `Makefile` provides two bootloader build modes.
+
+### Development bootloader
 
 ```sh
 make dev
 ```
 
-Builds the development bootloader with signature verification disabled:
+This builds a development bootloader with signature verification disabled:
 
 ```c
 BL_ENABLE_SIGNATURE_VERIFY=0u
 ```
 
+Use this build while bringing up the board, validating UART flashing, or testing
+unsigned packages.
+
+Behavior in Development build:
+
+- RSA signature verification is skipped.
+- The bootloader still parses the signed package structure.
+- CRC and protocol checks still run.
+- `DOWNLOAD_END` does not require a configured RSA public key.
+
+### Release bootloader
+
 ```sh
 make release
 ```
 
-Builds the release bootloader with signature verification enabled. The release
-build converts the PEM public key into a generated C header before compiling
+This builds a release bootloader with signature verification enabled. The build
+converts the PEM public key into a generated C header before compiling
 `bl_signature.c`.
+
+Behavior in Release build:
+
+- `BL_ENABLE_SIGNATURE_VERIFY=1u`
+- RSA-2048 / SHA-256 signature verification is required.
+- The SHA-256 digest is built incrementally while valid application bytes are
+  received and written during `DATA` processing.
+- `DOWNLOAD_END` finalizes the digest and verifies the signature before marking
+  the application valid.
 
 Default release key path:
 
@@ -34,7 +57,7 @@ Default release key path:
 Override the key path:
 
 ```sh
-make release PUBLIC_KEY_PEM=/path/to/publickey.pem
+make release PUBLIC_KEY_PEM=/path/to/public_key.pem
 ```
 
 Generated release key header:
@@ -42,6 +65,30 @@ Generated release key header:
 ```text
 build/Release/bl_rsa_public_key_generated.h
 ```
+
+## How To Add Or Replace The Bootloader Public Key
+
+1. Generate or obtain an RSA-2048 public key in PEM format.
+2. Place the PEM file at the default location:
+
+```text
+../RSA_Key/public_key.pem
+```
+
+   or pass a custom path when building release:
+
+```sh
+make release PUBLIC_KEY_PEM=/absolute/or/relative/path/to/public_key.pem
+```
+
+3. Run the release build. The host build converts the PEM file into generated C
+   constants and injects them into the bootloader build.
+4. Flash the resulting Release bootloader image to the target.
+5. Sign firmware packages using the matching private key.
+
+If the public key changes, you must rebuild and reflash the Release bootloader.
+Firmware signed by an old private key will no longer verify against the new
+public key.
 
 ## Generic Makefile Pattern
 

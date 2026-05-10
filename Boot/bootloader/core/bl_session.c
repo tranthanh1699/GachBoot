@@ -253,6 +253,7 @@ bl_status_t bl_session_set_metadata(bl_session_t *session, uint32_t package_size
     (void)signature;
     (void)signature_length;
 
+    bl_sha256_init(&session->sha256_ctx);
     session->state = BL_SESSION_STATE_DOWNLOAD;
     return BL_STATUS_OK;
 }
@@ -327,6 +328,10 @@ static bl_status_t bl_session_flush_app_buffer(bl_session_t *session, bool final
     if ((final_flush == false) && (session->write_buffer_length < BL_PLATFORM_FLASH_WRITE_ALIGN))
     {
         return BL_STATUS_OK;
+    }
+
+    if (session->signature_enabled) {
+        bl_sha256_update(&session->sha256_ctx, session->write_buffer, session->write_buffer_length);
     }
 
     write_address = session->target_address + session->app_bytes_written;
@@ -519,6 +524,7 @@ bl_status_t bl_session_process_block(bl_session_t *session, uint32_t block_index
 
 bl_status_t bl_session_finalize(bl_session_t *session)
 {
+    uint8_t digest[BL_SHA256_DIGEST_SIZE];
     uint32_t calculated_crc32;
     uint32_t calculated_signature_crc32;
     bl_status_t signature_status;
@@ -569,8 +575,8 @@ bl_status_t bl_session_finalize(bl_session_t *session)
 
     if (bl_signature_is_required() == true)
     {
-        signature_status = bl_signature_verify(session->target_address, session->app_size,
-                                               session->signature, session->signature_length);
+        bl_sha256_final(&session->sha256_ctx, digest);
+        signature_status = bl_signature_verify_digest(digest, session->signature, session->signature_length);
         if (signature_status != BL_STATUS_OK)
         {
             return signature_status;

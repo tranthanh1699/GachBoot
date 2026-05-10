@@ -181,6 +181,70 @@ Required tools:
 
 If CMake reports that Ninja or `arm-none-eabi-gcc` is missing, install the ARM GCC toolchain and Ninja, or update `CMakePresets.json` and `cmake/gcc-arm-none-eabi.cmake` for your local environment.
 
+## Development vs Release Bootloader
+
+The bootloader supports two security modes.
+
+### Development bootloader
+
+Use the repository root target:
+
+```sh
+make dev
+```
+
+Development build behavior:
+
+- signature verification is disabled
+- UART flashing flow still runs normally
+- package structure, protocol, and checksum checks still run
+- useful for board bring-up and unsigned test images
+
+### Release bootloader
+
+Use the repository root target:
+
+```sh
+make release
+```
+
+Release build behavior:
+
+- signature verification is enabled
+- the build injects an RSA-2048 public key into the firmware
+- the bootloader computes SHA-256 incrementally while valid application bytes
+  are received and written during `DATA`
+- `DOWNLOAD_END` finalizes the digest and verifies the RSA signature before the
+  valid marker is written
+
+Public key details and override examples are documented in:
+
+```text
+bootloader/docs/signature_key_injection.md
+```
+
+## Public Key Injection Summary
+
+Release bootloader images do not parse PEM files on target. Instead, the host
+build converts a PEM public key into generated C constants that are compiled
+into `bootloader/security/bl_signature.c`.
+
+Default key path used by the release build:
+
+```text
+../RSA_Key/public_key.pem
+```
+
+Override it when needed:
+
+```sh
+make release PUBLIC_KEY_PEM=/path/to/public_key.pem
+```
+
+If you replace the public key, you must rebuild and reflash the Release
+bootloader, and all firmware packages must be signed by the matching private
+key.
+
 ## Host Checks
 
 Some bootloader protocol code can be checked on host GCC:
@@ -307,3 +371,4 @@ Do not add MCU register access to `core/`, `protocol/`, `transport/`, or `securi
 - Avoid dynamic allocation in bootloader runtime paths.
 - Avoid logging on the protocol UART during flashing.
 - Run focused tests before committing.
+- `bootloader/docs/release_checklist.md`

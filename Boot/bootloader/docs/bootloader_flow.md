@@ -77,9 +77,9 @@ After a successful download, the boot path is:
 2. Bootloader writes each block to flash and verifies the block by readback.
 3. Tool sends `DOWNLOAD_END`.
 4. Bootloader checks that received package bytes match `DOWNLOAD_START` package size.
-5. Bootloader calculates CRC32 over app bytes in flash.
+5. Bootloader calculates application CRC32.
 6. Bootloader compares calculated CRC32 with `AppHeader.crc32`.
-7. Release bootloader verifies the signature over the app binary in flash.
+7. Release bootloader verifies the streaming RSA-2048/SHA-256 signature calculated incrementally during flash programming.
    Development bootloader skips signature verification.
 8. Bootloader erases the metadata sector, writes the signature, writes
    `CRC32(valid marker + signature)`, and writes `BL_APP_VALID_MARKER` last.

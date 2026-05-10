@@ -3,6 +3,7 @@
 
 #include "bl_security_config.h"
 #include "bl_types.h"
+#include "bl_signature.h"
 
 typedef enum
 {
@@ -38,6 +39,7 @@ typedef struct
     bool app_header_valid;
     bool signature_header_valid;
     bl_session_state_t state;
+    bl_sha256_ctx_t sha256_ctx;
 } bl_session_t;
 
 void bl_session_init(bl_session_t *session);
