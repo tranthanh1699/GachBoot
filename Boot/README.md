@@ -297,7 +297,7 @@ Do not add MCU register access to `core/`, `protocol/`, `transport/`, or `securi
 
 - Hardware flash erase/write and multi-bank support are implemented but should be validated on specific H7 variants.
 - USB CDC is initialized but not used as a transport.
-- Application metadata currently stores only the valid marker and entry point information.
+- Application metadata stores a metadata CRC32, valid marker, and 256-byte RSA signature.
 
 ## Development Rules
 

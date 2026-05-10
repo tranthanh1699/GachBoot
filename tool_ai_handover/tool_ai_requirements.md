@@ -91,6 +91,6 @@ At minimum, Tool AI must add tests for:
 ## Out of Scope for First Tool Milestone
 
 - Real cryptographic signing UI.
-- Firmware package format beyond raw `.bin`.
+- Firmware package formats beyond signed-package `.bin`.
 - Vendor-specific flashing outside this custom protocol.
 - Replacing CubeIDE or building firmware.

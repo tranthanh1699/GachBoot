@@ -134,9 +134,9 @@ Current default:
 ```text
 Bootloader start: 0x08000000
 Bootloader size : 0x00020000
-App start       : 0x08020000
-App max size    : 0x001C0000
-Metadata addr   : 0x081FF000
+App start       : 0x08100000
+App max size    : 0x000E0000
+Metadata addr   : 0x081E0000
 ```
 
 Valid stack pointer ranges include STM32H743 DTCM, AXI SRAM, SRAM1/2/3, and SRAM4.
@@ -185,13 +185,13 @@ It supports:
 
 - serial port connection
 - firmware selection
-- `.bin` and `.hex` firmware loading
+- signed-package `.bin` firmware loading
 - CRC32 calculation
 - protocol frame encode/decode
 - high-level flashing flow
 - progress and log UI
 - fake transport for tests
-- optional signing extension points
+- RSA-2048 signing and package creation scripts
 
 ### Flashing Tool Structure
 
@@ -200,9 +200,9 @@ Tool/flashing_tool/
 ├── app/
 │   └── main.py              Qt application entry point
 ├── firmware/
-│   ├── firmware_image.py    Loads .bin/.hex and prepares firmware data
+│   ├── firmware_image.py    Loads signed-package .bin files and prepares firmware data
 │   ├── checksum.py          CRC32 calculation
-│   └── signer.py            Signing extension point
+│   └── signer.py            RSA-2048 signing helper
 ├── protocol/
 │   ├── commands.py          Command IDs
 │   ├── errors.py            Protocol error codes
@@ -250,7 +250,7 @@ Basic use:
 1. Select the MCU COM/TTY port and baudrate.
 2. Click connect.
 3. The tool sends `HELLO` and displays bootloader information.
-4. Select a `.bin` or `.hex` firmware file.
+4. Select a signed-package `.bin` firmware file.
 5. Click flash.
 6. The tool sends `START_SESSION`, `ERASE`, `DOWNLOAD_START`, `DATA`, and `DOWNLOAD_END`.
 7. Check progress and logs for the final result.

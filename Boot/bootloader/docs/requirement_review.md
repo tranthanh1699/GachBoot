@@ -29,7 +29,7 @@ Initial implementation scope:
 ## Open Questions
 
 - Final bootloader flash size and linker partition should be confirmed against the production memory map.
-- App metadata currently stores only the valid marker word and entry point info; any expanded metadata layout still needs final definition.
+- App metadata layout is defined as metadata CRC32, valid marker, and 256-byte RSA signature; production must still confirm that this layout is suitable for factory programming and field recovery.
 - Boot entry policy now uses a configurable GPIO boot-mode request; timeout or software-flag entry modes remain open extensions.
 - Board owner must confirm the selected boot-mode GPIO pin, pull direction, and active level.
 - Public key storage policy uses a compiled-in header generated from a PEM file.

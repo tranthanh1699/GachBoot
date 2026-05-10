@@ -1,6 +1,6 @@
 # GachBoot Flashing Tool
 
-A lightweight, modular Python + Qt6 application designed for flashing application firmware over UART. It implements the custom GachBoot protocol and supports features like RSA firmware signing and automatic Intel HEX to Binary conversion.
+A lightweight, modular Python + Qt6 application designed for flashing signed application firmware packages over UART. It implements the custom GachBoot protocol and supports RSA-2048 firmware signing.
 
 ---
 
@@ -13,7 +13,7 @@ flashing_tool/
 ├── app/
 │   └── main.py              # Entry point. Initializes the Qt application.
 ├── firmware/
-│   ├── firmware_image.py    # Loads .bin/.hex/.ihex/.ihx, calculates CRC32, and handles signing.
+│   ├── firmware_image.py    # Loads signed-package .bin files and validates section CRC32 values.
 │   ├── checksum.py          # CRC32 calculation logic.
 │   └── signer.py            # RSA-2048 signing implementation using the 'cryptography' library.
 ├── protocol/
@@ -59,17 +59,17 @@ flashing_tool/
     python app/main.py
     ```
 2.  **Connection**: Select your MCU's COM/TTY port and baudrate (default 115200). Click **Connect**. The tool sends a `HELLO` command; if successful, it displays the bootloader version.
-3.  **Firmware**: Browse for a raw `.bin`, `.hex`, `.ihex`, `.ihx`, or signed package `.bin` file.
-    - If you select a HEX file, the tool automatically extracts the **Base Address** from the file.
-    - If you select a BIN file, the tool uses the default `app_start` address provided by the bootloader.
-    - If you select a signed package, the tool validates the package CRCs and sends only the app bytes in `DATA`.
-4.  **Security**: For Release bootloaders, flash a signed package or check **Sign Firmware** and select your RSA-2048 private key (`.pem`). The tool sends the signature during the `DOWNLOAD_START` phase.
+3.  **Firmware**: Browse for a signed package `.bin` file.
+    - The package layout is `[10-byte AppHeader] [App Binary] [10-byte SignatureHeader] [256-byte Signature]`.
+    - The tool validates the package CRCs before flashing.
+    - The tool uses the default `app_start` address provided by the bootloader unless the loaded firmware model has an explicit base address.
+4.  **Security**: For Release bootloaders, flash a signed package. The actual 256-byte signature is part of the package stream sent in `DATA`; `DOWNLOAD_START` sends package metadata with signature length `0`.
 5.  **Flash**: Click **Flash**. The tool will automatically ERASE the target area, send DATA blocks, and verify the result.
 
 ### CLI Shortcuts
 You can pre-fill the firmware path by passing it as a command-line argument:
 ```bash
-python app/main.py path/to/your/firmware.hex
+python app/main.py path/to/app_signed_package.bin
 ```
 
 ---
@@ -109,7 +109,7 @@ python scripts/sign_firmware.py --inspect app_signed_package.bin
 Legacy form is still accepted and now writes a signed package:
 
 ```bash
-python scripts/sign_firmware.py sign <firmware.bin|.hex> <private_key.pem> --output app_signed_package.bin
+python scripts/sign_firmware.py sign <firmware.bin> <private_key.pem> --output app_signed_package.bin
 ```
 
 ---

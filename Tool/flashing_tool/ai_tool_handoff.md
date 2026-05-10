@@ -29,10 +29,10 @@ Develop a Python + Qt6 flashing tool for a custom UART bootloader. The tool is n
 - Implemented **Milestone TOOL-2 (Firmware Model)**:
   - CRC32 calculation.
   - Firmware image loading and chunking.
-  - **Intel HEX support**: Automatic conversion from .hex, .ihex, .ihx to binary using `intelhex`. Automatically extracts and uses the base address from the HEX file as the target flash address.
+  - Signed-package `.bin` loading with application and signature section CRC validation.
   - Support for passing firmware file path as a CLI argument to the GUI.
   - **Automation Scripts**: Added `sign_firmware.sh` and `scripts/sign_firmware.py` for headless key generation and firmware signing.
-  - Unit tests for firmware model including hex loading.
+  - Unit tests for firmware model including signed-package loading and rejection of unsupported file formats.
 - Implemented **Milestone TOOL-3 (Serial Transport)**:
   - Base `Transport` abstraction.
   - `SerialTransport` using `pyserial`.
@@ -51,7 +51,7 @@ Develop a Python + Qt6 flashing tool for a custom UART bootloader. The tool is n
 - Implemented **Firmware Signing**:
   - `cryptography` requirement added.
   - `FirmwareSigner` implementation with RSA-2048.
-  - `DOWNLOAD_START` updated to send RSA signature bytes (256 bytes).
+  - `DOWNLOAD_START` sends signed-package metadata with signature length `0`; the 256-byte RSA signature is sent as part of the package stream in `DATA`.
 - **Bootloader Integration Fixes**:
   - Synced tool frame payload limit to `BL_FRAME_MAX_PAYLOAD_SIZE` (`490`) in the bootloader.
   - Increased `BL_SIGNATURE_MAX_SIZE` to 256 in bootloader.
@@ -83,7 +83,7 @@ Develop a Python + Qt6 flashing tool for a custom UART bootloader. The tool is n
 - Progress calculation: Based on acknowledged blocks.
 - Threading: Flashing runs in a background thread; UI updates must use signals.
 - Max Payload: 490 bytes for both tool and bootloader.
-- DATA chunking: `max_payload - 10` rounded down to the 32-byte flash write alignment. With the default 490-byte payload, DATA carries 480 firmware bytes per frame.
+- DATA chunking: `max_payload - 10` rounded down to the 32-byte flash write alignment. With the default 490-byte payload, DATA carries 480 signed-package bytes per frame.
 - Response timeouts: command-specific; `ERASE` uses 30000 ms and `DOWNLOAD_END` uses 10000 ms.
 
 ---

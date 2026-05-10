@@ -1,12 +1,16 @@
 import sys
 import os
 import argparse
+import struct
 
 # Add parent directory to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from firmware.firmware_image import FirmwareImage
-from firmware.signer import FirmwareSigner
+
+APP_SECTION_ID = 0xA501
+SIGNATURE_SECTION_ID = 0x5A02
+SECTION_HEADER_FORMAT = "<HII"
 
 def parse_u16(value: str) -> int:
     parsed = int(value, 0)
@@ -25,15 +29,38 @@ def inspect_package(path: str) -> None:
         print(f"Signature size: {len(fw.signature)} bytes")
         print(f"Signature CRC32: 0x{fw.signature_crc32:08X}")
 
+def read_application_binary(path: str) -> bytes:
+    _, ext = os.path.splitext(path.lower())
+    if ext != ".bin":
+        raise ValueError("Only raw .bin application images can be signed")
+
+    with open(path, "rb") as f:
+        data = f.read()
+
+    if not data:
+        raise ValueError("Input application binary is empty")
+
+    return data
+
+def build_signed_package(app_data: bytes, signature: bytes, app_id: int, signature_id: int) -> bytes:
+    fw = FirmwareImage(app_data, signature=signature)
+    app_header = struct.pack(SECTION_HEADER_FORMAT, app_id, fw.size, fw.crc32)
+    sig_header = struct.pack(SECTION_HEADER_FORMAT, signature_id, len(signature), fw.signature_crc32)
+    return app_header + app_data + sig_header + signature
+
 def write_signed_package(args: argparse.Namespace) -> None:
     if not os.path.exists(args.input):
         raise FileNotFoundError(f"Firmware file not found: {args.input}")
     if not os.path.exists(args.private_key):
         raise FileNotFoundError(f"Private key file not found: {args.private_key}")
 
+    app_data = read_application_binary(args.input)
+    from firmware.signer import FirmwareSigner
+
     signer = FirmwareSigner(args.private_key)
-    fw = FirmwareImage.from_file(args.input, signer)
-    package = fw.to_signed_package(args.app_id, args.signature_id)
+    signature = signer.sign(app_data)
+    package = build_signed_package(app_data, signature, args.app_id, args.signature_id)
+    fw = FirmwareImage(app_data, signature=signature)
 
     with open(args.output, "wb") as f:
         f.write(package)
@@ -59,7 +86,7 @@ def main():
 
     # Sign command
     sign_parser = subparsers.add_parser("sign", help="Sign a firmware file")
-    sign_parser.add_argument("firmware", help="Path to firmware file (.bin or .hex)")
+    sign_parser.add_argument("firmware", help="Path to raw application firmware file (.bin)")
     sign_parser.add_argument("key", help="Path to RSA private key (.pem)")
     sign_parser.add_argument("--output", "-o", help="Output signed package path (default: <firmware>.signed.bin)")
 
@@ -100,17 +127,17 @@ def main():
         output_path = args.output if args.output else args.firmware + ".signed.bin"
 
         try:
-            signer = FirmwareSigner(args.key)
-            fw = FirmwareImage.from_file(args.firmware, signer)
+            from firmware.signer import FirmwareSigner
 
-            if fw.signature:
-                with open(output_path, "wb") as f:
-                    f.write(fw.to_signed_package())
-                print(f"Successfully signed {args.firmware}")
-                print(f"Signed package saved to: {output_path}")
-            else:
-                print("Error: Failed to generate signature.")
-                sys.exit(1)
+            signer = FirmwareSigner(args.key)
+            app_data = read_application_binary(args.firmware)
+            signature = signer.sign(app_data)
+            package = build_signed_package(app_data, signature, APP_SECTION_ID, SIGNATURE_SECTION_ID)
+
+            with open(output_path, "wb") as f:
+                f.write(package)
+            print(f"Successfully signed {args.firmware}")
+            print(f"Signed package saved to: {output_path}")
 
         except Exception as e:
             print(f"Error: {e}")
@@ -118,6 +145,8 @@ def main():
 
     elif args.command == "keygen":
         try:
+            from firmware.signer import FirmwareSigner
+
             print(f"Generating RSA-2048 key pair...")
             FirmwareSigner.generate_keys(args.priv, args.pub)
             print(f"Private key: {args.priv}")

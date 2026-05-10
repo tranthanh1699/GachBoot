@@ -32,4 +32,4 @@ Read this handover folder first, then use the bootloader docs above as the proto
 The bootloader protocol, frame codec, session handling, and UART receive path are fully implemented.
 STM32H7 flash erase/write, multi-bank support, and firmware signature verification (RSA-2048 SHA-256) are also implemented and ready for hardware validation.
 
-The tool implements the full protocol flow, including `HELLO`, `START_SESSION`, `ERASE`, `DOWNLOAD_START` (with optional signature), `DATA` chunks, and `DOWNLOAD_END`.
+The tool implements the full protocol flow, including `HELLO`, `START_SESSION`, `ERASE`, `DOWNLOAD_START`, signed-package `DATA` chunks, and `DOWNLOAD_END`.
